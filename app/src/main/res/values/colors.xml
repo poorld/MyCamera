@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- 相机应用主题色 -->
+    <color name="camera_primary">#2196F3</color>
+    <color name="camera_primary_dark">#1976D2</color>
+    <color name="camera_accent">#FF4081</color>
+
+    <!-- 按钮颜色 -->
+    <color name="capture_button">#4CAF50</color>
+    <color name="capture_button_pressed">#388E3C</color>
+    <color name="record_button">#F44336</color>
+    <color name="record_button_pressed">#D32F2F</color>
+    <color name="record_button_recording">#FF5722</color>
+
+    <!-- 背景和覆盖层 -->
+    <color name="overlay_background">#80000000</color>
+    <color name="control_background">#E0000000</color>
+    <color name="status_background">#B3000000</color>
+
+    <!-- 文字颜色 -->
+    <color name="text_primary_light">#FFFFFF</color>
+    <color name="text_secondary_light">#E0FFFFFF</color>
+</resources>

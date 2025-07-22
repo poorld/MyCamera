@@ -1,0 +1,20 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.MyCamera" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- 自定义颜色主题 -->
+        <item name="colorPrimary">@color/camera_primary</item>
+        <item name="colorPrimaryDark">@color/camera_primary_dark</item>
+        <item name="colorAccent">@color/camera_accent</item>
+
+        <!-- 全屏模式 -->
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+
+        <!-- 保持屏幕常亮 -->
+        <item name="android:keepScreenOn">true</item>
+    </style>
+
+    <style name="Theme.MyCamera" parent="Base.Theme.MyCamera" />
+</resources>
