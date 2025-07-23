@@ -101,7 +101,7 @@ public class Camera2Helper implements ICameraHelper {
 
     @Override
     public void startRecord() {
-        Log.d(TAG, "startRecord: ");
+        Log.d(TAG, "startRecord: resolution=" + resolution);
         if (cameraDevice == null || isRecording) return;
 
         try {

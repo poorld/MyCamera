@@ -34,9 +34,12 @@ import com.android.mycamera.R;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class BgrYesActivity extends BaseAct {
 
@@ -46,11 +49,14 @@ public class BgrYesActivity extends BaseAct {
     private Spinner resolutionSpinner, fpsSpinner;
     private Button recordButton;
     private TextView statusTextView;
+    private TextView timeTextView;
     private RadioGroup apiRadioGroup;
 
     private BgrYesRecordService recordService;
     private boolean isBound = false;
     private boolean isRecording = false;
+    private Timer timer;
+    private int time;
 
     private final ServiceConnection connection = new ServiceConnection() {
         @Override
@@ -84,6 +90,7 @@ public class BgrYesActivity extends BaseAct {
         fpsSpinner = findViewById(R.id.fpsSpinner);
         recordButton = findViewById(R.id.recordButton);
         statusTextView = findViewById(R.id.statusTextView);
+        timeTextView = findViewById(R.id.timeTextView);
         apiRadioGroup = findViewById(R.id.apiRadioGroup);
 
         apiRadioGroup.setOnCheckedChangeListener((group, checkedId) -> {
@@ -121,6 +128,35 @@ public class BgrYesActivity extends BaseAct {
             recordButton.setText("Stop Recording");
             statusTextView.setText("Status: Recording");
             setControlsEnabled(false);
+            startTimer();
+        }
+    }
+
+    private void startTimer() {
+        if (timer != null) {
+            timer.cancel();
+            timer = null;
+        }
+        timer = new Timer();
+        time = 0;
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                runOnUiThread(() -> timeTextView.setText(getTime()));
+            }
+        }, 0, 1000);
+    }
+
+    private String getTime() {
+        time += 1;
+        int hours = time / 3600;
+        int minutes = (time % 3600) / 60;
+        int seconds = time % 60;
+
+        if (hours > 0) {
+            return String.format("%d:%02d:%02d", hours, minutes, seconds);
+        } else {
+            return String.format("%d:%02d", minutes, seconds);
         }
     }
 
@@ -131,7 +167,10 @@ public class BgrYesActivity extends BaseAct {
             isRecording = false;
             recordButton.setText("Start Recording");
             statusTextView.setText("Status: Idle");
+            timeTextView.setText("00:00");
             setControlsEnabled(true);
+            timer.cancel();
+            timer = null;
         }
     }
 
@@ -215,6 +254,10 @@ public class BgrYesActivity extends BaseAct {
     protected void onDestroy() {
         Log.d(TAG, "onDestroy: ");
         super.onDestroy();
+        if (timer != null) {
+            timer.cancel();
+            timer = null;
+        }
         if (isBound) {
             recordService.stopPreview();
             unbindService(connection);
