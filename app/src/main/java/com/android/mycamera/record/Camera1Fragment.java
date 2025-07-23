@@ -1,4 +1,4 @@
-package com.android.mycamera;
+package com.android.mycamera.record;
 
 import android.hardware.Camera;
 import android.media.CamcorderProfile;
@@ -13,6 +13,9 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+
+import com.android.mycamera.R;
+
 import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;

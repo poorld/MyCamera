@@ -1,4 +1,4 @@
-package com.android.mycamera;
+package com.android.mycamera.record;
 
 public interface RecordingCallback {
     void onRecordingStarted();

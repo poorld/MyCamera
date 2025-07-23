@@ -1,4 +1,4 @@
-package com.android.mycamera;
+package com.android.mycamera.camera;
 
 import android.content.Context;
 import android.graphics.ImageFormat;
@@ -16,6 +16,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+
+import com.android.mycamera.R;
 
 import java.util.ArrayList;
 import java.util.List;

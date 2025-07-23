@@ -13,6 +13,13 @@ import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.android.mycamera.bgr.BackgroudCameraActivity;
+import com.android.mycamera.camera.Cam1ApiActivity;
+import com.android.mycamera.camera.Cam2ApiActivity;
+import com.android.mycamera.camera.CamSizeActivity;
+import com.android.mycamera.camera.CamXApiActivity;
+import com.android.mycamera.record.VideoRecordActivity;
+
 public class MainAct extends BaseAct {
 
     private Button camera_x;

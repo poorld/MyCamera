@@ -1,7 +1,6 @@
-package com.android.mycamera;
+package com.android.mycamera.record;
 
 import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.content.Context;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;

@@ -1,6 +1,5 @@
-package com.android.mycamera;
+package com.android.mycamera.bgr;
 
-import android.Manifest;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -11,34 +10,38 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.TextureView;
-import android.view.View;
 import android.widget.Button;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
 
-public class CameraActivity extends BaseAct {
+import com.android.mycamera.BaseAct;
+import com.android.mycamera.R;
 
-    public static final String TAG = "CameraActivity";
+public class BackgroudCameraActivity extends BaseAct {
+
+    public static final String TAG = "BackgroudCameraActivity";
+
     private static final int REQUEST_CAMERA_PERMISSION = 200;
     private TextureView textureView;
     private Button btnRecord;
     private boolean isRecording = false;
-    private RecordService recordService;
+    private BackgroundRecordService backgroundRecordService;
     private boolean isBound = false;
-    private Camera2Helper camera2Helper;
 
     private final ServiceConnection connection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName className, IBinder service) {
-            RecordService.RecordBinder binder = (RecordService.RecordBinder) service;
-            recordService = binder.getService();
+            Log.d(TAG, "onServiceConnected: ");
+            BackgroundRecordService.RecordBinder binder = (BackgroundRecordService.RecordBinder) service;
+            backgroundRecordService = binder.getService();
             isBound = true;
+            backgroundRecordService.startPreview(textureView);
+
         }
 
         @Override
         public void onServiceDisconnected(ComponentName arg0) {
+            Log.d(TAG, "onServiceDisconnected: ");
             isBound = false;
         }
     };
@@ -59,48 +62,41 @@ public class CameraActivity extends BaseAct {
             }
         });
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED ||
-                ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ||
-                ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO, Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_CAMERA_PERMISSION);
-        } else {
-            startServiceAndBind();
-        }
+        startServiceAndBind();
+
     }
 
     @Override
     protected void onStart() {
+        Log.d(TAG, "onStart: ");
         super.onStart();
         if (textureView.isAvailable()) {
-            openCamera();
+            // TextureView is already available, you can proceed with camera setup
         } else {
             textureView.setSurfaceTextureListener(textureListener);
         }
     }
 
-    private void openCamera() {
-        if (isBound) {
-            recordService.startPreview(textureView);
-        }
-    }
-
     private void startServiceAndBind() {
-        Intent intent = new Intent(this, RecordService.class);
+        Log.d(TAG, "startServiceAndBind: ");
+        Intent intent = new Intent(this, BackgroundRecordService.class);
         startService(intent);
         bindService(intent, connection, Context.BIND_AUTO_CREATE);
     }
 
     private void startRecording() {
+        Log.d(TAG, "startRecording: isBound=" + isBound);
         if (isBound) {
-            recordService.startRecording();
+            backgroundRecordService.startRecording();
             btnRecord.setText("Stop");
             isRecording = true;
         }
     }
 
     private void stopRecording() {
+        Log.d(TAG, "stopRecording: ");
         if (isBound) {
-            recordService.stopRecording();
+            backgroundRecordService.stopRecording();
             btnRecord.setText("Record");
             isRecording = false;
         }
@@ -109,7 +105,7 @@ public class CameraActivity extends BaseAct {
     TextureView.SurfaceTextureListener textureListener = new TextureView.SurfaceTextureListener() {
         @Override
         public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-            openCamera();
+            // You can now set up the camera here if it wasn't already
         }
 
         @Override
@@ -140,9 +136,18 @@ public class CameraActivity extends BaseAct {
 
     @Override
     protected void onStop() {
+        Log.d(TAG, "onStop: ");
         super.onStop();
+        // if (isBound) {
+        //     unbindService(connection);
+        //     isBound = false;
+        // }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
         if (isBound) {
-            recordService.stopPreview();
             unbindService(connection);
             isBound = false;
         }

@@ -1,4 +1,4 @@
-package com.android.mycamera;
+package com.android.mycamera.camera;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
@@ -10,9 +10,12 @@ import android.widget.FrameLayout;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
+import com.android.mycamera.BaseAct;
+import com.android.mycamera.R;
+import com.android.mycamera.Utils;
 
 import java.io.File;
 import java.io.FileNotFoundException;

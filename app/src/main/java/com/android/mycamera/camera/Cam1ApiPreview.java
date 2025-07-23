@@ -1,4 +1,4 @@
-package com.android.mycamera;
+package com.android.mycamera.camera;
 
 
 import android.content.Context;

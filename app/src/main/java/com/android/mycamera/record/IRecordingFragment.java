@@ -1,4 +1,4 @@
-package com.android.mycamera;
+package com.android.mycamera.record;
 
 public interface IRecordingFragment {
     void startRecording(String resolution, int frameRate);

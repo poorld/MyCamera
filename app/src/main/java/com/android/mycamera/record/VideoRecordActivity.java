@@ -1,4 +1,4 @@
-package com.android.mycamera;
+package com.android.mycamera.record;
 
 import android.Manifest;
 import android.content.Context;
@@ -22,6 +22,9 @@ import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
+
+import com.android.mycamera.BaseAct;
+import com.android.mycamera.R;
 
 import java.util.ArrayList;
 import java.util.Collections;

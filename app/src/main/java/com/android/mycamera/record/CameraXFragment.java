@@ -1,4 +1,4 @@
-package com.android.mycamera;
+package com.android.mycamera.record;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
@@ -23,6 +23,8 @@ import androidx.camera.view.PreviewView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
+
+import com.android.mycamera.R;
 import com.google.common.util.concurrent.ListenableFuture;
 import java.io.File;
 import java.text.SimpleDateFormat;

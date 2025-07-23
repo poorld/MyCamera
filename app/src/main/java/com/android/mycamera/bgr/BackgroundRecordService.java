@@ -1,4 +1,4 @@
-package com.android.mycamera;
+package com.android.mycamera.bgr;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -9,12 +9,13 @@ import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
-import android.view.SurfaceView;
 import android.view.TextureView;
 
 import androidx.core.app.NotificationCompat;
 
-public class RecordService extends Service {
+import com.android.mycamera.record.Camera2Helper;
+
+public class BackgroundRecordService extends Service {
 
     public static final String TAG = "RecordService";
     private static final String CHANNEL_ID = "RecordServiceChannel";
@@ -22,8 +23,8 @@ public class RecordService extends Service {
     private final IBinder binder = new RecordBinder();
 
     public class RecordBinder extends Binder {
-        public RecordService getService() {
-            return RecordService.this;
+        public BackgroundRecordService getService() {
+            return BackgroundRecordService.this;
         }
     }
 
