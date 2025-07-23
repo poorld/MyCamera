@@ -17,6 +17,8 @@ import android.util.Log;
 import android.util.Range;
 import android.util.Size;
 import android.view.TextureView;
+import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.RadioGroup;
@@ -65,13 +67,7 @@ public class BgrYesActivity extends BaseAct {
             recordService = binder.getService();
             isBound = true;
 
-            String selectedApi = getSelectedApi();
-            String resolution = resolutionSpinner.getSelectedItem().toString();
-            int width = Integer.parseInt(resolution.split("x")[0]);
-            int height = Integer.parseInt(resolution.split("x")[1]);
-            int fps = Integer.parseInt(fpsSpinner.getSelectedItem().toString());
-
-            recordService.switchCamera(selectedApi, textureView, width, height, fps);
+            switchCamParam();
         }
 
         @Override
@@ -100,12 +96,21 @@ public class BgrYesActivity extends BaseAct {
                 return;
             }
             if (isBound) {
-                String selectedApi = getSelectedApi();
-                String resolution = resolutionSpinner.getSelectedItem().toString();
-                int width = Integer.parseInt(resolution.split("x")[0]);
-                int height = Integer.parseInt(resolution.split("x")[1]);
-                int fps = Integer.parseInt(fpsSpinner.getSelectedItem().toString());
-                recordService.switchCamera(selectedApi, textureView, width, height, fps);
+                switchCamParam();
+            }
+        });
+
+        resolutionSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (isBound) {
+                    switchCamParam();
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
             }
         });
 
@@ -119,6 +124,15 @@ public class BgrYesActivity extends BaseAct {
 
         setupSpinners();
         startServiceAndBind();
+    }
+
+    private void switchCamParam() {
+        String selectedApi = getSelectedApi();
+        String resolution = resolutionSpinner.getSelectedItem().toString();
+        int width = Integer.parseInt(resolution.split("x")[0]);
+        int height = Integer.parseInt(resolution.split("x")[1]);
+        int fps = Integer.parseInt(fpsSpinner.getSelectedItem().toString());
+        recordService.switchCamera(selectedApi, textureView, width, height, fps);
     }
 
     private void startRecording() {
@@ -144,7 +158,7 @@ public class BgrYesActivity extends BaseAct {
             public void run() {
                 runOnUiThread(() -> timeTextView.setText(getTime()));
             }
-        }, 0, 1000);
+        }, 1000, 1000);
     }
 
     private String getTime() {

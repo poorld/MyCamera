@@ -5,6 +5,7 @@ import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
 import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
+import android.util.Log;
 import android.view.TextureView;
 import androidx.lifecycle.LifecycleOwner;
 
@@ -31,6 +32,7 @@ public class Camera1Helper implements ICameraHelper {
 
     @Override
     public void openCamera(int width, int height, int fps) {
+        Log.d(TAG, String.format("openCamera: %dx%d,%d", width, height, fps));
         this.resolution = width + "x" + height;
         this.frameRate = fps;
         try {

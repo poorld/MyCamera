@@ -45,7 +45,7 @@ public class Camera2Helper implements ICameraHelper {
     @SuppressLint("MissingPermission")
     @Override
     public void openCamera(int width, int height, int fps) {
-        Log.d(TAG, "openCamera: ");
+        Log.d(TAG, String.format("openCamera: %dx%d,%d", width, height, fps));
         this.resolution = width + "x" + height;
         this.frameRate = fps;
         startBackgroundThread();

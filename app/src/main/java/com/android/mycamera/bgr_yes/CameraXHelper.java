@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.SurfaceTexture;
+import android.util.Log;
 import android.view.Surface;
 import android.view.TextureView;
 import androidx.annotation.NonNull;
@@ -31,6 +32,7 @@ import java.util.concurrent.ExecutionException;
 
 public class CameraXHelper implements ICameraHelper {
 
+    public static final String TAG = "CameraXHelper";
     private Context context;
     private ListenableFuture<ProcessCameraProvider> cameraProviderFuture;
     private VideoCapture<Recorder> videoCapture;
@@ -43,6 +45,7 @@ public class CameraXHelper implements ICameraHelper {
 
     @Override
     public void openCamera(int width, int height, int fps) {
+        Log.d(TAG, String.format("openCamera: %dx%d,%d", width, height, fps));
         cameraProviderFuture = ProcessCameraProvider.getInstance(context);
     }
 
