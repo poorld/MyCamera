@@ -9,6 +9,10 @@ import android.hardware.camera2.params.StreamConfigurationMap;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.activity.EdgeToEdge;
@@ -20,6 +24,7 @@ import androidx.core.view.WindowInsetsCompat;
 import com.android.mycamera.R;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 
@@ -30,6 +35,7 @@ public class CamSizeActivity extends AppCompatActivity {
 
     private CameraManager cameraManager;
     private String mCurrentCameraId = "0";
+    private Spinner size_spinner;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,14 +49,39 @@ public class CamSizeActivity extends AppCompatActivity {
         });
 
         cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+        size_spinner = findViewById(R.id.size_spinner);
+        try {
+            String[] cameraIdList = cameraManager.getCameraIdList();
+            ArrayAdapter<String> sizeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, cameraIdList);
+            sizeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            size_spinner.setAdapter(sizeAdapter);
+            size_spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    chooseCam(cameraIdList[position]);
+                }
+
+                @Override
+                public void onNothingSelected(AdapterView<?> parent) {
+
+                }
+            });
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        chooseCam(mCurrentCameraId);
+    }
+
+    private void chooseCam(String camId) {
         CameraCharacteristics characteristics = null;
         try {
-            characteristics = cameraManager.getCameraCharacteristics(mCurrentCameraId);
+            characteristics = cameraManager.getCameraCharacteristics(camId);
             StreamConfigurationMap s = characteristics
                     .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
             List<Size> supportedSizes = getSupportedPictureSize(s, ImageFormat.JPEG);

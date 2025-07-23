@@ -5,7 +5,13 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".camera.CamSizeActivity">
+    tools:context=".camera.CamSizeActivity"
+    android:orientation="vertical">
+
+    <Spinner
+        android:id="@+id/size_spinner"
+        android:layout_width="match_parent"
+        android:layout_height="50dp" />
 
     <TextView
         android:id="@+id/gg"
