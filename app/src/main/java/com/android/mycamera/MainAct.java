@@ -20,10 +20,12 @@ public class MainAct extends BaseAct {
     private Button camera_api;
     private Button camera_size;
     private Button video_record_button;
+    private Button background_record;
     private TextView titleTextView;
 
     private static final String[] REQUIRED_PERMISSIONS = {
             Manifest.permission.CAMERA,
+            Manifest.permission.RECORD_AUDIO,
             Manifest.permission.WRITE_EXTERNAL_STORAGE };
 
     private static final int REQUEST_CODE_PERMISSIONS = 10;
@@ -41,6 +43,7 @@ public class MainAct extends BaseAct {
         camera2_api = findViewById(R.id.camera2_api);
         camera_api = findViewById(R.id.camera_api);
         video_record_button = findViewById(R.id.video_record_button);
+        background_record = findViewById(R.id.background_record);
 
         camera_size.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -76,6 +79,13 @@ public class MainAct extends BaseAct {
                 startActivity(new Intent(MainAct.this, VideoRecordActivity.class));
             }
         });
+        background_record.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // startActivity(new Intent(MainAct.this, CameraActivity.class));
+                startActivity(new Intent(MainAct.this, BackgroudCameraActivity.class));
+            }
+        });
     }
 
     @Override
@@ -84,9 +94,7 @@ public class MainAct extends BaseAct {
         if (allPermissionsGranted()) {
         } else {
             ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS);
-
         }
-
     }
 
     private boolean allPermissionsGranted() {
