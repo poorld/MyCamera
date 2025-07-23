@@ -13,8 +13,6 @@ import android.view.TextureView;
 
 import androidx.core.app.NotificationCompat;
 
-import com.android.mycamera.record.Camera2Helper;
-
 public class BackgroundRecordService extends Service {
 
     public static final String TAG = "RecordService";

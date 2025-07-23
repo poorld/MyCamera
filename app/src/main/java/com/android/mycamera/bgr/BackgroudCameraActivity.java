@@ -138,7 +138,8 @@ public class BackgroudCameraActivity extends BaseAct {
     protected void onStop() {
         Log.d(TAG, "onStop: ");
         super.onStop();
-        // if (isBound) {
+        // if (!isRecording && isBound) {
+        //     backgroundRecordService.stopPreview();
         //     unbindService(connection);
         //     isBound = false;
         // }

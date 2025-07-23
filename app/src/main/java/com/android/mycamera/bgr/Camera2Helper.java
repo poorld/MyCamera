@@ -1,4 +1,4 @@
-package com.android.mycamera.record;
+package com.android.mycamera.bgr;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -41,12 +41,6 @@ public class Camera2Helper {
     private HandlerThread backgroundThread;
     private TextureView textureView;
     private String nextVideoAbsolutePath;
-
-    private OnCamOpenListener camOpenListener;
-
-    public interface OnCamOpenListener{
-        void onOpen();
-    }
 
     public Camera2Helper(Context context, TextureView textureView) {
         this.context = context;

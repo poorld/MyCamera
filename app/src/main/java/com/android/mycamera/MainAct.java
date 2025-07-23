@@ -14,6 +14,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.android.mycamera.bgr.BackgroudCameraActivity;
+import com.android.mycamera.bgr_yes.BgrYesActivity;
 import com.android.mycamera.camera.Cam1ApiActivity;
 import com.android.mycamera.camera.Cam2ApiActivity;
 import com.android.mycamera.camera.CamSizeActivity;
@@ -28,6 +29,7 @@ public class MainAct extends BaseAct {
     private Button camera_size;
     private Button video_record_button;
     private Button background_record;
+    private Button background_record_test;
     private TextView titleTextView;
 
     private static final String[] REQUIRED_PERMISSIONS = {
@@ -51,6 +53,7 @@ public class MainAct extends BaseAct {
         camera_api = findViewById(R.id.camera_api);
         video_record_button = findViewById(R.id.video_record_button);
         background_record = findViewById(R.id.background_record);
+        background_record_test = findViewById(R.id.background_record_test);
 
         camera_size.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -87,6 +90,13 @@ public class MainAct extends BaseAct {
             }
         });
         background_record.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // startActivity(new Intent(MainAct.this, CameraActivity.class));
+                startActivity(new Intent(MainAct.this, BgrYesActivity.class));
+            }
+        });
+        background_record_test.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 // startActivity(new Intent(MainAct.this, CameraActivity.class));

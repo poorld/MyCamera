@@ -9,7 +9,6 @@
     android:padding="16dp">
 
     <TextView
-        android:visibility="gone"
         android:id="@+id/titleTextView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -18,8 +17,7 @@
         android:textStyle="bold"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="32dp"/>
+        app:layout_constraintEnd_toEndOf="parent"/>
 
     <Button
         android:id="@+id/camera_size"
@@ -40,7 +38,6 @@
         app:layout_constraintTop_toBottomOf="@id/camera_size"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="16dp"
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
 
     <Button
@@ -51,7 +48,6 @@
         app:layout_constraintTop_toBottomOf="@id/camera_x"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="16dp"
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
 
     <Button
@@ -62,7 +58,6 @@
         app:layout_constraintTop_toBottomOf="@id/camera2_api"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="16dp"
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
 
     <Button
@@ -73,18 +68,28 @@
         app:layout_constraintTop_toBottomOf="@id/camera_api"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="16dp"
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+
 
     <Button
         android:id="@+id/background_record"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Background Record Test"
+        android:text="Background Record"
         app:layout_constraintTop_toBottomOf="@id/video_record_button"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="16dp"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+    <Button
+        android:id="@+id/background_record_test"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Background Record Test"
+        app:layout_constraintTop_toBottomOf="@id/background_record"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

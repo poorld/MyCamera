@@ -63,10 +63,15 @@
             android:enabled="true"
             android:exported="true" />
 
+
+        <activity
+            android:name=".bgr_yes.BgrYesActivity"
+            android:exported="true" />
+
         <service
-            android:name=".RecordingService"
-            android:foregroundServiceType="camera|microphone"
-            android:exported="false" />
+            android:name=".bgr_yes.BgrYesRecordService"
+            android:enabled="true"
+            android:exported="true" />
 
 
     </application>
