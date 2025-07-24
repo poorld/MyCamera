@@ -45,12 +45,35 @@ public class Camera1Helper implements ICameraHelper {
     @Override
     public void startPreview(TextureView textureView, LifecycleOwner lifecycleOwner) {
         this.textureView = textureView;
-        if (camera == null || textureView.getSurfaceTexture() == null) return;
+        if (camera == null) return;
+
         try {
-            camera.setPreviewTexture(textureView.getSurfaceTexture());
+            camera.stopPreview();
+        } catch (Exception e) {
+        }
+
+        SurfaceTexture surfaceTexture = textureView.getSurfaceTexture();
+        if (surfaceTexture == null) return;
+
+        try {
+            Camera.Parameters params = camera.getParameters();
+            String[] dimensions = resolution.split("x");
+            int previewWidth = Integer.parseInt(dimensions[0]);
+            int previewHeight = Integer.parseInt(dimensions[1]);
+
+            params.setPreviewSize(previewWidth, previewHeight);
+            camera.setParameters(params);
+
+            surfaceTexture.setDefaultBufferSize(previewWidth, previewHeight);
+
+            camera.setPreviewTexture(surfaceTexture);
             camera.startPreview();
+
         } catch (IOException e) {
             e.printStackTrace();
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            Log.e(TAG, "Failed to set camera parameters. Is the resolution " + resolution + " supported for preview?");
         }
     }
 
