@@ -101,11 +101,12 @@ public class CameraXFragment extends Fragment implements IRecordingFragment {
                     VideoRecordActivity activity = (VideoRecordActivity) requireActivity();
                     if (activity.qualityMap != null) {
                         quality = activity.qualityMap.get(resolution);
-                    } else {
-                        quality = Quality.HIGHEST;
                     }
 
                 } catch (IllegalStateException e) {
+                }
+
+                if (quality == null) {
                     quality = Quality.HIGHEST;
                 }
 

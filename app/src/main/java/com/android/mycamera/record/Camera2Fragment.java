@@ -24,6 +24,7 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.android.mycamera.R;
@@ -136,7 +137,6 @@ public class Camera2Fragment extends Fragment implements IRecordingFragment, Sur
             message = "Recording failed!";
         }
         releaseMediaRecorder();
-        createPreviewSession();
 
         isRecording = false;
         if (recordingCallback != null) {
@@ -227,7 +227,11 @@ public class Camera2Fragment extends Fragment implements IRecordingFragment, Sur
             if (holder == null || cameraDevice == null) return;
 
             String[] dimensions = resolution.split("x");
-            holder.setFixedSize(Integer.parseInt(dimensions[0]), Integer.parseInt(dimensions[1]));
+            // android.view.ViewRootImpl$CalledFromWrongThreadException: Only the original thread that created a view hierarchy can touch its views.
+            Context context = getContext();
+            if (context != null) {
+                ContextCompat.getMainExecutor(context).execute(() -> holder.setFixedSize(Integer.parseInt(dimensions[0]), Integer.parseInt(dimensions[1])));
+            }
 
             final CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             builder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, Range.create(frameRate, frameRate));

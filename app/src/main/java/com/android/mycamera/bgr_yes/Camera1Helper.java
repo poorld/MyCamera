@@ -7,6 +7,8 @@ import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import android.util.Log;
 import android.view.TextureView;
+import android.widget.Toast;
+
 import androidx.lifecycle.LifecycleOwner;
 
 import java.io.File;
@@ -39,6 +41,7 @@ public class Camera1Helper implements ICameraHelper {
             camera = Camera.open(0);
         } catch (Exception e) {
             e.printStackTrace();
+            Toast.makeText(context, "相机不可用", Toast.LENGTH_SHORT).show();
         }
     }
 

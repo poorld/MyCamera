@@ -14,6 +14,8 @@ import androidx.camera.video.Quality;
 import androidx.core.app.NotificationCompat;
 import androidx.lifecycle.LifecycleService;
 
+import com.android.mycamera.R;
+
 public class BgrYesRecordService extends LifecycleService {
 
     public static final String TAG = "BgrYesRecordService";
@@ -32,6 +34,7 @@ public class BgrYesRecordService extends LifecycleService {
         super.onCreate();
         createNotificationChannel();
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                // .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .setContentTitle("BGR Yes Recording Service")
                 .setContentText("Recording video in the background.")
                 .build();

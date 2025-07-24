@@ -4,6 +4,8 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.provider.Settings;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -11,6 +13,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
+import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 
 import com.android.mycamera.bgr.BackgroudCameraActivity;
@@ -111,6 +114,14 @@ public class MainAct extends BaseAct {
         if (allPermissionsGranted()) {
         } else {
             ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS);
+        }
+        boolean notificationsEnabled = NotificationManagerCompat.from(this).areNotificationsEnabled();
+        Log.d("TAG", "notificationsEnabled: " + notificationsEnabled);
+        if (!notificationsEnabled) {
+            // 请求通知权限
+            Intent intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+            startActivity(intent);
         }
     }
 

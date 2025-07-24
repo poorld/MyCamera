@@ -10,6 +10,8 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -184,6 +186,8 @@ public class Camera1Fragment extends Fragment implements IRecordingFragment, Sur
             camera.startPreview();
         } catch (IOException e) {
             Log.e(TAG, "Surface creation or camera preview failed", e);
+        } catch (RuntimeException e) {
+            Toast.makeText(getContext(), "相机不可用", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -192,6 +196,7 @@ public class Camera1Fragment extends Fragment implements IRecordingFragment, Sur
 
     @Override
     public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
+        Log.d(TAG, "surfaceDestroyed: ");
         if (isRecording) {
             stopRecording();
         }
@@ -200,6 +205,7 @@ public class Camera1Fragment extends Fragment implements IRecordingFragment, Sur
 
     @Override
     public void onPause() {
+        Log.d(TAG, "onPause: ");
         super.onPause();
         if (isRecording) {
             stopRecording();

@@ -29,7 +29,7 @@ import java.io.IOException;
  */
 public class Cam1ApiActivity extends BaseAct {
 
-    private static final String TAG = "MainActivity";
+    private static final String TAG = "Cam1ApiActivity";
     private static final int CAMERA_PERMISSION_CODE = 100;
 
     private Camera mCamera;
@@ -114,14 +114,24 @@ public class Cam1ApiActivity extends BaseAct {
     }
 
     // 安全地获取相机实例的方法
-    public static Camera getCameraInstance() {
+    public Camera getCameraInstance() {
         Log.d(TAG, "getCameraInstance: ");
+
+        int numCameras = Camera.getNumberOfCameras();
+        Log.d(TAG, "numCameras: " + numCameras);
+        if (numCameras == 0) {
+            Log.e(TAG, "No cameras found on this device.");
+            Toast.makeText(this, "相机不可用", Toast.LENGTH_SHORT).show();
+            return null;
+        }
+
         Camera c = null;
         try {
             c = Camera.open(); // 尝试获取一个 Camera 实例
         } catch (Exception e) {
             // 相机不可用（正在使用或不存在）
             Log.e(TAG, "相机不可用: " + e.getMessage());
+            Toast.makeText(this, "相机不可用", Toast.LENGTH_SHORT).show();
         }
         return c; // 返回 null 如果相机不可用
     }
