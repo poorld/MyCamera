@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">MyCamera</string>
+    <string name="background_record">Background Record</string>
+    <string name="video_record">Video Record</string>
+</resources>

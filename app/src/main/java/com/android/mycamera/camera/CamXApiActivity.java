@@ -11,10 +11,12 @@ import android.widget.Button;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.camera.core.CameraInfo;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ImageCapture;
 import androidx.camera.core.ImageCaptureException;
 import androidx.camera.core.Preview;
+import androidx.camera.core.impl.CameraInfoInternal;
 import androidx.camera.core.resolutionselector.AspectRatioStrategy;
 import androidx.camera.core.resolutionselector.ResolutionSelector;
 import androidx.camera.core.resolutionselector.ResolutionStrategy;
@@ -29,7 +31,9 @@ import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutionException;
 
@@ -81,7 +85,34 @@ public class CamXApiActivity extends BaseAct {
 
                 imageCapture = new ImageCapture.Builder().build();
 
-                CameraSelector cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA;
+                // CameraSelector cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA;
+                List<CameraInfo> availableCameras = cameraProvider.getAvailableCameraInfos();
+                if (availableCameras.isEmpty()) {
+                    Log.e(TAG, "No cameras available on this device.");
+                    return;
+                }
+
+                CameraInfo targetCameraInfo = null;
+                for (CameraInfo cameraInfo : availableCameras) {
+                    if (cameraInfo instanceof CameraInfoInternal) {
+                        String cameraId = ((CameraInfoInternal) cameraInfo).getCameraId();
+                        if ("0".equals(cameraId)) {
+                            targetCameraInfo = cameraInfo;
+                            Log.d(TAG, "Found target camera with ID: 0");
+                            break;
+                        }
+                    }
+                }
+
+                if (targetCameraInfo == null) {
+                    targetCameraInfo = availableCameras.get(0);
+                    Log.w(TAG, "Could not find camera with ID '0', falling back to the first available camera.");
+                }
+
+                CameraInfo finalTargetCameraInfo = targetCameraInfo;
+                CameraSelector cameraSelector = new CameraSelector.Builder()
+                        .addCameraFilter(cameraInfos -> Collections.singletonList(finalTargetCameraInfo))
+                        .build();
 
                 cameraProvider.unbindAll();
 
@@ -90,6 +121,8 @@ public class CamXApiActivity extends BaseAct {
             } catch (ExecutionException | InterruptedException e) {
                 Log.e(TAG, "相机启动失败", e);
                 Toast.makeText(this, "相机启动失败", Toast.LENGTH_SHORT).show();
+            } catch (IllegalArgumentException e) {
+                Toast.makeText(this, "相机错误❌", Toast.LENGTH_SHORT).show();
             }
         }, ContextCompat.getMainExecutor(this));
     }

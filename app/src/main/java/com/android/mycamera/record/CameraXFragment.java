@@ -8,12 +8,15 @@ import android.util.Range;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.camera.core.Camera;
 import androidx.camera.core.CameraInfo;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.Preview;
+import androidx.camera.core.impl.CameraInfoInternal;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.video.FileOutputOptions;
 import androidx.camera.video.Quality;
@@ -31,6 +34,8 @@ import com.android.mycamera.R;
 import com.google.common.util.concurrent.ListenableFuture;
 import java.io.File;
 import java.text.SimpleDateFormat;
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutionException;
 
@@ -111,8 +116,38 @@ public class CameraXFragment extends Fragment implements IRecordingFragment {
                         .build();
                 videoCapture = VideoCapture.withOutput(recorder);
 
+
+                List<CameraInfo> availableCameras = cameraProvider.getAvailableCameraInfos();
+                if (availableCameras.isEmpty()) {
+                    Log.e(TAG, "No cameras available on this device.");
+                    return;
+                }
+
+                CameraInfo targetCameraInfo = null;
+                for (CameraInfo cameraInfo : availableCameras) {
+                    if (cameraInfo instanceof CameraInfoInternal) {
+                        String cameraId = ((CameraInfoInternal) cameraInfo).getCameraId();
+                        if ("0".equals(cameraId)) {
+                            targetCameraInfo = cameraInfo;
+                            Log.d(TAG, "Found target camera with ID: 0");
+                            break;
+                        }
+                    }
+                }
+
+                if (targetCameraInfo == null) {
+                    targetCameraInfo = availableCameras.get(0);
+                    Log.w(TAG, "Could not find camera with ID '0', falling back to the first available camera.");
+                }
+
+                CameraInfo finalTargetCameraInfo = targetCameraInfo;
+                CameraSelector cameraSelector = new CameraSelector.Builder()
+                        .addCameraFilter(cameraInfos -> Collections.singletonList(finalTargetCameraInfo))
+                        .build();
+
                 cameraProvider.unbindAll();
-                Camera camera = cameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, videoCapture);
+                // Camera camera = cameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, videoCapture);
+                Camera camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, videoCapture);
                 preview.setSurfaceProvider(previewView.getSurfaceProvider());
 
                 if (cameraInfoListener != null) {
@@ -121,6 +156,8 @@ public class CameraXFragment extends Fragment implements IRecordingFragment {
 
             } catch (ExecutionException | InterruptedException e) {
                 Log.e(TAG, "CameraX start failed", e);
+            } catch (IllegalArgumentException e) {
+                Toast.makeText(getContext(), "相机错误❌", Toast.LENGTH_SHORT).show();
             }
         }, ContextCompat.getMainExecutor(requireContext()));
     }

@@ -8,11 +8,14 @@ import android.util.Log;
 import android.util.Range;
 import android.view.Surface;
 import android.view.TextureView;
+import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.camera.core.CameraInfo;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.Preview;
 import androidx.camera.core.SurfaceRequest;
+import androidx.camera.core.impl.CameraInfoInternal;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.video.FileOutputOptions;
 import androidx.camera.video.Quality;
@@ -29,6 +32,9 @@ import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutionException;
 
@@ -82,8 +88,58 @@ public class CameraXHelper extends ICameraXHelper {
                         .build();
                 videoCapture = VideoCapture.withOutput(recorder);
 
+                /*final String targetCameraId = "0";
+                CameraSelector cameraSelector = new CameraSelector.Builder()
+                        .addCameraFilter(cameraInfos -> {
+                            List<CameraInfo> filteredList = new ArrayList<>();
+                            for (CameraInfo cameraInfo : cameraInfos) {
+                                if (cameraInfo.getCameraId().equals(targetCameraId)) {
+                                    Log.d(TAG, "Found target camera with ID: " + targetCameraId);
+                                    filteredList.add(cameraInfo);
+                                    break;
+                                }
+                            }
+                            if (filteredList.isEmpty()) {
+                                Log.e(TAG, "Target camera with ID " + targetCameraId + " not found!");
+                            }
+                            // 返回包含目标摄像头的列表（如果找到的话）
+                            return filteredList;
+                        })
+                        .build();*/
+
+                List<CameraInfo> availableCameras = cameraProvider.getAvailableCameraInfos();
+                if (availableCameras.isEmpty()) {
+                    Log.e(TAG, "No cameras available on this device.");
+                    return;
+                }
+
+                CameraInfo targetCameraInfo = null;
+                for (CameraInfo cameraInfo : availableCameras) {
+                    if (cameraInfo instanceof CameraInfoInternal) {
+                        String cameraId = ((CameraInfoInternal) cameraInfo).getCameraId();
+                        if ("0".equals(cameraId)) {
+                            targetCameraInfo = cameraInfo;
+                            Log.d(TAG, "Found target camera with ID: 0");
+                            break;
+                        }
+                    }
+                }
+
+                if (targetCameraInfo == null) {
+                    targetCameraInfo = availableCameras.get(0);
+                    Log.w(TAG, "Could not find camera with ID '0', falling back to the first available camera.");
+                }
+
+                CameraInfo finalTargetCameraInfo = targetCameraInfo;
+                CameraSelector cameraSelector = new CameraSelector.Builder()
+                        .addCameraFilter(cameraInfos -> Collections.singletonList(finalTargetCameraInfo))
+                        .build();
+
+
+
                 cameraProvider.unbindAll();
-                cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, videoCapture);
+                // cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, videoCapture);
+                cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, videoCapture);
 
                 preview.setSurfaceProvider(request -> {
                     SurfaceTexture surfaceTexture = textureView.getSurfaceTexture();
@@ -113,6 +169,8 @@ public class CameraXHelper extends ICameraXHelper {
 
             } catch (ExecutionException | InterruptedException e) {
                 e.printStackTrace();
+            } catch (IllegalArgumentException e) {
+                Toast.makeText(context, "相机错误❌", Toast.LENGTH_SHORT).show();
             }
         }, ContextCompat.getMainExecutor(context));
     }
