@@ -64,7 +64,7 @@
         android:id="@+id/video_record_button"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Video Record Test"
+        android:text="@string/video_record"
         app:layout_constraintTop_toBottomOf="@id/camera_api"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -76,13 +76,14 @@
         android:id="@+id/background_record"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Background Record"
+        android:text="@string/background_record"
         app:layout_constraintTop_toBottomOf="@id/video_record_button"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
 
     <Button
+        android:visibility="invisible"
         android:id="@+id/background_record_test"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
