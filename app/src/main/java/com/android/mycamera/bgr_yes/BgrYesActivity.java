@@ -1,11 +1,9 @@
 package com.android.mycamera.bgr_yes;
 
-import android.Manifest;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
-import android.content.pm.PackageManager;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
@@ -13,6 +11,7 @@ import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.text.TextUtils;
 import android.util.Log;
 import android.util.Range;
 import android.util.Size;
@@ -27,18 +26,20 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
+import androidx.camera.core.CameraInfo;
+import androidx.camera.video.Quality;
+import androidx.camera.video.QualitySelector;
 
 import com.android.mycamera.BaseAct;
 import com.android.mycamera.R;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -75,6 +76,12 @@ public class BgrYesActivity extends BaseAct {
             isBound = false;
         }
     };
+    private ArrayAdapter<String> camXadapter;
+    private ArrayAdapter<String> camAdapter;
+    private ArrayAdapter<String> fpsAdapter;
+    private Map<String, Quality> qualityMap;
+    private String lastApi;
+    private ArrayAdapter<String> qualityAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -96,11 +103,27 @@ public class BgrYesActivity extends BaseAct {
                 return;
             }
             if (isBound) {
+                setupSpinners();
                 switchCamParam();
             }
         });
 
         resolutionSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (isBound) {
+                    // setupSpinners();
+                    switchCamParam();
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
+            }
+        });
+
+        fpsSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 if (isBound) {
@@ -128,12 +151,25 @@ public class BgrYesActivity extends BaseAct {
 
     private void switchCamParam() {
         String selectedApi = getSelectedApi();
-        String resolution = resolutionSpinner.getSelectedItem().toString();
-        int width = Integer.parseInt(resolution.split("x")[0]);
-        int height = Integer.parseInt(resolution.split("x")[1]);
-        int fps = Integer.parseInt(fpsSpinner.getSelectedItem().toString());
-        recordService.switchCamera(selectedApi, textureView, width, height, fps);
+
+        Log.d(TAG, "switchCamParam: " + selectedApi);
+
+        if ("CameraX".equals(selectedApi)) {
+            String qualityName = resolutionSpinner.getSelectedItem().toString();
+            Quality quality = qualityMap.get(qualityName);
+            Log.d(TAG, "quality: " + quality);
+            int fps = Integer.parseInt(fpsSpinner.getSelectedItem().toString());
+            recordService.switchCameraX(selectedApi, textureView, quality, fps, this::updateCamXAdapter);
+        } else {
+            String resolution = resolutionSpinner.getSelectedItem().toString();
+            int width = Integer.parseInt(resolution.split("x")[0]);
+            int height = Integer.parseInt(resolution.split("x")[1]);
+            int fps = Integer.parseInt(fpsSpinner.getSelectedItem().toString());
+            recordService.switchCamera(selectedApi, textureView, width, height, fps);
+        }
+
     }
+
 
     private void startRecording() {
         if (isBound && recordService != null && recordService.isReady()) {
@@ -237,31 +273,108 @@ public class BgrYesActivity extends BaseAct {
             CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraId);
             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
             if (map == null) return;
-
-            Size[] outputSizes = map.getOutputSizes(MediaRecorder.class);
-            List<String> resolutions = new ArrayList<>();
-            for (Size size : outputSizes) {
-                resolutions.add(size.getWidth() + "x" + size.getHeight());
-            }
-            ArrayAdapter<String> resolutionAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, resolutions);
-            resolutionAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            resolutionSpinner.setAdapter(resolutionAdapter);
-
-            Range<Integer>[] fpsRanges = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
-            Set<String> frameRatesSet = new HashSet<>();
-            for (Range<Integer> range : fpsRanges) {
-                frameRatesSet.add(range.getUpper().toString());
-            }
-            List<String> frameRates = new ArrayList<>(frameRatesSet);
-            Collections.sort(frameRates);
-            ArrayAdapter<String> fpsAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, frameRates);
-            fpsAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            fpsSpinner.setAdapter(fpsAdapter);
+            setupResolutionAdapter(characteristics);
+            setupFpsAdapter(characteristics);
 
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
     }
+
+    private void setupResolutionAdapter(CameraCharacteristics characteristics) {
+        StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+        if ("CameraX".equals(getSelectedApi())) {
+            if (qualityAdapter != null) {
+                resolutionSpinner.setAdapter(qualityAdapter);
+            } else if (camXadapter == null) {
+                camXadapter = getCamXAdapter();
+                resolutionSpinner.setAdapter(camXadapter);
+            }
+        } else {
+            if (camAdapter == null) {
+                camAdapter = getCamAdapter(map);
+            }
+            resolutionSpinner.setAdapter(camAdapter);
+        }
+    }
+
+    private void setupFpsAdapter(CameraCharacteristics characteristics) {
+        if (fpsAdapter == null) {
+            fpsAdapter = getFpsAdapter(characteristics);
+        }
+        fpsSpinner.setAdapter(fpsAdapter);
+    }
+
+    @NonNull
+    private ArrayAdapter<String> getCamXAdapter() {
+        qualityMap = new HashMap<>();
+
+        // List<Quality> camXQualities = Quality.getSortedQualities();
+        // List<Quality> camXQualities = QualitySelector.getSupportedQualities();
+
+        List<Quality> camXQualities = Arrays.asList(Quality.HIGHEST);
+        List<String> resolutions = new ArrayList<>();
+        for (Quality quality : camXQualities) {
+            String name = ((Quality.ConstantQuality) quality).getName();
+            qualityMap.put(name, quality);
+            resolutions.add(name);
+        }
+        ArrayAdapter<String> resolutionAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, resolutions);
+        resolutionAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return resolutionAdapter;
+    }
+
+    @NonNull
+    private void updateCamXAdapter(CameraInfo cameraInfo) {
+        if (qualityAdapter != null) {
+            return;
+        }
+        Log.d(TAG, "updateCamXAdapter: " + cameraInfo);
+        qualityMap = new HashMap<>();
+
+        List<Quality> camXQualities = QualitySelector.getSupportedQualities(cameraInfo);
+        Log.d(TAG, "camXQualities: " + camXQualities.size());
+        List<String> resolutions = new ArrayList<>();
+        for (Quality quality : camXQualities) {
+            Log.d(TAG, "quality: " + quality);
+            String name = ((Quality.ConstantQuality) quality).getName();
+            qualityMap.put(name, quality);
+            resolutions.add(name);
+        }
+        qualityAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, resolutions);
+        qualityAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        // return resolutionAdapter;
+        resolutionSpinner.setAdapter(qualityAdapter);
+    }
+
+
+
+    @NonNull
+    private ArrayAdapter<String> getCamAdapter(StreamConfigurationMap map) {
+        Size[] outputSizes = map.getOutputSizes(MediaRecorder.class);
+        List<String> resolutions = new ArrayList<>();
+        for (Size size : outputSizes) {
+            resolutions.add(size.getWidth() + "x" + size.getHeight());
+        }
+        ArrayAdapter<String> resolutionAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, resolutions);
+        resolutionAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return resolutionAdapter;
+    }
+
+    private ArrayAdapter<String> getFpsAdapter(CameraCharacteristics characteristics) {
+        Range<Integer>[] fpsRanges = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
+        Set<String> frameRatesSet = new HashSet<>();
+        for (Range<Integer> range : fpsRanges) {
+            frameRatesSet.add(range.getUpper().toString());
+        }
+        List<String> frameRates = new ArrayList<>(frameRatesSet);
+        Collections.sort(frameRates);
+        ArrayAdapter<String> fpsAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, frameRates);
+        fpsAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return fpsAdapter;
+    }
+
+
 
 
     @Override

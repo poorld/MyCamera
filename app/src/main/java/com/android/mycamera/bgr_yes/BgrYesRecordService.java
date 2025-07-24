@@ -10,6 +10,7 @@ import android.os.IBinder;
 import android.util.Log;
 import android.view.TextureView;
 
+import androidx.camera.video.Quality;
 import androidx.core.app.NotificationCompat;
 import androidx.lifecycle.LifecycleService;
 
@@ -59,8 +60,8 @@ public class BgrYesRecordService extends LifecycleService {
         return currentApi;
     }
 
+
     public void switchCamera(String api, TextureView textureView, int width, int height, int fps) {
-        boolean wasCameraX = "CameraX".equals(currentApi);
 
         if (cameraHelper != null) {
             cameraHelper.closeCamera();
@@ -70,14 +71,25 @@ public class BgrYesRecordService extends LifecycleService {
         // Pass the service's own lifecycle to the helper
         androidx.lifecycle.LifecycleOwner lifecycleOwner = this;
 
-        if (wasCameraX) {
-            // Give CameraX a moment to release resources asynchronously
-            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                createAndStartPreview(api, textureView, width, height, fps, lifecycleOwner);
-            }, 200); // 200ms delay as a pragmatic solution
-        } else {
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
             createAndStartPreview(api, textureView, width, height, fps, lifecycleOwner);
+        }, 300); // 200ms delay as a pragmatic solution
+    }
+
+    public void switchCameraX(String api, TextureView textureView, Quality quality, int fps, CameraXHelper.CameraInfoListener cameraInfoListener) {
+
+        if (cameraHelper != null) {
+            cameraHelper.closeCamera();
+            cameraHelper = null;
         }
+
+        // Pass the service's own lifecycle to the helper
+        androidx.lifecycle.LifecycleOwner lifecycleOwner = this;
+
+        // Give CameraX a moment to release resources asynchronously
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            createAndStartXPreview(api, textureView, quality, fps, lifecycleOwner, cameraInfoListener);
+        }, 300); // 200ms delay as a pragmatic solution
     }
 
     private void createAndStartPreview(String api, TextureView textureView, int width, int height, int fps, androidx.lifecycle.LifecycleOwner lifecycleOwner) {
@@ -89,15 +101,20 @@ public class BgrYesRecordService extends LifecycleService {
             case "Camera2":
                 cameraHelper = new Camera2Helper(this);
                 break;
-            case "CameraX":
-                cameraHelper = new CameraXHelper(this);
-                break;
         }
 
         if (cameraHelper != null) {
             cameraHelper.openCamera(width, height, fps);
             cameraHelper.startPreview(textureView, lifecycleOwner);
         }
+    }
+
+    private void createAndStartXPreview(String api, TextureView textureView, Quality quality, int fps, androidx.lifecycle.LifecycleOwner lifecycleOwner, CameraXHelper.CameraInfoListener cameraInfoListener) {
+        this.currentApi = api;
+        cameraHelper = new CameraXHelper(this);
+        ((CameraXHelper) cameraHelper).setCameraInfoListener(cameraInfoListener);
+        ((ICameraXHelper) cameraHelper).openCamera(quality, fps);
+        cameraHelper.startPreview(textureView, lifecycleOwner);
     }
 
     public void stopPreview() {

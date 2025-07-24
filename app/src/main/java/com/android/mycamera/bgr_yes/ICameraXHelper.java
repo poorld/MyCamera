@@ -1,4 +1,12 @@
 package com.android.mycamera.bgr_yes;
 
-public interface ICameraXHelper {
+import androidx.camera.video.Quality;
+
+public abstract class ICameraXHelper implements ICameraHelper {
+    public void openCamera(int width, int height, int fps) {
+
+    }
+
+    public abstract void openCamera(Quality quality, int fps);
+
 }

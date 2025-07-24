@@ -8,8 +8,8 @@ android {
 
     defaultConfig {
         applicationId "com.android.mycamera"
-        minSdk 29
-        targetSdk 29
+        minSdk 30
+        targetSdk 32
         versionCode 1
         versionName "1.0"
 

@@ -56,7 +56,9 @@ public class Camera2Helper implements ICameraHelper {
                 public void onOpened(@NonNull CameraDevice camera) {
                     Log.d(TAG, "onOpened: ");
                     cameraDevice = camera;
-                    createPreviewSession();
+                    if (textureView != null) {
+                        createPreviewSession();
+                    }
                 }
                 @Override
                 public void onDisconnected(@NonNull CameraDevice camera) {

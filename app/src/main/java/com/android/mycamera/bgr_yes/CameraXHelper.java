@@ -8,6 +8,7 @@ import android.util.Log;
 import android.view.Surface;
 import android.view.TextureView;
 import androidx.annotation.NonNull;
+import androidx.camera.core.CameraInfo;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.Preview;
 import androidx.camera.core.SurfaceRequest;
@@ -30,7 +31,11 @@ import java.text.SimpleDateFormat;
 import java.util.Locale;
 import java.util.concurrent.ExecutionException;
 
-public class CameraXHelper implements ICameraHelper {
+public class CameraXHelper extends ICameraXHelper {
+
+    public interface CameraInfoListener {
+        void onCameraInfoAvailable(CameraInfo cameraInfo);
+    }
 
     public static final String TAG = "CameraXHelper";
     private Context context;
@@ -38,19 +43,29 @@ public class CameraXHelper implements ICameraHelper {
     private VideoCapture<Recorder> videoCapture;
     private Recording recording;
     private LifecycleOwner lifecycleOwner;
+    private Quality quality;
+    private int fps;
+    private CameraInfoListener cameraInfoListener;
 
     public CameraXHelper(Context context) {
         this.context = context;
     }
 
+    public void setCameraInfoListener(CameraInfoListener listener) {
+        this.cameraInfoListener = listener;
+    }
+
+
     @Override
-    public void openCamera(int width, int height, int fps) {
-        Log.d(TAG, String.format("openCamera: %dx%d,%d", width, height, fps));
+    public void openCamera(Quality quality, int fps) {
+        this.quality = quality;
+        this.fps = fps;
         cameraProviderFuture = ProcessCameraProvider.getInstance(context);
     }
 
     @Override
     public void startPreview(TextureView textureView, LifecycleOwner owner) {
+        Log.d(TAG, "startPreview: quality " + quality);
         this.lifecycleOwner = owner;
         cameraProviderFuture.addListener(() -> {
             try {
@@ -58,7 +73,9 @@ public class CameraXHelper implements ICameraHelper {
                 Preview preview = new Preview.Builder().build();
 
                 Recorder recorder = new Recorder.Builder()
-                        .setQualitySelector(QualitySelector.from(Quality.HIGHEST))
+                        // .setQualitySelector(QualitySelector.from(quality,
+                        //         androidx.camera.video.FallbackStrategy.lowerQualityOrHigherThan(Quality.SD)))
+                        .setQualitySelector(QualitySelector.from(quality))
                         .build();
                 videoCapture = VideoCapture.withOutput(recorder);
 
@@ -71,8 +88,16 @@ public class CameraXHelper implements ICameraHelper {
                         request.willNotProvideSurface();
                         return;
                     }
+
+                    Log.d(TAG, "startPreview: cameraInfoListener=" + cameraInfoListener);
+                    if (cameraInfoListener != null) {
+                        cameraInfoListener.onCameraInfoAvailable(request.getCamera().getCameraInfo());
+                    }
+
+
                     surfaceTexture.setDefaultBufferSize(request.getResolution().getWidth(), request.getResolution().getHeight());
                     Surface surface = new Surface(surfaceTexture);
+                    // surface.setFrameRate(fps, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE);
                     request.provideSurface(surface, ContextCompat.getMainExecutor(context), result -> {
                         // DO NOT RELEASE THE SURFACE TEXTURE HERE!
                         // It is owned by the TextureView.
