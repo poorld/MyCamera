@@ -1,7 +1,11 @@
 package com.android.mycamera.camera;
 
 import android.os.Bundle;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.WindowManager;
+import android.util.DisplayMetrics;
+import android.util.Size;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.Toast;
@@ -11,6 +15,9 @@ import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ImageCapture;
 import androidx.camera.core.ImageCaptureException;
 import androidx.camera.core.Preview;
+import androidx.camera.core.resolutionselector.AspectRatioStrategy;
+import androidx.camera.core.resolutionselector.ResolutionSelector;
+import androidx.camera.core.resolutionselector.ResolutionStrategy;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
 import androidx.core.content.ContextCompat;
@@ -52,31 +59,32 @@ public class CamXApiActivity extends BaseAct {
     }
 
     private void startCamera() {
-        // ProcessCameraProvider 的获取是异步的
         ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(this);
 
         cameraProviderFuture.addListener(() -> {
             try {
-                // 成功获取 ProcessCameraProvider
                 ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
 
-                // 1. 创建 Preview 用例
-                Preview preview = new Preview.Builder().build();
+                DisplayMetrics metrics = new DisplayMetrics();
+                getWindowManager().getDefaultDisplay().getMetrics(metrics);
+                int screenWidth = metrics.widthPixels;
+                int screenHeight = metrics.heightPixels;
+
+                ResolutionSelector resolutionSelector = new ResolutionSelector.Builder()
+                        .setResolutionStrategy(new ResolutionStrategy(new Size(screenWidth, screenHeight), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER))
+                        .build();
+
+                Preview preview = new Preview.Builder()
+                        .setResolutionSelector(resolutionSelector)
+                        .build();
                 preview.setSurfaceProvider(previewView.getSurfaceProvider());
 
-                // 2. 创建 ImageCapture 用例
                 imageCapture = new ImageCapture.Builder().build();
 
-                // 3. 选择后置摄像头作为默认相机
-                // 【优化点】使用 CameraSelector.DEFAULT_BACK_CAMERA 替代复杂的过滤器
                 CameraSelector cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA;
 
-                // 4. 绑定用例到生命周期
-                // 在绑定前先解绑，确保没有其他用例在运行
                 cameraProvider.unbindAll();
 
-                // 【核心】将相机用例绑定到 Activity 的生命周期
-                // CameraX 会自动处理相机的打开和关闭
                 cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture);
 
             } catch (ExecutionException | InterruptedException e) {
@@ -101,11 +109,9 @@ public class CamXApiActivity extends BaseAct {
             return;
         }
 
-        // 创建包含文件和元数据的输出选项
         ImageCapture.OutputFileOptions outputOptions =
                 new ImageCapture.OutputFileOptions.Builder(photoFile).build();
 
-        // 执行拍照
         imageCapture.takePicture(
                 outputOptions,
                 ContextCompat.getMainExecutor(this), // 在主线程中执行回调
