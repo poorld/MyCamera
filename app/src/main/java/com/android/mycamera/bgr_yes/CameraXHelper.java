@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.SurfaceTexture;
 import android.util.Log;
+import android.util.Range;
 import android.view.Surface;
 import android.view.TextureView;
 import androidx.annotation.NonNull;
@@ -70,7 +71,9 @@ public class CameraXHelper extends ICameraXHelper {
         cameraProviderFuture.addListener(() -> {
             try {
                 ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
-                Preview preview = new Preview.Builder().build();
+                Preview preview = new Preview.Builder()
+                        .setTargetFrameRate(Range.create(fps, fps))
+                        .build();
 
                 Recorder recorder = new Recorder.Builder()
                         // .setQualitySelector(QualitySelector.from(quality,
@@ -97,6 +100,9 @@ public class CameraXHelper extends ICameraXHelper {
 
                     surfaceTexture.setDefaultBufferSize(request.getResolution().getWidth(), request.getResolution().getHeight());
                     Surface surface = new Surface(surfaceTexture);
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                        surface.setFrameRate(fps, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE);
+                    }
                     // surface.setFrameRate(fps, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE);
                     request.provideSurface(surface, ContextCompat.getMainExecutor(context), result -> {
                         // DO NOT RELEASE THE SURFACE TEXTURE HERE!
