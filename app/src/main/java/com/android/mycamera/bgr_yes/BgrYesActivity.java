@@ -80,7 +80,6 @@ public class BgrYesActivity extends BaseAct {
     private ArrayAdapter<String> camAdapter;
     private ArrayAdapter<String> fpsAdapter;
     private Map<String, Quality> qualityMap;
-    private String lastApi;
     private ArrayAdapter<String> qualityAdapter;
 
     @Override
@@ -222,16 +221,6 @@ public class BgrYesActivity extends BaseAct {
             timer.cancel();
             timer = null;
         }
-    }
-
-    private void startPreviewForSelectedApi() {
-        Log.d(TAG, "startPreviewForSelectedApi: ");
-        String selectedApi = getSelectedApi();
-        String resolution = resolutionSpinner.getSelectedItem().toString();
-        int width = Integer.parseInt(resolution.split("x")[0]);
-        int height = Integer.parseInt(resolution.split("x")[1]);
-        int fps = Integer.parseInt(fpsSpinner.getSelectedItem().toString());
-        // recordService.startPreview(selectedApi, textureView, width, height, fps, this);
     }
 
     private String getSelectedApi() {

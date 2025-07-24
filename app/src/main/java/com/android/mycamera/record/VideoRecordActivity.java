@@ -11,6 +11,8 @@ import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.util.Range;
 import android.util.Size;
+import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.RadioGroup;
@@ -19,6 +21,9 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.camera.core.CameraInfo;
+import androidx.camera.video.Quality;
+import androidx.camera.video.QualitySelector;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
@@ -28,9 +33,13 @@ import com.android.mycamera.R;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class VideoRecordActivity extends BaseAct implements RecordingCallback {
 
@@ -42,6 +51,15 @@ public class VideoRecordActivity extends BaseAct implements RecordingCallback {
     private Button recordButton;
     private RadioGroup apiRadioGroup;
     private TextView statusTextView;
+    private TextView timeTextView;
+    private Timer timer;
+    private int time = 0;
+
+    private ArrayAdapter<String> camXadapter;
+    private ArrayAdapter<String> camAdapter;
+    private ArrayAdapter<String> fpsAdapter;
+    public Map<String, Quality> qualityMap;
+    private ArrayAdapter<String> qualityAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,26 +80,32 @@ public class VideoRecordActivity extends BaseAct implements RecordingCallback {
         recordButton = findViewById(R.id.recordButton);
         apiRadioGroup = findViewById(R.id.apiRadioGroup);
         statusTextView = findViewById(R.id.statusTextView);
+        timeTextView = findViewById(R.id.timeTextView);
 
         apiRadioGroup.setOnCheckedChangeListener((group, checkedId) -> {
-            Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
-            if (currentFragment instanceof IRecordingFragment && ((IRecordingFragment) currentFragment).isCurrentlyRecording()) {
-                group.check(getCheckedRadioButtonId()); // Revert selection if recording
-                return;
-            }
+            if (isRecording()) return;
+            setupSpinners();
+            switchCamParam();
+        });
 
-            Fragment selectedFragment = null;
-            if (checkedId == R.id.camera1RadioButton) {
-                selectedFragment = new Camera1Fragment();
-            } else if (checkedId == R.id.camera2RadioButton) {
-                selectedFragment = new Camera2Fragment();
-            } else if (checkedId == R.id.cameraXRadioButton) {
-                selectedFragment = new CameraXFragment();
+        resolutionSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (isRecording()) return;
+                switchCamParam();
             }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
 
-            if (selectedFragment != null) {
-                loadFragment(selectedFragment);
+        fpsSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (isRecording()) return;
+                switchCamParam();
             }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
         });
 
         recordButton.setOnClickListener(v -> {
@@ -91,12 +115,45 @@ public class VideoRecordActivity extends BaseAct implements RecordingCallback {
                 if (recordingFragment.isCurrentlyRecording()) {
                     recordingFragment.stopRecording();
                 } else {
-                    String resolution = (String) resolutionSpinner.getSelectedItem();
-                    int fps = Integer.parseInt((String) fpsSpinner.getSelectedItem());
-                    recordingFragment.startRecording(resolution, fps);
+                    recordingFragment.startRecording(getSelectedResolution(), getSelectedFps());
                 }
             }
         });
+    }
+
+    private void switchCamParam() {
+        Fragment selectedFragment;
+        String selectedApi = getSelectedApi();
+        if ("Camera1".equals(selectedApi)) {
+            selectedFragment = new Camera1Fragment();
+        } else if ("Camera2".equals(selectedApi)) {
+            selectedFragment = new Camera2Fragment();
+        } else {
+            selectedFragment = new CameraXFragment();
+        }
+
+        Bundle args = new Bundle();
+        args.putString("resolution", getSelectedResolution());
+        args.putInt("fps", getSelectedFps());
+        selectedFragment.setArguments(args);
+
+        loadFragment(selectedFragment);
+    }
+
+    private boolean isRecording() {
+        Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+        if (currentFragment instanceof IRecordingFragment) {
+            return ((IRecordingFragment) currentFragment).isCurrentlyRecording();
+        }
+        return false;
+    }
+
+    private String getSelectedResolution() {
+        return (String) resolutionSpinner.getSelectedItem();
+    }
+
+    private int getSelectedFps() {
+        return Integer.parseInt((String) fpsSpinner.getSelectedItem());
     }
 
     private int getCheckedRadioButtonId() {
@@ -110,6 +167,9 @@ public class VideoRecordActivity extends BaseAct implements RecordingCallback {
         if (fragment instanceof IRecordingFragment) {
             ((IRecordingFragment) fragment).setRecordingCallback(this);
         }
+        if (fragment instanceof CameraXFragment) {
+            ((CameraXFragment) fragment).setCameraInfoListener(this::updateCamXAdapter);
+        }
         getSupportFragmentManager().beginTransaction()
                 .replace(R.id.fragment_container, fragment)
                 .commit();
@@ -121,7 +181,36 @@ public class VideoRecordActivity extends BaseAct implements RecordingCallback {
             recordButton.setText("Stop Recording");
             statusTextView.setText("Status: Recording...");
             setControlsEnabled(false);
+            startTimer();
         });
+    }
+
+    private void startTimer() {
+        if (timer != null) {
+            timer.cancel();
+            timer = null;
+        }
+        timer = new Timer();
+        time = 0;
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                runOnUiThread(() -> timeTextView.setText(getTime()));
+            }
+        }, 1000, 1000);
+    }
+
+    private String getTime() {
+        time += 1;
+        int hours = time / 3600;
+        int minutes = (time % 3600) / 60;
+        int seconds = time % 60;
+
+        if (hours > 0) {
+            return String.format("%d:%02d:%02d", hours, minutes, seconds);
+        } else {
+            return String.format("%d:%02d", minutes, seconds);
+        }
     }
 
     @Override
@@ -130,6 +219,11 @@ public class VideoRecordActivity extends BaseAct implements RecordingCallback {
             recordButton.setText("Start Recording");
             statusTextView.setText("Status: Idle. " + message);
             setControlsEnabled(true);
+            if (timer != null) {
+                timer.cancel();
+                timer = null;
+            }
+            timeTextView.setText("00:00");
         });
     }
 
@@ -150,33 +244,105 @@ public class VideoRecordActivity extends BaseAct implements RecordingCallback {
 
             if (map == null) return;
 
-            Size[] outputSizes = map.getOutputSizes(MediaRecorder.class);
-            List<String> resolutions = new ArrayList<>();
-            if (outputSizes != null) {
-                for (Size size : outputSizes) {
-                    resolutions.add(size.getWidth() + "x" + size.getHeight());
-                }
-            }
-            ArrayAdapter<String> resolutionAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, resolutions);
-            resolutionAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            resolutionSpinner.setAdapter(resolutionAdapter);
-
-            Range<Integer>[] fpsRanges = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
-            Set<String> frameRatesSet = new HashSet<>();
-            if (fpsRanges != null) {
-                for (Range<Integer> range : fpsRanges) {
-                    frameRatesSet.add(range.getUpper().toString());
-                }
-            }
-            List<String> frameRates = new ArrayList<>(frameRatesSet);
-            Collections.sort(frameRates);
-            ArrayAdapter<String> fpsAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, frameRates);
-            fpsAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            fpsSpinner.setAdapter(fpsAdapter);
+            setupResolutionAdapter(characteristics);
+            setupFpsAdapter(characteristics);
 
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
+    }
+
+    private void setupResolutionAdapter(CameraCharacteristics characteristics) {
+        StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+        if ("CameraX".equals(getSelectedApi())) {
+            if (qualityAdapter != null) {
+                resolutionSpinner.setAdapter(qualityAdapter);
+            } else if (camXadapter == null) {
+                camXadapter = getCamXAdapter();
+                resolutionSpinner.setAdapter(camXadapter);
+            }
+        } else {
+            if (camAdapter == null) {
+                camAdapter = getCamAdapter(map);
+            }
+            resolutionSpinner.setAdapter(camAdapter);
+        }
+    }
+
+    private void setupFpsAdapter(CameraCharacteristics characteristics) {
+        if (fpsAdapter == null) {
+            fpsAdapter = getFpsAdapter(characteristics);
+        }
+        fpsSpinner.setAdapter(fpsAdapter);
+    }
+
+    @NonNull
+    private ArrayAdapter<String> getCamXAdapter() {
+        List<Quality> camXQualities = new ArrayList<>();
+        camXQualities.add(Quality.HIGHEST);
+        List<String> resolutions = new ArrayList<>();
+        for (Quality quality : camXQualities) {
+            String name = ((Quality.ConstantQuality) quality).getName();
+            resolutions.add(name);
+        }
+        ArrayAdapter<String> resolutionAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, resolutions);
+        resolutionAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return resolutionAdapter;
+    }
+
+    @NonNull
+    private void updateCamXAdapter(CameraInfo cameraInfo) {
+        if (qualityAdapter != null) {
+            return;
+        }
+        qualityMap = new HashMap<>();
+
+        List<Quality> camXQualities = QualitySelector.getSupportedQualities(cameraInfo);
+        List<String> resolutions = new ArrayList<>();
+        for (Quality quality : camXQualities) {
+            String name = ((Quality.ConstantQuality) quality).getName();
+            qualityMap.put(name, quality);
+            resolutions.add(name);
+        }
+        qualityAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, resolutions);
+        qualityAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        resolutionSpinner.setAdapter(qualityAdapter);
+    }
+
+    @NonNull
+    private ArrayAdapter<String> getCamAdapter(StreamConfigurationMap map) {
+        Size[] outputSizes = map.getOutputSizes(MediaRecorder.class);
+        List<String> resolutions = new ArrayList<>();
+        if (outputSizes != null) {
+            for (Size size : outputSizes) {
+                resolutions.add(size.getWidth() + "x" + size.getHeight());
+            }
+        }
+        ArrayAdapter<String> resolutionAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, resolutions);
+        resolutionAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return resolutionAdapter;
+    }
+
+    private ArrayAdapter<String> getFpsAdapter(CameraCharacteristics characteristics) {
+        Range<Integer>[] fpsRanges = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
+        Set<String> frameRatesSet = new HashSet<>();
+        if (fpsRanges != null) {
+            for (Range<Integer> range : fpsRanges) {
+                frameRatesSet.add(range.getUpper().toString());
+            }
+        }
+        List<String> frameRates = new ArrayList<>(frameRatesSet);
+        Collections.sort(frameRates);
+        ArrayAdapter<String> fpsAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, frameRates);
+        fpsAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return fpsAdapter;
+    }
+
+    private String getSelectedApi() {
+        int selectedId = apiRadioGroup.getCheckedRadioButtonId();
+        if (selectedId == R.id.camera1RadioButton) return "Camera1";
+        if (selectedId == R.id.camera2RadioButton) return "Camera2";
+        return "CameraX";
     }
 
     private boolean allPermissionsGranted() {

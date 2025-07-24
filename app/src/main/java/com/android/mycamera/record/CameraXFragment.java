@@ -4,11 +4,14 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
+import android.util.Range;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.camera.core.Camera;
+import androidx.camera.core.CameraInfo;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.Preview;
 import androidx.camera.lifecycle.ProcessCameraProvider;
@@ -33,6 +36,10 @@ import java.util.concurrent.ExecutionException;
 
 public class CameraXFragment extends Fragment implements IRecordingFragment {
 
+    public interface CameraInfoListener {
+        void onCameraInfoAvailable(CameraInfo cameraInfo);
+    }
+
     private static final String TAG = "CameraXFragment";
 
     private PreviewView previewView;
@@ -40,11 +47,28 @@ public class CameraXFragment extends Fragment implements IRecordingFragment {
     private VideoCapture<Recorder> videoCapture;
     private Recording recording;
     private RecordingCallback recordingCallback;
+    private CameraInfoListener cameraInfoListener;
     private boolean isRecording = false;
 
     @Override
     public void setRecordingCallback(RecordingCallback callback) {
         this.recordingCallback = callback;
+    }
+
+    public void setCameraInfoListener(CameraInfoListener listener) {
+        this.cameraInfoListener = listener;
+    }
+
+    private String resolution;
+    private int frameRate;
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        if (getArguments() != null) {
+            resolution = getArguments().getString("resolution");
+            frameRate = getArguments().getInt("fps");
+        }
     }
 
     @Nullable
@@ -61,15 +85,40 @@ public class CameraXFragment extends Fragment implements IRecordingFragment {
         cameraProviderFuture.addListener(() -> {
             try {
                 ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
-                Preview preview = new Preview.Builder().build();
+                Preview preview = new Preview.Builder()
+                        .setTargetFrameRate(new Range<>(frameRate, frameRate))
+                        .build();
+
+
+                Quality quality = null;
+
+                try {
+                    VideoRecordActivity activity = (VideoRecordActivity) requireActivity();
+                    if (activity.qualityMap != null) {
+                        quality = activity.qualityMap.get(resolution);
+                    } else {
+                        quality = Quality.HIGHEST;
+                    }
+
+                } catch (IllegalStateException e) {
+                    quality = Quality.HIGHEST;
+                }
+
+                Log.d(TAG, "startCamera: quality " + quality);
+
                 Recorder recorder = new Recorder.Builder()
-                        .setQualitySelector(QualitySelector.from(Quality.HIGHEST))
+                        .setQualitySelector(QualitySelector.from(quality))
                         .build();
                 videoCapture = VideoCapture.withOutput(recorder);
 
                 cameraProvider.unbindAll();
-                cameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, videoCapture);
+                Camera camera = cameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, videoCapture);
                 preview.setSurfaceProvider(previewView.getSurfaceProvider());
+
+                if (cameraInfoListener != null) {
+                    cameraInfoListener.onCameraInfoAvailable(camera.getCameraInfo());
+                }
+
             } catch (ExecutionException | InterruptedException e) {
                 Log.e(TAG, "CameraX start failed", e);
             }

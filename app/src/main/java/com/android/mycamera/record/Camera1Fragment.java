@@ -31,6 +31,17 @@ public class Camera1Fragment extends Fragment implements IRecordingFragment, Sur
     private RecordingCallback recordingCallback;
     private boolean isRecording = false;
     private File outputFile;
+    private String resolution;
+    private int frameRate;
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        if (getArguments() != null) {
+            resolution = getArguments().getString("resolution");
+            frameRate = getArguments().getInt("fps");
+        }
+    }
 
     @Override
     public void setRecordingCallback(RecordingCallback callback) {
@@ -50,7 +61,7 @@ public class Camera1Fragment extends Fragment implements IRecordingFragment, Sur
     public void startRecording(String resolution, int frameRate) {
         if (camera == null || isRecording) return;
 
-        if (!setupMediaRecorder(resolution, frameRate)) {
+        if (!setupMediaRecorder(this.resolution, this.frameRate)) {
             if (recordingCallback != null) {
                 recordingCallback.onRecordingStopped("Failed to setup MediaRecorder");
             }
@@ -119,12 +130,12 @@ public class Camera1Fragment extends Fragment implements IRecordingFragment, Sur
             mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
             mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
             mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
-            if (resolution != null) {
-                String[] dimensions = resolution.split("x");
-                mediaRecorder.setVideoSize(Integer.parseInt(dimensions[0]), Integer.parseInt(dimensions[1]));
-            }
         }
 
+        if (resolution != null) {
+            String[] dimensions = resolution.split("x");
+            mediaRecorder.setVideoSize(Integer.parseInt(dimensions[0]), Integer.parseInt(dimensions[1]));
+        }
         mediaRecorder.setVideoFrameRate(frameRate);
         outputFile = new File(requireActivity().getExternalFilesDir(null), new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis()) + "_C1.mp4");
         mediaRecorder.setOutputFile(outputFile.getAbsolutePath());
@@ -162,6 +173,13 @@ public class Camera1Fragment extends Fragment implements IRecordingFragment, Sur
     public void surfaceCreated(@NonNull SurfaceHolder holder) {
         try {
             camera = Camera.open(0);
+            Camera.Parameters params = camera.getParameters();
+            if (resolution != null) {
+                String[] dimensions = resolution.split("x");
+                params.setPreviewSize(Integer.parseInt(dimensions[0]), Integer.parseInt(dimensions[1]));
+            }
+            params.setPreviewFrameRate(frameRate);
+            camera.setParameters(params);
             camera.setPreviewDisplay(holder);
             camera.startPreview();
         } catch (IOException e) {

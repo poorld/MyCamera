@@ -14,6 +14,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
+import android.util.Range;
 import android.view.LayoutInflater;
 import android.view.Surface;
 import android.view.SurfaceHolder;
@@ -47,6 +48,17 @@ public class Camera2Fragment extends Fragment implements IRecordingFragment, Sur
     private RecordingCallback recordingCallback;
     private boolean isRecording = false;
     private File outputFile;
+    private String resolution;
+    private int frameRate;
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        if (getArguments() != null) {
+            resolution = getArguments().getString("resolution");
+            frameRate = getArguments().getInt("fps");
+        }
+    }
 
     @Override
     public void setRecordingCallback(RecordingCallback callback) {
@@ -67,7 +79,7 @@ public class Camera2Fragment extends Fragment implements IRecordingFragment, Sur
         if (cameraDevice == null || isRecording) return;
 
         try {
-            if (!setupMediaRecorder(resolution, frameRate)) return;
+            if (!setupMediaRecorder(this.resolution, this.frameRate)) return;
 
             SurfaceHolder holder = surfaceView.getHolder();
             Surface recorderSurface = mediaRecorder.getSurface();
@@ -189,12 +201,12 @@ public class Camera2Fragment extends Fragment implements IRecordingFragment, Sur
             mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
             mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
             mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
-            if (resolution != null) {
-                String[] dimensions = resolution.split("x");
-                mediaRecorder.setVideoSize(Integer.parseInt(dimensions[0]), Integer.parseInt(dimensions[1]));
-            }
         }
 
+        if (resolution != null) {
+            String[] dimensions = resolution.split("x");
+            mediaRecorder.setVideoSize(Integer.parseInt(dimensions[0]), Integer.parseInt(dimensions[1]));
+        }
         mediaRecorder.setVideoFrameRate(frameRate); // Allow user to override frame rate
         outputFile = new File(requireActivity().getExternalFilesDir(null), new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis()) + "_C2.mp4");
         mediaRecorder.setOutputFile(outputFile.getAbsolutePath());
@@ -214,12 +226,17 @@ public class Camera2Fragment extends Fragment implements IRecordingFragment, Sur
             SurfaceHolder holder = surfaceView.getHolder();
             if (holder == null || cameraDevice == null) return;
 
+            String[] dimensions = resolution.split("x");
+            holder.setFixedSize(Integer.parseInt(dimensions[0]), Integer.parseInt(dimensions[1]));
+
             final CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+            builder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, Range.create(frameRate, frameRate));
             builder.addTarget(holder.getSurface());
 
             cameraDevice.createCaptureSession(Collections.singletonList(holder.getSurface()), new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
+                    if (!isAdded()) return;
                     captureSession = session;
                     try {
                         session.setRepeatingRequest(builder.build(), null, backgroundHandler);
