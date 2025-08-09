@@ -91,12 +91,21 @@
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
 
             <Button
-                android:visibility="invisible"
                 android:id="@+id/background_record_test"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Background Record Test"
                 app:layout_constraintTop_toBottomOf="@id/background_record"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+            
+            <Button
+                android:id="@+id/focus_camera_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Focus Camera"
+                app:layout_constraintTop_toBottomOf="@id/background_record_test"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>

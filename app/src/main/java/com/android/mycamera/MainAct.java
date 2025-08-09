@@ -22,6 +22,7 @@ import com.android.mycamera.camera.Cam1ApiActivity;
 import com.android.mycamera.camera.Cam2ApiActivity;
 import com.android.mycamera.camera.CamSizeActivity;
 import com.android.mycamera.camera.CamXApiActivity;
+import com.android.mycamera.focus.FocusCameraActivity;
 import com.android.mycamera.record.VideoRecordActivity;
 
 public class MainAct extends BaseAct {
@@ -33,6 +34,7 @@ public class MainAct extends BaseAct {
     private Button video_record_button;
     private Button background_record;
     private Button background_record_test;
+    private Button focus_camera_button;
     private TextView titleTextView;
 
     private static final String[] REQUIRED_PERMISSIONS = {
@@ -57,6 +59,7 @@ public class MainAct extends BaseAct {
         video_record_button = findViewById(R.id.video_record_button);
         background_record = findViewById(R.id.background_record);
         background_record_test = findViewById(R.id.background_record_test);
+        focus_camera_button = findViewById(R.id.focus_camera_button);
 
         camera_size.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -104,6 +107,13 @@ public class MainAct extends BaseAct {
             public void onClick(View v) {
                 // startActivity(new Intent(MainAct.this, CameraActivity.class));
                 startActivity(new Intent(MainAct.this, BackgroudCameraActivity.class));
+            }
+        });
+        
+        focus_camera_button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(MainAct.this, FocusCameraActivity.class));
             }
         });
     }

@@ -32,13 +32,25 @@ public class BgrYesRecordService extends LifecycleService {
     @Override
     public void onCreate() {
         super.onCreate();
-        createNotificationChannel();
+        /*createNotificationChannel();
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 // .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .setContentTitle("BGR Yes Recording Service")
                 .setContentText("Recording video in the background.")
                 .build();
+        startForeground(1, notification);*/
+        NotificationChannel mChannel = new NotificationChannel(CHANNEL_ID, "my_cam", NotificationManager.IMPORTANCE_LOW);
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        Log.i(TAG, mChannel.toString());
+        manager.createNotificationChannel(mChannel);
+        Notification notification = new Notification.Builder(this, CHANNEL_ID)
+                .setChannelId(CHANNEL_ID)
+                .setContentTitle("Recording Service")
+                .setContentText("Recording video in the background.")
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .build();
         startForeground(1, notification);
+        // manager.notify(, notification);
     }
 
     @Override

@@ -71,6 +71,7 @@
         <activity
             android:name=".bgr_yes.BgrYesActivity"
             android:exported="true" />
+        <activity android:name="com.android.mycamera.focus.FocusCameraActivity" />
 
         <service
             android:name=".bgr_yes.BgrYesRecordService"
