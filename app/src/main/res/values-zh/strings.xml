@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">MyCamera</string>
+    <string name="app_name">YourCamera</string>
     <string name="background_record">后台录像</string>
     <string name="video_record">视频录像</string>
 </resources>

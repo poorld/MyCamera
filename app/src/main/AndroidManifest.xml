@@ -27,7 +27,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MyCamera"
-        android:requestLegacyExternalStorage="true">
+        android:requestLegacyExternalStorage="true"
+        android:hardwareAccelerated="true">
 
         <activity android:name=".MainAct"
             android:exported="true">
@@ -72,6 +73,10 @@
             android:name=".bgr_yes.BgrYesActivity"
             android:exported="true" />
         <activity android:name="com.android.mycamera.focus.FocusCameraActivity" />
+        
+        <activity
+            android:name=".multicamera.MultiCameraActivity"
+            android:exported="true" />
 
         <service
             android:name=".bgr_yes.BgrYesRecordService"
