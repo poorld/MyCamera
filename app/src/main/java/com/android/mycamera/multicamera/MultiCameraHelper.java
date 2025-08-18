@@ -53,7 +53,7 @@ public class MultiCameraHelper {
     private Map<String, String> videoPaths = new ConcurrentHashMap<>();
     
     private boolean isRecording = false;
-    
+
     public MultiCameraHelper(Context context) {
         this.context = context;
         this.cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
@@ -126,59 +126,7 @@ public class MultiCameraHelper {
             Log.e(TAG, "Error opening single camera: " + cameraId, e);
         }
     }
-    
-    @SuppressLint("MissingPermission")
-    public void openLogicalCamera(MultiCameraManager.LogicalCameraInfo logicalCamera) {
-        if (!logicalCamera.hasPhysicalCameras()) {
-            Log.e(TAG, "Logical camera has no physical cameras");
-            return;
-        }
-        
-        try {
-            Set<String> physicalIds = logicalCamera.getPhysicalCameraIds();
-            for (String physicalId : physicalIds) {
-                openPhysicalCamera(physicalId, logicalCamera);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error opening logical camera", e);
-        }
-    }
-    
-    private void openPhysicalCamera(String physicalCameraId, MultiCameraManager.LogicalCameraInfo logicalCamera) {
-        try {
-            MultiCameraManager.PhysicalCameraInfo physicalInfo = logicalCamera.getPhysicalCameras().get(physicalCameraId);
-            Size[] outputSizes = physicalInfo.getOutputSizes(MediaRecorder.class);
-            Size videoSize = chooseVideoSize(outputSizes);
-            videoSizes.put(physicalCameraId, videoSize);
-            
-            cameraManager.openCamera(logicalCamera.getCameraId(), new CameraDevice.StateCallback() {
-                @Override
-                public void onOpened(@NonNull CameraDevice camera) {
-                    cameraDevices.put(physicalCameraId, camera);
-                    Log.d(TAG, "Physical camera opened: " + physicalCameraId);
-                    createCameraPreviewSession(physicalCameraId);
-                }
-                
-                @Override
-                public void onDisconnected(@NonNull CameraDevice camera) {
-                    camera.close();
-                    cameraDevices.remove(physicalCameraId);
-                    Log.d(TAG, "Physical camera disconnected: " + physicalCameraId);
-                }
-                
-                @Override
-                public void onError(@NonNull CameraDevice camera, int error) {
-                    camera.close();
-                    cameraDevices.remove(physicalCameraId);
-                    Log.e(TAG, "Physical camera error: " + physicalCameraId + ", error: " + error);
-                }
-            }, backgroundHandler);
-            
-        } catch (CameraAccessException e) {
-            Log.e(TAG, "Error opening physical camera: " + physicalCameraId, e);
-        }
-    }
-    
+
     private void createCameraPreviewSession(String physicalCameraId) {
         CameraDevice cameraDevice = cameraDevices.get(physicalCameraId);
         TextureView textureView = textureViews.get(physicalCameraId);

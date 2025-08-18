@@ -1,10 +1,15 @@
 package com.android.mycamera.multicamera;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.SurfaceTexture;
+import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.TextureView;
 import android.view.View;
@@ -17,15 +22,20 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.android.mycamera.R;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class MultiCameraActivity extends AppCompatActivity {
     private static final String TAG = "MultiCameraActivity";
@@ -38,12 +48,18 @@ public class MultiCameraActivity extends AppCompatActivity {
     private Button stopPreviewButton;
     private Button startRecordButton;
     private Button stopRecordButton;
+    private SwitchCompat switch_order;
+    private boolean orderOpenCam;
+    private AtomicBoolean hasTextureViewOpen = new AtomicBoolean();
     
     private MultiCameraHelper multiCameraHelper;
     private Map<String, CameraInfo> availableCameras = new HashMap<>();
     private List<String> selectedCameras = new ArrayList<>();
     private Map<String, TextureView> cameraViews = new HashMap<>();
-    
+    private CameraManager cameraManager;
+
+    private Handler handler;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -56,7 +72,10 @@ public class MultiCameraActivity extends AppCompatActivity {
             finish();
             return;
         }
-        
+
+        cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+        handler = new Handler(Looper.getMainLooper());
+
         initViews();
         checkPermissions();
     }
@@ -68,11 +87,13 @@ public class MultiCameraActivity extends AppCompatActivity {
         stopPreviewButton = findViewById(R.id.stop_preview_button);
         startRecordButton = findViewById(R.id.start_record_button);
         stopRecordButton = findViewById(R.id.stop_record_button);
-        
+        switch_order = findViewById(R.id.switch_order);
+
         startPreviewButton.setOnClickListener(v -> startPreview());
         stopPreviewButton.setOnClickListener(v -> stopPreview());
         startRecordButton.setOnClickListener(v -> startRecording());
         stopRecordButton.setOnClickListener(v -> stopRecording());
+        switch_order.setOnCheckedChangeListener((buttonView, isChecked) -> orderOpenCam = isChecked);
         
         stopPreviewButton.setEnabled(false);
         stopRecordButton.setEnabled(false);
@@ -190,7 +211,7 @@ public class MultiCameraActivity extends AppCompatActivity {
         if (selectedCameras.size() > 2) {
             Toast.makeText(this, "建议不要同时打开超过2个摄像头，以免影响性能", Toast.LENGTH_LONG).show();
         }
-        
+
         createPreviewViews();
         // 移除立即打开摄像头的调用，等待SurfaceTexture可用后再打开
         // openSelectedCameras();
@@ -199,7 +220,7 @@ public class MultiCameraActivity extends AppCompatActivity {
         stopPreviewButton.setEnabled(true);
         startRecordButton.setEnabled(true);
     }
-    
+
     private void stopPreview() {
         closeAllCameras();
         
@@ -213,6 +234,7 @@ public class MultiCameraActivity extends AppCompatActivity {
         cameraViews.clear();
         
         for (String cameraId : selectedCameras) {
+
             CameraInfo cameraInfo = availableCameras.get(cameraId);
             
             // 创建摄像头标题
@@ -237,12 +259,24 @@ public class MultiCameraActivity extends AppCompatActivity {
             textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
                 @Override
                 public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
-                    Log.d(TAG, "SurfaceTexture available for camera: " + cameraId);
-                    // 当SurfaceTexture可用时，打开摄像头
-                    if (multiCameraHelper != null) {
-                        multiCameraHelper.addTextureView(cameraId, textureView);
-                        multiCameraHelper.openSingleCamera(cameraId);
+                    int delay = 0;
+                    if (orderOpenCam) {
+                        if (!hasTextureViewOpen.getAndSet(true)) {
+                            delay = 0;
+                        }else {
+                            delay = 3000;
+                        }
                     }
+                    Log.d(TAG, "onSurfaceTextureAvailable: delay " + delay);
+                    handler.postDelayed(() -> {
+                        Log.d(TAG, "SurfaceTexture available for camera: " + cameraId);
+
+                        if (multiCameraHelper != null) {
+                            multiCameraHelper.addTextureView(cameraId, textureView);
+                            multiCameraHelper.openSingleCamera(cameraId);
+                        }
+                    }, delay);
+
                 }
                 
                 @Override
@@ -266,14 +300,10 @@ public class MultiCameraActivity extends AppCompatActivity {
             cameraViews.put(cameraId, textureView);
             
             Log.d(TAG, "创建预览视图: " + cameraInfo.name);
+
         }
     }
-    
-    private void openSelectedCameras() {
-        for (String cameraId : selectedCameras) {
-            multiCameraHelper.openSingleCamera(cameraId);
-        }
-    }
+
     
     private void closeAllCameras() {
         if (multiCameraHelper != null) {
@@ -281,6 +311,7 @@ public class MultiCameraActivity extends AppCompatActivity {
         }
         previewContainer.removeAllViews();
         cameraViews.clear();
+        hasTextureViewOpen.set(false);
     }
     
     private void startRecording() {

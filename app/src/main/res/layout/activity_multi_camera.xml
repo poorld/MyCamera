@@ -36,6 +36,18 @@
 
         </LinearLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone">
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/switch_order"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="顺序打开"/>
+        </LinearLayout>
+
         <!-- 控制按钮 -->
         <LinearLayout
             android:layout_width="match_parent"
