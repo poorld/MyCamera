@@ -5,9 +5,18 @@
     android:layout_height="match_parent"
     tools:context=".camera.Cam1ApiActivity">
 
+    <!-- 摄像头切换按钮 -->
+    <Button
+        android:id="@+id/switchCameraButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:text="切换摄像头" />
+
     <!-- FrameLayout 将用于容纳相机预览 SurfaceView -->
     <FrameLayout
         android:id="@+id/camera_preview"
+        android:layout_below="@id/switchCameraButton"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 

@@ -6,12 +6,22 @@
     android:layout_height="match_parent"
     tools:context=".camera.CamXApiActivity">
 
+    <!-- 摄像头切换按钮 -->
+    <Button
+        android:id="@+id/switchCameraButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:text="切换摄像头" />
 
 
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
+        android:layout_below="@id/switchCameraButton"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
+
+
 
     <!-- 拍照按钮 -->
     <Button

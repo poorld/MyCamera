@@ -38,20 +38,22 @@ public class Camera2Helper implements ICameraHelper {
     private String resolution;
     private int frameRate;
 
+    private IPreViewListener mPreviewListener;
+
     public Camera2Helper(Context context) {
         this.context = context;
     }
 
     @SuppressLint("MissingPermission")
     @Override
-    public void openCamera(int width, int height, int fps) {
-        Log.d(TAG, String.format("openCamera: %dx%d,%d", width, height, fps));
+    public void openCamera(int width, int height, int fps, String cameraId) {
+        Log.d(TAG, String.format("openCamera: %dx%d,%d,cameraId=%s", width, height, fps, cameraId));
         this.resolution = width + "x" + height;
         this.frameRate = fps;
         startBackgroundThread();
         CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
         try {
-            manager.openCamera("0", new CameraDevice.StateCallback() {
+            manager.openCamera(cameraId, new CameraDevice.StateCallback() {
                 @Override
                 public void onOpened(@NonNull CameraDevice camera) {
                     Log.d(TAG, "onOpened: ");
@@ -175,6 +177,11 @@ public class Camera2Helper implements ICameraHelper {
         stopBackgroundThread();
     }
 
+    @Override
+    public void setPreviewListener(IPreViewListener previewListener) {
+        mPreviewListener = previewListener;
+    }
+
     private boolean setupMediaRecorder() {
         Log.d(TAG, "setupMediaRecorder: ");
         mediaRecorder = new MediaRecorder();
@@ -231,6 +238,8 @@ public class Camera2Helper implements ICameraHelper {
                     } catch (CameraAccessException e) {
                         e.printStackTrace();
                     }
+                    mPreviewListener.onPreviewOpen();
+
                 }
                 @Override
                 public void onConfigureFailed(@NonNull CameraCaptureSession session) {

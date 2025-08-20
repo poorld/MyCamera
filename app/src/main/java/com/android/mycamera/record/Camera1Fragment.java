@@ -35,6 +35,7 @@ public class Camera1Fragment extends Fragment implements IRecordingFragment, Sur
     private File outputFile;
     private String resolution;
     private int frameRate;
+    private String cameraId = "0";
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -42,6 +43,7 @@ public class Camera1Fragment extends Fragment implements IRecordingFragment, Sur
         if (getArguments() != null) {
             resolution = getArguments().getString("resolution");
             frameRate = getArguments().getInt("fps");
+            cameraId = getArguments().getString("cameraId", "0");
         }
     }
 
@@ -174,7 +176,7 @@ public class Camera1Fragment extends Fragment implements IRecordingFragment, Sur
     @Override
     public void surfaceCreated(@NonNull SurfaceHolder holder) {
         try {
-            camera = Camera.open(0);
+            camera = Camera.open(Integer.parseInt(cameraId));
             Camera.Parameters params = camera.getParameters();
             if (resolution != null) {
                 String[] dimensions = resolution.split("x");

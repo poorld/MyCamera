@@ -42,11 +42,14 @@ public class Cam2ApiActivity extends BaseAct {
 
     private TextureView textureView;
     private Button btnCapture;
+    private Button switchCameraButton;
 
     private String cameraId;
     private CameraDevice cameraDevice;
     private CameraCaptureSession cameraCaptureSession;
     private CaptureRequest.Builder captureRequestBuilder;
+    private String[] cameraIds;
+    private int currentCameraIndex = 0;
 
     private Size previewSize;
     private ImageReader imageReader;
@@ -63,11 +66,13 @@ public class Cam2ApiActivity extends BaseAct {
 
         textureView = findViewById(R.id.textureView);
         btnCapture = findViewById(R.id.button_capture);
+        switchCameraButton = findViewById(R.id.switchCameraButton);
 
         // TextureView 的生命周期监听
         textureView.setSurfaceTextureListener(textureListener);
 
         btnCapture.setOnClickListener(v -> takePicture());
+        switchCameraButton.setOnClickListener(v -> switchCamera());
     }
 
     // TextureView 的监听器，在其可用时打开相机
@@ -100,8 +105,16 @@ public class Cam2ApiActivity extends BaseAct {
 
         CameraManager manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
-            // 选择后置摄像头
-            cameraId = manager.getCameraIdList()[0];
+            // 获取所有可用的摄像头
+            cameraIds = manager.getCameraIdList();
+            if (cameraIds == null || cameraIds.length == 0) {
+                Log.e(TAG, "No cameras found on this device.");
+                Toast.makeText(this, "没有可用的摄像头", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            
+            // 选择当前摄像头
+            cameraId = cameraIds[currentCameraIndex];
             CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
             // 获取支持的预览尺寸
             Size[] jpegSizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(ImageFormat.JPEG);
@@ -281,6 +294,29 @@ public class Cam2ApiActivity extends BaseAct {
             imageReader.close();
             imageReader = null;
         }
+    }
+    
+    private void switchCamera() {
+        if (cameraIds == null || cameraIds.length <= 1) {
+            Toast.makeText(this, "只有一个摄像头可用", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // 关闭当前相机
+        closeCamera();
+        
+        // 切换到下一个摄像头
+        currentCameraIndex = (currentCameraIndex + 1) % cameraIds.length;
+        cameraId = cameraIds[currentCameraIndex];
+        
+        Log.d(TAG, "Switching to camera ID: " + cameraId);
+        
+        // 重新打开相机
+        if (textureView.isAvailable()) {
+            openCamera(textureView.getWidth(), textureView.getHeight());
+        }
+        
+        Toast.makeText(this, "切换到摄像头 " + cameraId, Toast.LENGTH_SHORT).show();
     }
 
     // 启动后台线程

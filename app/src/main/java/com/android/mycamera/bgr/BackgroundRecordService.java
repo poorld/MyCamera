@@ -80,6 +80,13 @@ public class BackgroundRecordService extends Service {
             camera2Helper.stopRecording();
         }
     }
+    
+    public void switchCamera() {
+        Log.d(TAG, "switchCamera: ");
+        if (camera2Helper != null) {
+            camera2Helper.switchToNextCamera();
+        }
+    }
 
     @Override
     public void onDestroy() {

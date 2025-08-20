@@ -51,6 +51,7 @@ public class Camera2Fragment extends Fragment implements IRecordingFragment, Sur
     private File outputFile;
     private String resolution;
     private int frameRate;
+    private String cameraId = "0";
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -58,6 +59,7 @@ public class Camera2Fragment extends Fragment implements IRecordingFragment, Sur
         if (getArguments() != null) {
             resolution = getArguments().getString("resolution");
             frameRate = getArguments().getInt("fps");
+            cameraId = getArguments().getString("cameraId", "0");
         }
     }
 
@@ -165,7 +167,7 @@ public class Camera2Fragment extends Fragment implements IRecordingFragment, Sur
             if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                 return;
             }
-            manager.openCamera("0", new CameraDevice.StateCallback() {
+            manager.openCamera(cameraId, new CameraDevice.StateCallback() {
                 @Override
                 public void onOpened(@NonNull CameraDevice camera) {
                     cameraDevice = camera;

@@ -35,6 +35,8 @@ public class Cam1ApiActivity extends BaseAct {
     private Camera mCamera;
     private Cam1ApiPreview mPreview;
     private FrameLayout cameraPreviewLayout;
+    private int currentCameraIndex = 0;
+    private int cameraCount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,6 +45,7 @@ public class Cam1ApiActivity extends BaseAct {
 
         cameraPreviewLayout = findViewById(R.id.camera_preview);
         Button captureButton = findViewById(R.id.button_capture);
+        Button switchCameraButton = findViewById(R.id.switchCameraButton);
 
         // 检查相机权限
         if (checkCameraPermission()) {
@@ -61,6 +64,8 @@ public class Cam1ApiActivity extends BaseAct {
                 mCamera.takePicture(null, null, mPicture);
             }
         });
+        
+        switchCameraButton.setOnClickListener(v -> switchCamera());
     }
 
     @Override
@@ -117,9 +122,9 @@ public class Cam1ApiActivity extends BaseAct {
     public Camera getCameraInstance() {
         Log.d(TAG, "getCameraInstance: ");
 
-        int numCameras = Camera.getNumberOfCameras();
-        Log.d(TAG, "numCameras: " + numCameras);
-        if (numCameras == 0) {
+        cameraCount = Camera.getNumberOfCameras();
+        Log.d(TAG, "numCameras: " + cameraCount);
+        if (cameraCount == 0) {
             Log.e(TAG, "No cameras found on this device.");
             Toast.makeText(this, "相机不可用", Toast.LENGTH_SHORT).show();
             return null;
@@ -127,7 +132,7 @@ public class Cam1ApiActivity extends BaseAct {
 
         Camera c = null;
         try {
-            c = Camera.open(); // 尝试获取一个 Camera 实例
+            c = Camera.open(currentCameraIndex); // 尝试获取指定摄像头实例
         } catch (Exception e) {
             // 相机不可用（正在使用或不存在）
             Log.e(TAG, "相机不可用: " + e.getMessage());
@@ -190,6 +195,28 @@ public class Cam1ApiActivity extends BaseAct {
             // 此时相机已经处于空闲状态，可以安全地释放。
             mCamera.release();
             mCamera = null;
+        }
+    }
+    
+    private void switchCamera() {
+        if (cameraCount <= 1) {
+            Toast.makeText(this, "只有一个摄像头可用", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // 释放当前相机
+        releaseCameraAndPreview();
+        
+        // 切换到下一个摄像头
+        currentCameraIndex = (currentCameraIndex + 1) % cameraCount;
+        
+        Log.d(TAG, "Switching to camera index: " + currentCameraIndex);
+        
+        // 重新初始化相机
+        mCamera = getCameraInstance();
+        if (mCamera != null) {
+            setupCameraPreview();
+            Toast.makeText(this, "切换到摄像头 " + currentCameraIndex, Toast.LENGTH_SHORT).show();
         }
     }
 }

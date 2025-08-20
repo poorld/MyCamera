@@ -36,6 +36,7 @@ public class FocusHelper {
     private Context context;
     private CameraControl cameraControl;
     private CameraInfo cameraInfo;
+    private String currentCameraId = "0"; // 当前摄像头ID
     
     // Camera2 API 相关
     private CameraDevice cameraDevice;
@@ -59,6 +60,10 @@ public class FocusHelper {
 
     public void setCameraInfo(CameraInfo cameraInfo) {
         this.cameraInfo = cameraInfo;
+    }
+
+    public void setCurrentCameraId(String cameraId) {
+        this.currentCameraId = cameraId;
     }
     
     public void setCameraDevice(CameraDevice cameraDevice) {
@@ -131,9 +136,8 @@ public class FocusHelper {
             String[] cameraIds = cameraManager.getCameraIdList();
             if (cameraIds.length == 0) return false;
             
-            // 使用第一个相机ID
-            // String cameraId = cameraIds[0];
-            String cameraId = "2";
+            // 使用当前相机ID
+            String cameraId = currentCameraId;
             CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraId);
             
             return hasFocuser(characteristics);

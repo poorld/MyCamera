@@ -52,7 +52,10 @@ public class CameraXHelper extends ICameraXHelper {
     private LifecycleOwner lifecycleOwner;
     private Quality quality;
     private int fps;
+    private String cameraId = "0";
     private CameraInfoListener cameraInfoListener;
+
+    private IPreViewListener mPreviewListener;
 
     public CameraXHelper(Context context) {
         this.context = context;
@@ -60,6 +63,10 @@ public class CameraXHelper extends ICameraXHelper {
 
     public void setCameraInfoListener(CameraInfoListener listener) {
         this.cameraInfoListener = listener;
+    }
+
+    public void setCameraId(String cameraId) {
+        this.cameraId = cameraId;
     }
 
 
@@ -116,10 +123,10 @@ public class CameraXHelper extends ICameraXHelper {
                 CameraInfo targetCameraInfo = null;
                 for (CameraInfo cameraInfo : availableCameras) {
                     if (cameraInfo instanceof CameraInfoInternal) {
-                        String cameraId = ((CameraInfoInternal) cameraInfo).getCameraId();
-                        if ("0".equals(cameraId)) {
+                        String availableCameraId = ((CameraInfoInternal) cameraInfo).getCameraId();
+                        if (cameraId.equals(availableCameraId)) {
                             targetCameraInfo = cameraInfo;
-                            Log.d(TAG, "Found target camera with ID: 0");
+                            Log.d(TAG, "Found target camera with ID: " + cameraId);
                             break;
                         }
                     }
@@ -127,7 +134,7 @@ public class CameraXHelper extends ICameraXHelper {
 
                 if (targetCameraInfo == null) {
                     targetCameraInfo = availableCameras.get(0);
-                    Log.w(TAG, "Could not find camera with ID '0', falling back to the first available camera.");
+                    Log.w(TAG, "Could not find camera with ID '" + cameraId + "', falling back to the first available camera.");
                 }
 
                 CameraInfo finalTargetCameraInfo = targetCameraInfo;
@@ -148,7 +155,7 @@ public class CameraXHelper extends ICameraXHelper {
                         return;
                     }
 
-                    Log.d(TAG, "startPreview: cameraInfoListener=" + cameraInfoListener);
+                    Log.d(TAG, "cameraProviderFuture: cameraInfoListener=" + cameraInfoListener);
                     if (cameraInfoListener != null) {
                         cameraInfoListener.onCameraInfoAvailable(request.getCamera().getCameraInfo());
                     }
@@ -165,6 +172,9 @@ public class CameraXHelper extends ICameraXHelper {
                         // It is owned by the TextureView.
                         surface.release();
                     });
+
+                    mPreviewListener.onPreviewOpen();
+
                 });
 
             } catch (ExecutionException | InterruptedException e) {
@@ -228,5 +238,10 @@ public class CameraXHelper extends ICameraXHelper {
                 e.printStackTrace();
             }
         }
+    }
+
+    @Override
+    public void setPreviewListener(IPreViewListener previewListener) {
+        mPreviewListener = previewListener;
     }
 }

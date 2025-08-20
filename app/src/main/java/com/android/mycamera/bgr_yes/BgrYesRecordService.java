@@ -16,12 +16,19 @@ import androidx.lifecycle.LifecycleService;
 
 import com.android.mycamera.R;
 
-public class BgrYesRecordService extends LifecycleService {
+import java.util.concurrent.atomic.AtomicBoolean;
+
+public class BgrYesRecordService extends LifecycleService implements IPreViewListener {
 
     public static final String TAG = "BgrYesRecordService";
     private static final String CHANNEL_ID = "BgrYesRecordServiceChannel";
     private ICameraHelper cameraHelper;
     private final IBinder binder = new BgrYesRecordBinder();
+
+    @Override
+    public void onPreviewOpen() {
+        Log.d(TAG, "onPreviewOpen: ");
+    }
 
     public class BgrYesRecordBinder extends Binder {
         public BgrYesRecordService getService() {
@@ -66,6 +73,7 @@ public class BgrYesRecordService extends LifecycleService {
     }
 
     private String currentApi;
+    private String currentCameraId = "0"; // 当前摄像头ID
 
     public boolean isReady() {
         return cameraHelper != null;
@@ -76,8 +84,12 @@ public class BgrYesRecordService extends LifecycleService {
     }
 
 
-    public void switchCamera(String api, TextureView textureView, int width, int height, int fps) {
+    public void setCurrentCameraId(String cameraId) {
+        currentCameraId = cameraId;
+    }
 
+
+    public void switchCamera(String api, TextureView textureView, int width, int height, int fps) {
         if (cameraHelper != null) {
             cameraHelper.closeCamera();
             cameraHelper = null;
@@ -91,8 +103,8 @@ public class BgrYesRecordService extends LifecycleService {
         }, 300); // 200ms delay as a pragmatic solution
     }
 
-    public void switchCameraX(String api, TextureView textureView, Quality quality, int fps, CameraXHelper.CameraInfoListener cameraInfoListener) {
 
+    public void switchCameraX(String api, TextureView textureView, Quality quality, int fps, CameraXHelper.CameraInfoListener cameraInfoListener) {
         if (cameraHelper != null) {
             cameraHelper.closeCamera();
             cameraHelper = null;
@@ -119,7 +131,8 @@ public class BgrYesRecordService extends LifecycleService {
         }
 
         if (cameraHelper != null) {
-            cameraHelper.openCamera(width, height, fps);
+            cameraHelper.setPreviewListener(this);
+            cameraHelper.openCamera(width, height, fps, currentCameraId);
             cameraHelper.startPreview(textureView, lifecycleOwner);
         }
     }
@@ -127,7 +140,9 @@ public class BgrYesRecordService extends LifecycleService {
     private void createAndStartXPreview(String api, TextureView textureView, Quality quality, int fps, androidx.lifecycle.LifecycleOwner lifecycleOwner, CameraXHelper.CameraInfoListener cameraInfoListener) {
         this.currentApi = api;
         cameraHelper = new CameraXHelper(this);
+        cameraHelper.setPreviewListener(this);
         ((CameraXHelper) cameraHelper).setCameraInfoListener(cameraInfoListener);
+        ((CameraXHelper) cameraHelper).setCameraId(currentCameraId);
         ((ICameraXHelper) cameraHelper).openCamera(quality, fps);
         cameraHelper.startPreview(textureView, lifecycleOwner);
     }

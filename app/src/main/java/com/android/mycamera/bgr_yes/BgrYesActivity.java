@@ -5,16 +5,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.hardware.camera2.CameraAccessException;
-import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
-import android.hardware.camera2.params.StreamConfigurationMap;
-import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.text.TextUtils;
 import android.util.Log;
-import android.util.Range;
-import android.util.Size;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.AdapterView;
@@ -25,69 +20,58 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.camera.core.CameraInfo;
 import androidx.camera.video.Quality;
-import androidx.camera.video.QualitySelector;
 
 import com.android.mycamera.BaseAct;
 import com.android.mycamera.R;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
-
 public class BgrYesActivity extends BaseAct {
 
-    public static final String TAG = "BgrYesActivity";
-
+    private static final String TAG = "BgrYesActivity";
+    
     private TextureView textureView;
-    private Spinner resolutionSpinner, fpsSpinner;
+    private Spinner resolutionSpinner;
+    private Spinner fpsSpinner;
     private Button recordButton;
     private TextView statusTextView;
     private TextView timeTextView;
     private RadioGroup apiRadioGroup;
-
+    
     private BgrYesRecordService recordService;
-    private boolean isBound = false;
+    private boolean isServiceBound = false;
     private boolean isRecording = false;
-    private Timer timer;
-    private int time;
+    
+    private CameraSetupHelper cameraSetupHelper;
+    private RecordingTimer recordingTimer;
+    
+    private String currentCameraId = "0";
+    private String currentApi;
+    private Quality currentQuality;
+    private String currentResolution;
+    private int currentFps;
 
-    private final ServiceConnection connection = new ServiceConnection() {
+    private final ServiceConnection serviceConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName className, IBinder service) {
             BgrYesRecordService.BgrYesRecordBinder binder = (BgrYesRecordService.BgrYesRecordBinder) service;
             recordService = binder.getService();
-            isBound = true;
-
-            switchCamParam();
+            isServiceBound = true;
+            updateCameraParameters();
         }
 
         @Override
         public void onServiceDisconnected(ComponentName arg0) {
-            isBound = false;
+            isServiceBound = false;
         }
     };
-    private ArrayAdapter<String> camXadapter;
-    private ArrayAdapter<String> camAdapter;
-    private ArrayAdapter<String> fpsAdapter;
-    private Map<String, Quality> qualityMap;
-    private ArrayAdapter<String> qualityAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_bgr_yes);
 
-        textureView = findViewById(R.id.fragment_container); // Re-using the ID, but it's a TextureView now
+        textureView = findViewById(R.id.fragment_container);
         resolutionSpinner = findViewById(R.id.resolutionSpinner);
         fpsSpinner = findViewById(R.id.fpsSpinner);
         recordButton = findViewById(R.id.recordButton);
@@ -95,143 +79,153 @@ public class BgrYesActivity extends BaseAct {
         timeTextView = findViewById(R.id.timeTextView);
         apiRadioGroup = findViewById(R.id.apiRadioGroup);
 
+        cameraSetupHelper = new CameraSetupHelper(this);
+        recordingTimer = new RecordingTimer(timeTextView);
+        
         apiRadioGroup.setOnCheckedChangeListener((group, checkedId) -> {
             if (isRecording) {
                 Toast.makeText(this, "Cannot switch API while recording", Toast.LENGTH_SHORT).show();
-                group.check(getCheckedRadioButtonId()); // Revert selection
+                group.check(getCurrentApiRadioButtonId());
                 return;
             }
-            if (isBound) {
+            if (isServiceBound) {
+                cameraSetupHelper.clearAdapters();
                 setupSpinners();
-                switchCamParam();
+                updateCameraParameters();
             }
         });
+
+        Button switchCameraButton = findViewById(R.id.switchCameraButton);
+        if (switchCameraButton != null) {
+            switchCameraButton.setOnClickListener(v -> {
+                switchCamera();
+                setupSpinners();
+            });
+        }
 
         resolutionSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (isBound) {
-                    // setupSpinners();
-                    switchCamParam();
+                if (isServiceBound) {
+                    updateCameraParameters();
                 }
             }
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
-
+                // Do nothing
             }
         });
 
         fpsSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (isBound) {
-                    switchCamParam();
+                if (isServiceBound) {
+                    updateCameraParameters();
                 }
             }
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
-
+                // Do nothing
             }
         });
 
-        recordButton.setOnClickListener(v -> {
-            if (isRecording) {
-                stopRecording();
-            } else {
-                startRecording();
-            }
-        });
+        recordButton.setOnClickListener(v -> toggleRecording());
 
         setupSpinners();
-        startServiceAndBind();
+        startAndBindService();
     }
-
-    private void switchCamParam() {
-        String selectedApi = getSelectedApi();
-
-        Log.d(TAG, "switchCamParam: " + selectedApi);
-
-        if ("CameraX".equals(selectedApi)) {
-            String qualityName = resolutionSpinner.getSelectedItem().toString();
-            Quality quality = qualityMap.get(qualityName);
-            Log.d(TAG, "quality: " + quality);
-            int fps = Integer.parseInt(fpsSpinner.getSelectedItem().toString());
-            recordService.switchCameraX(selectedApi, textureView, quality, fps, this::updateCamXAdapter);
-        } else {
-            String resolution = resolutionSpinner.getSelectedItem().toString();
-            int width = Integer.parseInt(resolution.split("x")[0]);
-            int height = Integer.parseInt(resolution.split("x")[1]);
-            int fps = Integer.parseInt(fpsSpinner.getSelectedItem().toString());
-            recordService.switchCamera(selectedApi, textureView, width, height, fps);
-        }
-
+    
+    public String getCurrentCameraId() {
+        return currentCameraId;
     }
-
-
-    private void startRecording() {
-        if (isBound && recordService != null && recordService.isReady()) {
-            recordService.startRecording();
-            isRecording = true;
-            recordButton.setText("Stop Recording");
-            statusTextView.setText("Status: Recording");
-            setControlsEnabled(false);
-            startTimer();
-        }
+    
+    public void setCurrentCameraId(String cameraId) {
+        this.currentCameraId = cameraId;
     }
-
-    private void startTimer() {
-        if (timer != null) {
-            timer.cancel();
-            timer = null;
-        }
-        timer = new Timer();
-        time = 0;
-        timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                runOnUiThread(() -> timeTextView.setText(getTime()));
-            }
-        }, 1000, 1000);
-    }
-
-    private String getTime() {
-        time += 1;
-        int hours = time / 3600;
-        int minutes = (time % 3600) / 60;
-        int seconds = time % 60;
-
-        if (hours > 0) {
-            return String.format("%d:%02d:%02d", hours, minutes, seconds);
-        } else {
-            return String.format("%d:%02d", minutes, seconds);
-        }
-    }
-
-    private void stopRecording() {
-        Log.d(TAG, "stopRecording: ");
-        if (isBound) {
-            recordService.stopRecording();
-            isRecording = false;
-            recordButton.setText("Start Recording");
-            statusTextView.setText("Status: Idle");
-            timeTextView.setText("00:00");
-            setControlsEnabled(true);
-            timer.cancel();
-            timer = null;
-        }
-    }
-
-    private String getSelectedApi() {
+    
+    public String getSelectedApi() {
         int selectedId = apiRadioGroup.getCheckedRadioButtonId();
         if (selectedId == R.id.camera1RadioButton) return "Camera1";
         if (selectedId == R.id.camera2RadioButton) return "Camera2";
         return "CameraX";
     }
-    private int getCheckedRadioButtonId() {
+
+    private void updateCameraParameters() {
+        String selectedApi = getSelectedApi();
+        recordService.setCurrentCameraId(currentCameraId);
+        
+        if ("CameraX".equals(selectedApi)) {
+            updateCameraXParameters(selectedApi);
+        } else {
+            updateCameraParameters(selectedApi);
+        }
+    }
+    
+    private void updateCameraXParameters(String selectedApi) {
+        String qualityName = resolutionSpinner.getSelectedItem().toString();
+        Quality quality = cameraSetupHelper.getQualityMap().get(qualityName);
+        int fps = Integer.parseInt(fpsSpinner.getSelectedItem().toString());
+        
+        if (currentQuality != quality) {
+            recordService.switchCameraX(selectedApi, textureView, quality, fps, 
+                cameraInfo -> cameraSetupHelper.updateCameraXAdapter(cameraInfo, resolutionSpinner));
+            currentQuality = quality;
+            currentApi = selectedApi;
+        }
+    }
+    
+    private void updateCameraParameters(String selectedApi) {
+        String resolution = resolutionSpinner.getSelectedItem().toString();
+        int width = Integer.parseInt(resolution.split("x")[0]);
+        int height = Integer.parseInt(resolution.split("x")[1]);
+        int fps = Integer.parseInt(fpsSpinner.getSelectedItem().toString());
+        
+        if (!TextUtils.equals(currentResolution, resolution) || 
+            currentFps != fps || 
+            !TextUtils.equals(currentApi, selectedApi)) {
+            
+            recordService.switchCamera(selectedApi, textureView, width, height, fps);
+            currentResolution = resolution;
+            currentFps = fps;
+            currentApi = selectedApi;
+        }
+    }
+
+    private void toggleRecording() {
+        if (isRecording) {
+            stopRecording();
+        } else {
+            startRecording();
+        }
+    }
+    
+    private void startRecording() {
+        if (isServiceBound && recordService != null && recordService.isReady()) {
+            recordService.startRecording();
+            isRecording = true;
+            recordButton.setText("Stop Recording");
+            statusTextView.setText("Status: Recording");
+            setControlsEnabled(false);
+            recordingTimer.start();
+        }
+    }
+
+    private void stopRecording() {
+        if (isServiceBound) {
+            recordService.stopRecording();
+            isRecording = false;
+            recordButton.setText("Start Recording");
+            statusTextView.setText("Status: Idle");
+            setControlsEnabled(true);
+            recordingTimer.stop();
+        }
+    }
+
+    private int getCurrentApiRadioButtonId() {
         String currentApi = recordService.getCurrentApi();
-        if (currentApi == null) return R.id.cameraXRadioButton; // Default
+        if (currentApi == null) return R.id.cameraXRadioButton;
         switch (currentApi) {
             case "Camera1":
                 return R.id.camera1RadioButton;
@@ -248,136 +242,58 @@ public class BgrYesActivity extends BaseAct {
         fpsSpinner.setEnabled(enabled);
     }
 
-    private void startServiceAndBind() {
-        Log.d(TAG, "startServiceAndBind: ");
+    private void startAndBindService() {
         Intent intent = new Intent(this, BgrYesRecordService.class);
         startService(intent);
-        bindService(intent, connection, Context.BIND_AUTO_CREATE);
+        bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
     }
 
     private void setupSpinners() {
-        CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+        cameraSetupHelper.setupSpinners(currentCameraId, resolutionSpinner, fpsSpinner);
+    }
+    
+    private void switchCamera() {
         try {
-            String cameraId = "0"; // Default to back camera
-            CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraId);
-            StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-            if (map == null) return;
-            setupResolutionAdapter(characteristics);
-            setupFpsAdapter(characteristics);
-
+            CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+            String[] cameraIds = cameraManager.getCameraIdList();
+            
+            if (cameraIds.length <= 1) {
+                Toast.makeText(this, "只有一个摄像头可用", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            
+            int currentIndex = -1;
+            for (int i = 0; i < cameraIds.length; i++) {
+                if (cameraIds[i].equals(currentCameraId)) {
+                    currentIndex = i;
+                    break;
+                }
+            }
+            
+            if (currentIndex == -1) {
+                currentIndex = 0;
+            }
+            
+            int nextIndex = (currentIndex + 1) % cameraIds.length;
+            currentCameraId = cameraIds[nextIndex];
+            
+            cameraSetupHelper.clearAdapters();
+            Toast.makeText(this, "切换到摄像头 " + currentCameraId, Toast.LENGTH_SHORT).show();
+            
         } catch (CameraAccessException e) {
-            e.printStackTrace();
+            Log.e(TAG, "切换摄像头失败", e);
+            Toast.makeText(this, "切换摄像头失败", Toast.LENGTH_SHORT).show();
         }
     }
-
-    private void setupResolutionAdapter(CameraCharacteristics characteristics) {
-        StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-        if ("CameraX".equals(getSelectedApi())) {
-            if (qualityAdapter != null) {
-                resolutionSpinner.setAdapter(qualityAdapter);
-            } else if (camXadapter == null) {
-                camXadapter = getCamXAdapter();
-                resolutionSpinner.setAdapter(camXadapter);
-            }
-        } else {
-            if (camAdapter == null) {
-                camAdapter = getCamAdapter(map);
-            }
-            resolutionSpinner.setAdapter(camAdapter);
-        }
-    }
-
-    private void setupFpsAdapter(CameraCharacteristics characteristics) {
-        if (fpsAdapter == null) {
-            fpsAdapter = getFpsAdapter(characteristics);
-        }
-        fpsSpinner.setAdapter(fpsAdapter);
-    }
-
-    @NonNull
-    private ArrayAdapter<String> getCamXAdapter() {
-        qualityMap = new HashMap<>();
-
-        // List<Quality> camXQualities = Quality.getSortedQualities();
-        // List<Quality> camXQualities = QualitySelector.getSupportedQualities();
-
-        List<Quality> camXQualities = Arrays.asList(Quality.HIGHEST);
-        List<String> resolutions = new ArrayList<>();
-        for (Quality quality : camXQualities) {
-            String name = ((Quality.ConstantQuality) quality).getName();
-            qualityMap.put(name, quality);
-            resolutions.add(name);
-        }
-        ArrayAdapter<String> resolutionAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, resolutions);
-        resolutionAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        return resolutionAdapter;
-    }
-
-    @NonNull
-    private void updateCamXAdapter(CameraInfo cameraInfo) {
-        if (qualityAdapter != null) {
-            return;
-        }
-        Log.d(TAG, "updateCamXAdapter: " + cameraInfo);
-        qualityMap = new HashMap<>();
-
-        List<Quality> camXQualities = QualitySelector.getSupportedQualities(cameraInfo);
-        Log.d(TAG, "camXQualities: " + camXQualities.size());
-        List<String> resolutions = new ArrayList<>();
-        for (Quality quality : camXQualities) {
-            Log.d(TAG, "quality: " + quality);
-            String name = ((Quality.ConstantQuality) quality).getName();
-            qualityMap.put(name, quality);
-            resolutions.add(name);
-        }
-        qualityAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, resolutions);
-        qualityAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        // return resolutionAdapter;
-        resolutionSpinner.setAdapter(qualityAdapter);
-    }
-
-
-
-    @NonNull
-    private ArrayAdapter<String> getCamAdapter(StreamConfigurationMap map) {
-        Size[] outputSizes = map.getOutputSizes(MediaRecorder.class);
-        List<String> resolutions = new ArrayList<>();
-        for (Size size : outputSizes) {
-            resolutions.add(size.getWidth() + "x" + size.getHeight());
-        }
-        ArrayAdapter<String> resolutionAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, resolutions);
-        resolutionAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        return resolutionAdapter;
-    }
-
-    private ArrayAdapter<String> getFpsAdapter(CameraCharacteristics characteristics) {
-        Range<Integer>[] fpsRanges = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
-        Set<String> frameRatesSet = new HashSet<>();
-        for (Range<Integer> range : fpsRanges) {
-            frameRatesSet.add(range.getUpper().toString());
-        }
-        List<String> frameRates = new ArrayList<>(frameRatesSet);
-        Collections.sort(frameRates);
-        ArrayAdapter<String> fpsAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, frameRates);
-        fpsAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        return fpsAdapter;
-    }
-
-
-
 
     @Override
     protected void onDestroy() {
-        Log.d(TAG, "onDestroy: ");
         super.onDestroy();
-        if (timer != null) {
-            timer.cancel();
-            timer = null;
-        }
-        if (isBound) {
+        recordingTimer.stop();
+        if (isServiceBound) {
             recordService.stopPreview();
-            unbindService(connection);
-            isBound = false;
+            unbindService(serviceConnection);
+            isServiceBound = false;
         }
     }
 }

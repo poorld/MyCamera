@@ -24,6 +24,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -39,6 +40,7 @@ public class FocusCameraActivity extends BaseAct {
     private FocusView focusView;
     private ImageCapture imageCapture;
     private FocusHelper focusHelper;
+    private String currentCameraId = "0"; // 默认使用第一个摄像头
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,6 +66,10 @@ public class FocusCameraActivity extends BaseAct {
         Button captureButton = findViewById(R.id.captureButton);
         captureButton.setOnClickListener(v -> takePhoto());
 
+        // 添加摄像头切换按钮
+        Button switchCameraButton = findViewById(R.id.switchCameraButton);
+        switchCameraButton.setOnClickListener(v -> switchCamera());
+
         startCamera();
     }
 
@@ -86,14 +92,14 @@ public class FocusCameraActivity extends BaseAct {
                     return;
                 }
 
-                // 选择相机ID为2的相机
+                // 根据当前摄像头ID选择相机
                 CameraInfo targetCameraInfo = null;
                 for (CameraInfo cameraInfo : availableCameras) {
                     if (cameraInfo instanceof CameraInfoInternal) {
                         String cameraId = ((CameraInfoInternal) cameraInfo).getCameraId();
-                        if ("2".equals(cameraId)) {
+                        if (currentCameraId.equals(cameraId)) {
                             targetCameraInfo = cameraInfo;
-                            Log.d(TAG, "Found target camera with ID: 2");
+                            Log.d(TAG, "Found target camera with ID: " + currentCameraId);
                             break;
                         }
                     }
@@ -101,7 +107,8 @@ public class FocusCameraActivity extends BaseAct {
 
                 if (targetCameraInfo == null) {
                     targetCameraInfo = availableCameras.get(0);
-                    Log.w(TAG, "Could not find camera with ID '2', falling back to the first available camera.");
+                    currentCameraId = ((CameraInfoInternal) targetCameraInfo).getCameraId();
+                    Log.w(TAG, "Could not find camera with ID '" + currentCameraId + "', falling back to the first available camera.");
                 }
 
                 CameraInfo finalTargetCameraInfo = targetCameraInfo;
@@ -117,6 +124,7 @@ public class FocusCameraActivity extends BaseAct {
                 // 设置相机控制和信息到聚焦帮助类
                 focusHelper.setCameraControl(camera.getCameraControl());
                 focusHelper.setCameraInfo(camera.getCameraInfo());
+                focusHelper.setCurrentCameraId(currentCameraId);
                 
                 // 记录相机对焦模式信息
                 focusHelper.logCameraFocusModes();
@@ -128,6 +136,41 @@ public class FocusCameraActivity extends BaseAct {
                 Toast.makeText(this, "相机错误❌", Toast.LENGTH_SHORT).show();
             }
         }, ContextCompat.getMainExecutor(this));
+    }
+
+    private void switchCamera() {
+        try {
+            ProcessCameraProvider cameraProvider = ProcessCameraProvider.getInstance(this).get();
+            List<CameraInfo> availableCameras = cameraProvider.getAvailableCameraInfos();
+            
+            if (availableCameras.size() <= 1) {
+                Toast.makeText(this, "只有一个摄像头可用", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // 找到下一个可用的摄像头ID
+            List<String> cameraIds = new ArrayList<>();
+            for (CameraInfo cameraInfo : availableCameras) {
+                if (cameraInfo instanceof CameraInfoInternal) {
+                    cameraIds.add(((CameraInfoInternal) cameraInfo).getCameraId());
+                }
+            }
+
+            int currentIndex = cameraIds.indexOf(currentCameraId);
+            int nextIndex = (currentIndex + 1) % cameraIds.size();
+            currentCameraId = cameraIds.get(nextIndex);
+
+            Log.d(TAG, "Switching to camera ID: " + currentCameraId);
+            
+            // 重新启动相机
+            startCamera();
+            
+            Toast.makeText(this, "切换到摄像头 " + currentCameraId, Toast.LENGTH_SHORT).show();
+            
+        } catch (ExecutionException | InterruptedException e) {
+            Log.e(TAG, "切换摄像头失败", e);
+            Toast.makeText(this, "切换摄像头失败", Toast.LENGTH_SHORT).show();
+        }
     }
 
     public void takePhoto() {

@@ -11,6 +11,7 @@ import android.os.IBinder;
 import android.util.Log;
 import android.view.TextureView;
 import android.widget.Button;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 
@@ -24,9 +25,11 @@ public class BackgroudCameraActivity extends BaseAct {
     private static final int REQUEST_CAMERA_PERMISSION = 200;
     private TextureView textureView;
     private Button btnRecord;
+    private Button switchCameraButton;
     private boolean isRecording = false;
     private BackgroundRecordService backgroundRecordService;
     private boolean isBound = false;
+    private String currentCameraId = "0";
 
     private final ServiceConnection connection = new ServiceConnection() {
         @Override
@@ -53,6 +56,7 @@ public class BackgroudCameraActivity extends BaseAct {
 
         textureView = findViewById(R.id.textureView);
         btnRecord = findViewById(R.id.btn_record);
+        switchCameraButton = findViewById(R.id.switchCameraButton);
 
         btnRecord.setOnClickListener(v -> {
             if (isRecording) {
@@ -61,6 +65,8 @@ public class BackgroudCameraActivity extends BaseAct {
                 startRecording();
             }
         });
+        
+        switchCameraButton.setOnClickListener(v -> switchCamera());
 
         startServiceAndBind();
 
@@ -90,6 +96,53 @@ public class BackgroudCameraActivity extends BaseAct {
             backgroundRecordService.startRecording();
             btnRecord.setText("Stop");
             isRecording = true;
+        }
+    }
+    
+    private void switchCamera() {
+        if (isRecording) {
+            Toast.makeText(this, "录制中无法切换摄像头", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        try {
+            android.hardware.camera2.CameraManager cameraManager = (android.hardware.camera2.CameraManager) getSystemService(Context.CAMERA_SERVICE);
+            String[] cameraIds = cameraManager.getCameraIdList();
+            
+            if (cameraIds.length <= 1) {
+                Toast.makeText(this, "只有一个摄像头可用", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            
+            // 找到当前摄像头的索引
+            int currentIndex = -1;
+            for (int i = 0; i < cameraIds.length; i++) {
+                if (cameraIds[i].equals(currentCameraId)) {
+                    currentIndex = i;
+                    break;
+                }
+            }
+            
+            if (currentIndex == -1) {
+                currentIndex = 0;
+            }
+            
+            // 切换到下一个摄像头
+            int nextIndex = (currentIndex + 1) % cameraIds.length;
+            currentCameraId = cameraIds[nextIndex];
+            
+            Log.d(TAG, "Switching to camera ID: " + currentCameraId);
+            
+            // 重新启动预览
+            if (isBound) {
+                backgroundRecordService.switchCamera();
+            }
+            
+            Toast.makeText(this, "切换到摄像头 " + currentCameraId, Toast.LENGTH_SHORT).show();
+            
+        } catch (android.hardware.camera2.CameraAccessException e) {
+            Log.e(TAG, "切换摄像头失败", e);
+            Toast.makeText(this, "切换摄像头失败", Toast.LENGTH_SHORT).show();
         }
     }
 

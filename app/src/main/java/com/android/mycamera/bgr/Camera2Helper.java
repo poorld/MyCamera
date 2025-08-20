@@ -41,6 +41,7 @@ public class Camera2Helper {
     private HandlerThread backgroundThread;
     private TextureView textureView;
     private String nextVideoAbsolutePath;
+    private String currentCameraId = "0"; // 当前摄像头ID
 
     public Camera2Helper(Context context, TextureView textureView) {
         this.context = context;
@@ -69,13 +70,40 @@ public class Camera2Helper {
     @SuppressLint("MissingPermission")
     public void openCamera() {
         Log.d(TAG, "openCamera: ");
+        openCamera(currentCameraId);
+    }
+
+    @SuppressLint("MissingPermission")
+    public void openCamera(String cameraId) {
+        Log.d(TAG, "openCamera: " + cameraId);
         cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
         try {
-            String cameraId = cameraManager.getCameraIdList()[0];
-            CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraId);
+            String[] availableCameraIds = cameraManager.getCameraIdList();
+            if (availableCameraIds.length == 0) {
+                Log.e(TAG, "No cameras available");
+                return;
+            }
+            
+            // 验证请求的摄像头ID是否有效
+            boolean cameraExists = false;
+            for (String availableId : availableCameraIds) {
+                if (availableId.equals(cameraId)) {
+                    cameraExists = true;
+                    break;
+                }
+            }
+            
+            if (!cameraExists) {
+                Log.w(TAG, "Camera ID " + cameraId + " not found, using first available camera");
+                currentCameraId = availableCameraIds[0];
+            } else {
+                currentCameraId = cameraId;
+            }
+            
+            CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(currentCameraId);
             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
             videoSize = chooseVideoSize(map.getOutputSizes(MediaRecorder.class));
-            cameraManager.openCamera(cameraId, stateCallback, backgroundHandler);
+            cameraManager.openCamera(currentCameraId, stateCallback, backgroundHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
@@ -243,6 +271,55 @@ public class Camera2Helper {
         if (cameraDevice != null) {
             createCameraPreviewSession();
         }
+    }
+
+    public String getCurrentCameraId() {
+        return currentCameraId;
+    }
+
+    public String[] getAvailableCameraIds() {
+        if (cameraManager == null) {
+            cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+        }
+        try {
+            return cameraManager.getCameraIdList();
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+            return new String[0];
+        }
+    }
+
+    public void switchToNextCamera() {
+        String[] cameraIds = getAvailableCameraIds();
+        if (cameraIds.length <= 1) {
+            Log.w(TAG, "Only one camera available, cannot switch");
+            return;
+        }
+
+        // 找到当前摄像头的索引
+        int currentIndex = -1;
+        for (int i = 0; i < cameraIds.length; i++) {
+            if (cameraIds[i].equals(currentCameraId)) {
+                currentIndex = i;
+                break;
+            }
+        }
+
+        if (currentIndex == -1) {
+            currentIndex = 0;
+        }
+
+        // 切换到下一个摄像头
+        int nextIndex = (currentIndex + 1) % cameraIds.length;
+        String nextCameraId = cameraIds[nextIndex];
+
+        Log.d(TAG, "Switching from camera " + currentCameraId + " to camera " + nextCameraId);
+        
+        // 关闭当前相机
+        closeCamera();
+        
+        // 打开新相机
+        openCamera(nextCameraId);
     }
 
     private static Size chooseVideoSize(Size[] choices) {

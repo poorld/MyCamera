@@ -27,18 +27,19 @@ public class Camera1Helper implements ICameraHelper {
     private boolean isRecording = false;
     private String resolution;
     private int frameRate;
+    private IPreViewListener mPreviewListener;
 
     public Camera1Helper(Context context) {
         this.context = context;
     }
 
     @Override
-    public void openCamera(int width, int height, int fps) {
-        Log.d(TAG, String.format("openCamera: %dx%d,%d", width, height, fps));
+    public void openCamera(int width, int height, int fps, String cameraId) {
+        Log.d(TAG, String.format("openCamera: %dx%d,%d,cameraId=%s", width, height, fps, cameraId));
         this.resolution = width + "x" + height;
         this.frameRate = fps;
         try {
-            camera = Camera.open(0);
+            camera = Camera.open(Integer.parseInt(cameraId));
         } catch (Exception e) {
             e.printStackTrace();
             Toast.makeText(context, "相机不可用", Toast.LENGTH_SHORT).show();
@@ -71,6 +72,7 @@ public class Camera1Helper implements ICameraHelper {
 
             camera.setPreviewTexture(surfaceTexture);
             camera.startPreview();
+            mPreviewListener.onPreviewOpen();
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -136,6 +138,11 @@ public class Camera1Helper implements ICameraHelper {
             camera.release();
             camera = null;
         }
+    }
+
+    @Override
+    public void setPreviewListener(IPreViewListener previewListener) {
+        mPreviewListener = previewListener;
     }
 
     private boolean setupMediaRecorder() {

@@ -6,11 +6,21 @@
     android:layout_height="match_parent"
     tools:context=".record.VideoRecordActivity">
 
+    <!-- 摄像头切换按钮 -->
+    <Button
+        android:id="@+id/switchCameraButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        android:text="切换摄像头" />
+
     <FrameLayout
         android:id="@+id/fragment_container"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/switchCameraButton"
         app:layout_constraintBottom_toTopOf="@+id/controlsLayout" />
 
     <LinearLayout

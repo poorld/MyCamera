@@ -46,6 +46,9 @@ public class CamXApiActivity extends BaseAct {
 
     private PreviewView previewView;
     private ImageCapture imageCapture;
+    private String currentCameraId = "0";
+    private List<CameraInfo> availableCameras;
+    private ProcessCameraProvider cameraProvider;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,10 +59,12 @@ public class CamXApiActivity extends BaseAct {
 
         previewView = findViewById(R.id.previewView);
         Button captureButton = findViewById(R.id.captureButton);
+        Button switchCameraButton = findViewById(R.id.switchCameraButton);
 
         startCamera();
 
         captureButton.setOnClickListener(v -> takePhoto());
+        switchCameraButton.setOnClickListener(v -> switchCamera());
     }
 
     private void startCamera() {
@@ -67,7 +72,7 @@ public class CamXApiActivity extends BaseAct {
 
         cameraProviderFuture.addListener(() -> {
             try {
-                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
+                this.cameraProvider = cameraProviderFuture.get();
 
                 DisplayMetrics metrics = new DisplayMetrics();
                 getWindowManager().getDefaultDisplay().getMetrics(metrics);
@@ -85,36 +90,26 @@ public class CamXApiActivity extends BaseAct {
 
                 imageCapture = new ImageCapture.Builder().build();
 
-                // CameraSelector cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA;
-                List<CameraInfo> availableCameras = cameraProvider.getAvailableCameraInfos();
+                // 获取所有可用摄像头
+                availableCameras = cameraProvider.getAvailableCameraInfos();
                 if (availableCameras.isEmpty()) {
                     Log.e(TAG, "No cameras available on this device.");
                     return;
                 }
 
-                CameraInfo targetCameraInfo = null;
-                for (CameraInfo cameraInfo : availableCameras) {
-                    if (cameraInfo instanceof CameraInfoInternal) {
-                        String cameraId = ((CameraInfoInternal) cameraInfo).getCameraId();
-                        if ("0".equals(cameraId)) {
-                            targetCameraInfo = cameraInfo;
-                            Log.d(TAG, "Found target camera with ID: 0");
-                            break;
-                        }
-                    }
-                }
-
+                CameraInfo targetCameraInfo = findCameraInfoById(currentCameraId);
                 if (targetCameraInfo == null) {
                     targetCameraInfo = availableCameras.get(0);
-                    Log.w(TAG, "Could not find camera with ID '0', falling back to the first available camera.");
+                    currentCameraId = getCameraId(targetCameraInfo);
+                    Log.w(TAG, "Could not find camera with ID '" + currentCameraId + "', falling back to the first available camera.");
                 }
+
+                cameraProvider.unbindAll();
 
                 CameraInfo finalTargetCameraInfo = targetCameraInfo;
                 CameraSelector cameraSelector = new CameraSelector.Builder()
                         .addCameraFilter(cameraInfos -> Collections.singletonList(finalTargetCameraInfo))
                         .build();
-
-                cameraProvider.unbindAll();
 
                 cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture);
 
@@ -165,8 +160,51 @@ public class CamXApiActivity extends BaseAct {
         );
     }
 
+    private void switchCamera() {
+        if (availableCameras == null || availableCameras.size() <= 1) {
+            Toast.makeText(this, "只有一个摄像头可用", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
+        // 找到当前摄像头的索引
+        int currentIndex = -1;
+        for (int i = 0; i < availableCameras.size(); i++) {
+            String cameraId = getCameraId(availableCameras.get(i));
+            if (currentCameraId.equals(cameraId)) {
+                currentIndex = i;
+                break;
+            }
+        }
 
+        // 切换到下一个摄像头
+        int nextIndex = (currentIndex + 1) % availableCameras.size();
+        currentCameraId = getCameraId(availableCameras.get(nextIndex));
 
+        Log.d(TAG, "Switching to camera ID: " + currentCameraId);
+        
+        // 重新启动相机
+        startCamera();
+        
+        Toast.makeText(this, "切换到摄像头 " + currentCameraId, Toast.LENGTH_SHORT).show();
+    }
+
+    private CameraInfo findCameraInfoById(String cameraId) {
+        for (CameraInfo cameraInfo : availableCameras) {
+            if (cameraInfo instanceof CameraInfoInternal) {
+                String id = ((CameraInfoInternal) cameraInfo).getCameraId();
+                if (cameraId.equals(id)) {
+                    return cameraInfo;
+                }
+            }
+        }
+        return null;
+    }
+
+    private String getCameraId(CameraInfo cameraInfo) {
+        if (cameraInfo instanceof CameraInfoInternal) {
+            return ((CameraInfoInternal) cameraInfo).getCameraId();
+        }
+        return "0";
+    }
 
 }

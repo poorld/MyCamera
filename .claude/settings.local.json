@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:developer.android.com)"
+      "WebFetch(domain:developer.android.com)",
+      "Bash(find:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

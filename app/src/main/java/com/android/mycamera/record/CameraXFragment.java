@@ -66,6 +66,7 @@ public class CameraXFragment extends Fragment implements IRecordingFragment {
 
     private String resolution;
     private int frameRate;
+    private String cameraId = "0";
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -73,6 +74,7 @@ public class CameraXFragment extends Fragment implements IRecordingFragment {
         if (getArguments() != null) {
             resolution = getArguments().getString("resolution");
             frameRate = getArguments().getInt("fps");
+            cameraId = getArguments().getString("cameraId", "0");
         }
     }
 
@@ -99,15 +101,15 @@ public class CameraXFragment extends Fragment implements IRecordingFragment {
 
                 try {
                     VideoRecordActivity activity = (VideoRecordActivity) requireActivity();
-                    if (activity.qualityMap != null) {
-                        quality = activity.qualityMap.get(resolution);
+                    if (activity.getQualityMap() != null) {
+                        quality = activity.getQualityMap().get(resolution);
                     }
 
                 } catch (IllegalStateException e) {
                 }
 
                 if (quality == null) {
-                    quality = Quality.HIGHEST;
+                    quality = Quality.SD;
                 }
 
                 Log.d(TAG, "startCamera: quality " + quality);
@@ -127,10 +129,10 @@ public class CameraXFragment extends Fragment implements IRecordingFragment {
                 CameraInfo targetCameraInfo = null;
                 for (CameraInfo cameraInfo : availableCameras) {
                     if (cameraInfo instanceof CameraInfoInternal) {
-                        String cameraId = ((CameraInfoInternal) cameraInfo).getCameraId();
-                        if ("0".equals(cameraId)) {
+                        String availableCameraId = ((CameraInfoInternal) cameraInfo).getCameraId();
+                        if (cameraId.equals(availableCameraId)) {
                             targetCameraInfo = cameraInfo;
-                            Log.d(TAG, "Found target camera with ID: 0");
+                            Log.d(TAG, "Found target camera with ID: " + cameraId);
                             break;
                         }
                     }
@@ -138,7 +140,7 @@ public class CameraXFragment extends Fragment implements IRecordingFragment {
 
                 if (targetCameraInfo == null) {
                     targetCameraInfo = availableCameras.get(0);
-                    Log.w(TAG, "Could not find camera with ID '0', falling back to the first available camera.");
+                    Log.w(TAG, "Could not find camera with ID '" + cameraId + "', falling back to the first available camera.");
                 }
 
                 CameraInfo finalTargetCameraInfo = targetCameraInfo;
