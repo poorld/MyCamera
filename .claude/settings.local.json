@@ -3,7 +3,10 @@
     "allow": [
       "WebFetch(domain:developer.android.com)",
       "Bash(find:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(mkdir:*)",
+      "Bash(./gradlew:*)",
+      "Bash(java:*)"
     ],
     "deny": []
   }

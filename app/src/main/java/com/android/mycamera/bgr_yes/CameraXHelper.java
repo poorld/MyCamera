@@ -168,8 +168,6 @@ public class CameraXHelper extends ICameraXHelper {
                     }
                     // surface.setFrameRate(fps, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE);
                     request.provideSurface(surface, ContextCompat.getMainExecutor(context), result -> {
-                        // DO NOT RELEASE THE SURFACE TEXTURE HERE!
-                        // It is owned by the TextureView.
                         surface.release();
                     });
 

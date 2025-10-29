@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     tools:context=".focus.FocusCameraActivity">
 
     <!-- 摄像头切换按钮 -->
@@ -11,31 +12,38 @@
         android:id="@+id/switchCameraButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_centerHorizontal="true"
+        android:layout_gravity="center"
         android:layout_marginTop="15dp"
         android:text="切换摄像头" />
 
-    <androidx.camera.view.PreviewView
-        android:id="@+id/previewView"
+    <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent">
 
-    <!-- 聚焦视图 - 点击显示聚焦框 -->
-    <com.android.mycamera.focus.FocusView
-        android:id="@+id/focusView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
-    <!-- 拍照按钮 -->
-    <Button
-        android:id="@+id/captureButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:layout_centerHorizontal="true"
-        android:layout_marginBottom="24dp"
-        android:text="拍照" />
+        <androidx.camera.view.PreviewView
+            android:id="@+id/previewView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
 
 
 
-</RelativeLayout>
+        <!-- 聚焦视图 - 点击显示聚焦框 -->
+        <com.android.mycamera.focus.FocusView
+            android:id="@+id/focusView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- 拍照按钮 -->
+        <Button
+            android:id="@+id/captureButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:layout_centerHorizontal="true"
+            android:layout_marginBottom="24dp"
+            android:text="拍照" />
+    </RelativeLayout>
+
+
+
+</LinearLayout>
