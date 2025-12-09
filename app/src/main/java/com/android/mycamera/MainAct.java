@@ -22,6 +22,7 @@ import com.android.mycamera.camera.Cam1ApiActivity;
 import com.android.mycamera.camera.Cam2ApiActivity;
 import com.android.mycamera.camera.CamSizeActivity;
 import com.android.mycamera.camera.CamXApiActivity;
+import com.android.mycamera.camera.MultipleCam2ApiActivity;
 import com.android.mycamera.focus.FocusCameraActivity;
 import com.android.mycamera.multicamera.MultiCameraActivity;
 import com.android.mycamera.record.VideoRecordActivity;
@@ -126,6 +127,13 @@ public class MainAct extends BaseAct {
                 startActivity(new Intent(MainAct.this, MultiCameraActivity.class));
             }
         });
+        findViewById(R.id.multi_camera2_button)
+                .setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        startActivity(new Intent(MainAct.this, MultipleCam2ApiActivity.class));
+                    }
+                });
     }
 
     @Override

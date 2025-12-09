@@ -51,6 +51,7 @@ public class CameraUtils {
      */
     public static File createCameraDirectory() {
         File cameraDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "Camera");
+        // File cameraDir = new File("/storage/B985-11F6/DCIM/Camera");
         if (!cameraDir.exists()) {
             cameraDir.mkdirs();
         }

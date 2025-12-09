@@ -120,6 +120,13 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+            <Button
+                android:id="@+id/multi_camera2_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Multi-Camera2"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
             
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>

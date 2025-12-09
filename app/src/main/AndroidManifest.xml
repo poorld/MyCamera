@@ -87,6 +87,7 @@
         <activity
             android:name=".multicamera.MultiCameraActivity"
             android:exported="true" />
+        <activity android:name="com.android.mycamera.camera.MultipleCam2ApiActivity" />
 
         <service
             android:name=".bgr_yes.BgrYesRecordService"
