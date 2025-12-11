@@ -30,6 +30,7 @@ import androidx.camera.video.Quality;
 import androidx.camera.video.QualitySelector;
 import androidx.camera.video.Recorder;
 import androidx.camera.video.Recording;
+import androidx.camera.video.RecordingStats;
 import androidx.camera.video.VideoCapture;
 import androidx.camera.video.VideoRecordEvent;
 import androidx.core.app.ActivityCompat;
@@ -60,6 +61,16 @@ public class CameraXStrategy extends BaseCameraStrategy {
     private TextureView cameraPreview;
     private Camera camera;
     // private Executor executor;
+
+    private static final long MAX_FILE_SIZE = 1024 * 1024 * 500; // 500M
+    private static final long SEGMENT_DURATION_MS = 60 * 1000 * 20L; // 20m
+    // private static final long SEGMENT_DURATION_MS = 5 * 1000; // 5s
+    private static final boolean SPLIT_SEGMENT = true;
+    private boolean isUserStopping = false;
+    private boolean isSplitting = false;
+
+    private boolean firstStart = true;
+    private File outputFile;
 
     public CameraXStrategy(Context context) {
         super(context);
@@ -190,32 +201,87 @@ public class CameraXStrategy extends BaseCameraStrategy {
     public void startRecording() {
         Log.d(TAG, "startRecording: videoCapture=" + videoCapture);
         if (videoCapture == null) return;
-        File outputFile = CameraUtils.generateUniqueMediaFile("mp4");
+        outputFile = CameraUtils.generateUniqueMediaFile("mp4");
         FileOutputOptions outputOptions = new FileOutputOptions.Builder(outputFile).build();
         recording = videoCapture.getOutput()
                 .prepareRecording(context, outputOptions)
                 .withAudioEnabled()
-                .start(ContextCompat.getMainExecutor(context), event -> {
-                    if (event instanceof VideoRecordEvent.Start) {
-                        notifyRecordingStarted();
+                .start(ContextCompat.getMainExecutor(context), this::checkEvent);
+    }
 
-                    } else if (event instanceof VideoRecordEvent.Finalize) {
-                        if (((VideoRecordEvent.Finalize) event).hasError()) {
-                            Log.d(TAG, "Recording failed: ");
-                            notifyError("Recording failed");
-                        } else {
-                            notifyPhotoCaptured(outputFile.getAbsolutePath());
-                        }
-                        notifyRecordingStopped();
-                    }
-                });
+    private void checkEvent(VideoRecordEvent event) {
+        if (event instanceof VideoRecordEvent.Start) {
+            if (firstStart) {
+                notifyRecordingStarted();
+                firstStart = false;
+            }
+        }
+
+        // 20251209 add splitSegment
+        if (event instanceof VideoRecordEvent.Status) {
+            RecordingStats stats = event.getRecordingStats();
+
+            long size = stats.getNumBytesRecorded();
+            long duration = stats.getRecordedDurationNanos() / 1_000_000;
+
+            // 条件 1：大小分段
+            // if (!isUserStopping && size >= MAX_FILE_SIZE) {
+            //     Log.d("Segment", String.format("Size reached %d, splitting...", size));
+            //     splitSegment();
+            //     return;
+            // }
+
+            // 条件 2：时间分段
+            if (!isUserStopping && SEGMENT_DURATION_MS > 0 &&
+                    duration >= SEGMENT_DURATION_MS) {
+                Log.d(TAG, "Time reached, splitting...");
+                splitSegment();
+            }
+        }
+
+        if (event instanceof VideoRecordEvent.Finalize) {
+            if (((VideoRecordEvent.Finalize) event).hasError()) {
+                Log.d(TAG, "Recording failed: ");
+                notifyError("Recording failed");
+            } else {
+                if (isSplitting) {
+                    Log.d(TAG, "Segment finalized, starting next segment...");
+                    startNextSegment();
+                } else {
+                    notifyRecordingStopped();
+                    notifyPhotoCaptured(outputFile.getAbsolutePath());
+                }
+            }
+        }
+    }
+
+
+    private void startNextSegment() {
+        if (SPLIT_SEGMENT) {
+            isSplitting = false;
+            startRecording();
+        }
+    }
+
+    private void splitSegment() {
+        if (SPLIT_SEGMENT) {
+            if (recording == null) return;
+
+            isSplitting = true;
+            recording.stop();
+        }
+
     }
 
     @Override
     public void stopRecording() {
         if (recording != null) {
+            isUserStopping = true;  // ⬅️ 用户主动停止
+            isSplitting = false;    // 不再分段
             recording.stop();
             recording = null;
+
+            firstStart = true;
         }
     }
 
