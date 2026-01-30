@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Environment;
+import android.util.Log;
 
 import androidx.core.content.ContextCompat;
 
@@ -50,12 +51,15 @@ public class CameraUtils {
      * Create camera directory if it doesn't exist
      */
     public static File createCameraDirectory() {
+        Log.d("TAG", "createCameraDirectory: ");
         File cameraDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "Camera");
         // File cameraDir = new File("/storage/B985-11F6/DCIM/Camera");
         if (!cameraDir.exists()) {
             cameraDir.mkdirs();
         }
-        return cameraDir;
+        Log.d("TAG", "createCameraDirectory: " + cameraDir.getPath());
+        Log.d("TAG", "cameraDir: " + cameraDir.exists());
+        return cameraDir.exists() ? cameraDir : Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM);
     }
     
     /**

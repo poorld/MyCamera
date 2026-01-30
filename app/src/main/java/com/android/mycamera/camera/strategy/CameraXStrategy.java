@@ -65,7 +65,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
     private static final long MAX_FILE_SIZE = 1024 * 1024 * 500; // 500M
     private static final long SEGMENT_DURATION_MS = 60 * 1000 * 20L; // 20m
     // private static final long SEGMENT_DURATION_MS = 5 * 1000; // 5s
-    private static final boolean SPLIT_SEGMENT = true;
+    private static final boolean SPLIT_SEGMENT = false;
     private boolean isUserStopping = false;
     private boolean isSplitting = false;
 

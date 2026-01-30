@@ -76,6 +76,8 @@ public class MainActivity extends AppCompatActivity implements CameraStateObserv
         setupClickListeners();
         
         recordingTimerHandler = new Handler(Looper.getMainLooper());
+
+        CameraUtils.createCameraDirectory();
     }
     
     private void initializeViews() {
