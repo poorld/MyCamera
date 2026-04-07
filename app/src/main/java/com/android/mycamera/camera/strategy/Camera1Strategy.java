@@ -110,6 +110,8 @@ public class Camera1Strategy extends BaseCameraStrategy {
         logDebug("Starting Camera1 preview");
         
         try {
+            applyPreviewConfiguration();
+
             // Ensure preview size is set on the surface texture
             android.graphics.SurfaceTexture surfaceTexture = textureView.getSurfaceTexture();
             if (surfaceTexture == null) {
@@ -130,6 +132,75 @@ public class Camera1Strategy extends BaseCameraStrategy {
             logError("Failed to start Camera1 preview", e);
             notifyError("Preview start failed: " + e.getMessage());
         }
+    }
+
+    private void applyPreviewConfiguration() {
+        if (camera == null || currentConfig == null) return;
+        try {
+            Camera.Parameters parameters = camera.getParameters();
+            Resolution resolution = currentConfig.getResolution();
+
+            Camera.Size targetPreviewSize = chooseBestPreviewSize(parameters.getSupportedPreviewSizes(), resolution);
+            if (targetPreviewSize != null) {
+                parameters.setPreviewSize(targetPreviewSize.width, targetPreviewSize.height);
+            }
+
+            int[] targetFpsRange = chooseBestPreviewFpsRange(parameters.getSupportedPreviewFpsRange(), currentConfig.getFrameRate());
+            if (targetFpsRange != null) {
+                parameters.setPreviewFpsRange(targetFpsRange[0], targetFpsRange[1]);
+            }
+
+            camera.setParameters(parameters);
+        } catch (Exception e) {
+            logError("Failed to apply Camera1 preview configuration", e);
+        }
+    }
+
+    private Camera.Size chooseBestPreviewSize(List<Camera.Size> supportedSizes, Resolution desiredResolution) {
+        if (supportedSizes == null || supportedSizes.isEmpty() || desiredResolution == null) return null;
+
+        Camera.Size exact = null;
+        Camera.Size closest = null;
+        long bestAreaDiff = Long.MAX_VALUE;
+        long targetArea = (long) desiredResolution.getWidth() * desiredResolution.getHeight();
+
+        for (Camera.Size size : supportedSizes) {
+            if (size.width == desiredResolution.getWidth() && size.height == desiredResolution.getHeight()) {
+                exact = size;
+                break;
+            }
+            long area = (long) size.width * size.height;
+            long areaDiff = Math.abs(area - targetArea);
+            if (areaDiff < bestAreaDiff) {
+                bestAreaDiff = areaDiff;
+                closest = size;
+            }
+        }
+        return exact != null ? exact : closest;
+    }
+
+    private int[] chooseBestPreviewFpsRange(List<int[]> supportedFpsRanges, int desiredFps) {
+        if (supportedFpsRanges == null || supportedFpsRanges.isEmpty() || desiredFps <= 0) return null;
+
+        int desired = desiredFps * 1000;
+        int[] bestRange = null;
+        int bestScore = Integer.MAX_VALUE;
+
+        for (int[] range : supportedFpsRanges) {
+            if (range == null || range.length < 2) continue;
+            int lower = range[0];
+            int upper = range[1];
+            int clamped = Math.max(lower, Math.min(desired, upper));
+            int distance = Math.abs(clamped - desired);
+            int span = upper - lower;
+            int score = distance * 1000 + span;
+            if (score < bestScore) {
+                bestScore = score;
+                bestRange = range;
+            }
+        }
+
+        return bestRange;
     }
     
     @Override
@@ -254,6 +325,8 @@ public class Camera1Strategy extends BaseCameraStrategy {
         logDebug("Capturing photo with Camera1");
         
         try {
+            applyPhotoConfiguration();
+
             // Take picture
             camera.takePicture(null, null, new Camera.PictureCallback() {
                 @Override
@@ -283,6 +356,45 @@ public class Camera1Strategy extends BaseCameraStrategy {
             logError("Failed to capture Camera1 photo", e);
             notifyError("Photo capture failed: " + e.getMessage());
         }
+    }
+
+    private void applyPhotoConfiguration() {
+        if (camera == null || currentConfig == null) return;
+        try {
+            Camera.Parameters parameters = camera.getParameters();
+            Resolution resolution = currentConfig.getResolution();
+            Camera.Size targetPictureSize = chooseBestPictureSize(parameters.getSupportedPictureSizes(), resolution);
+            if (targetPictureSize != null) {
+                parameters.setPictureSize(targetPictureSize.width, targetPictureSize.height);
+                logDebug("Camera1 picture size set to: " + targetPictureSize.width + "x" + targetPictureSize.height);
+                camera.setParameters(parameters);
+            }
+        } catch (Exception e) {
+            logError("Failed to apply Camera1 photo configuration", e);
+        }
+    }
+
+    private Camera.Size chooseBestPictureSize(List<Camera.Size> supportedSizes, Resolution desiredResolution) {
+        if (supportedSizes == null || supportedSizes.isEmpty() || desiredResolution == null) return null;
+
+        Camera.Size exact = null;
+        Camera.Size closest = null;
+        long bestAreaDiff = Long.MAX_VALUE;
+        long targetArea = (long) desiredResolution.getWidth() * desiredResolution.getHeight();
+
+        for (Camera.Size size : supportedSizes) {
+            if (size.width == desiredResolution.getWidth() && size.height == desiredResolution.getHeight()) {
+                exact = size;
+                break;
+            }
+            long area = (long) size.width * size.height;
+            long areaDiff = Math.abs(area - targetArea);
+            if (areaDiff < bestAreaDiff) {
+                bestAreaDiff = areaDiff;
+                closest = size;
+            }
+        }
+        return exact != null ? exact : closest;
     }
     
     @Override

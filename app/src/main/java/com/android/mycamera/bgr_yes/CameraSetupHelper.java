@@ -93,7 +93,7 @@ public class CameraSetupHelper {
     
     private ArrayAdapter<String> createCameraXAdapter() {
         qualityMap = new HashMap<>();
-        List<Quality> camXQualities = Arrays.asList(Quality.SD);
+        List<Quality> camXQualities = Arrays.asList(Quality.UHD, Quality.FHD, Quality.HD, Quality.SD);
         List<String> resolutions = new ArrayList<>();
         
         for (Quality quality : camXQualities) {
@@ -184,6 +184,9 @@ public class CameraSetupHelper {
     }
     
     public Map<String, Quality> getQualityMap() {
+        if (qualityMap == null) {
+            qualityMap = new HashMap<>();
+        }
         return qualityMap;
     }
 }

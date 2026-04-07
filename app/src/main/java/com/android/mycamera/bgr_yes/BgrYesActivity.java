@@ -50,6 +50,8 @@ public class BgrYesActivity extends BaseAct {
     private Quality currentQuality;
     private String currentResolution;
     private int currentFps;
+    private String currentCameraXQualityName;
+    private String currentCameraXCameraId;
 
     private final ServiceConnection serviceConnection = new ServiceConnection() {
         @Override
@@ -164,15 +166,33 @@ public class BgrYesActivity extends BaseAct {
     }
     
     private void updateCameraXParameters(String selectedApi) {
-        String qualityName = resolutionSpinner.getSelectedItem().toString();
+        Object selectedItem = resolutionSpinner.getSelectedItem();
+        if (selectedItem == null || cameraSetupHelper.getQualityMap() == null) {
+            return;
+        }
+
+        String qualityName = selectedItem.toString();
         Quality quality = cameraSetupHelper.getQualityMap().get(qualityName);
+        if (quality == null) {
+            return;
+        }
+
         int fps = Integer.parseInt(fpsSpinner.getSelectedItem().toString());
-        
-        if (currentQuality != quality) {
+
+        boolean needSwitch = currentQuality != quality
+                || currentFps != fps
+                || !TextUtils.equals(currentApi, selectedApi)
+                || !TextUtils.equals(currentCameraXQualityName, qualityName)
+                || !TextUtils.equals(currentCameraXCameraId, currentCameraId);
+
+        if (needSwitch) {
             recordService.switchCameraX(selectedApi, textureView, quality, fps, 
                 cameraInfo -> cameraSetupHelper.updateCameraXAdapter(cameraInfo, resolutionSpinner));
             currentQuality = quality;
+            currentFps = fps;
             currentApi = selectedApi;
+            currentCameraXQualityName = qualityName;
+            currentCameraXCameraId = currentCameraId;
         }
     }
     

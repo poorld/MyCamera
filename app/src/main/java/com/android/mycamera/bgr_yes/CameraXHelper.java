@@ -4,8 +4,8 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.SurfaceTexture;
+import android.media.MediaMetadataRetriever;
 import android.util.Log;
-import android.util.Range;
 import android.view.Surface;
 import android.view.TextureView;
 import android.widget.Toast;
@@ -31,8 +31,9 @@ import androidx.lifecycle.LifecycleOwner;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.File;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -48,6 +49,10 @@ public class CameraXHelper extends ICameraXHelper {
     private Context context;
     private ListenableFuture<ProcessCameraProvider> cameraProviderFuture;
     private VideoCapture<Recorder> videoCapture;
+    private Preview previewUseCase;
+    private ProcessCameraProvider cameraProvider;
+    private CameraSelector activeCameraSelector;
+    private Quality appliedQuality;
     private Recording recording;
     private LifecycleOwner lifecycleOwner;
     private Quality quality;
@@ -84,16 +89,11 @@ public class CameraXHelper extends ICameraXHelper {
         cameraProviderFuture.addListener(() -> {
             try {
                 ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
-                Preview preview = new Preview.Builder()
-                        .setTargetFrameRate(Range.create(fps, fps))
-                        .build();
-
-                Recorder recorder = new Recorder.Builder()
-                        // .setQualitySelector(QualitySelector.from(quality,
-                        //         androidx.camera.video.FallbackStrategy.lowerQualityOrHigherThan(Quality.SD)))
-                        .setQualitySelector(QualitySelector.from(quality))
-                        .build();
-                videoCapture = VideoCapture.withOutput(recorder);
+                this.cameraProvider = cameraProvider;
+                // Do not hard-lock preview fps for CameraX recording, otherwise the whole capture
+                // session may downgrade record resolution (e.g. UHD -> FHD) to satisfy fps.
+                Preview preview = new Preview.Builder().build();
+                this.previewUseCase = preview;
 
                 /*final String targetCameraId = "0";
                 CameraSelector cameraSelector = new CameraSelector.Builder()
@@ -141,7 +141,26 @@ public class CameraXHelper extends ICameraXHelper {
                 CameraSelector cameraSelector = new CameraSelector.Builder()
                         .addCameraFilter(cameraInfos -> Collections.singletonList(finalTargetCameraInfo))
                         .build();
+                this.activeCameraSelector = cameraSelector;
 
+                List<Quality> supportedQualities = QualitySelector.getSupportedQualities(finalTargetCameraInfo);
+                Quality selectedQuality = quality;
+                if (!supportedQualities.contains(selectedQuality)) {
+                    for (Quality candidate : Arrays.asList(Quality.UHD, Quality.FHD, Quality.HD, Quality.SD)) {
+                        if (supportedQualities.contains(candidate)) {
+                            selectedQuality = candidate;
+                            break;
+                        }
+                    }
+                    Log.w(TAG, "Requested quality " + quality + " is not supported for cameraId="
+                            + cameraId + ", fallback to " + selectedQuality);
+                }
+
+                Recorder recorder = new Recorder.Builder()
+                        .setQualitySelector(QualitySelector.from(selectedQuality))
+                        .build();
+                videoCapture = VideoCapture.withOutput(recorder);
+                appliedQuality = selectedQuality;
 
 
                 cameraProvider.unbindAll();
@@ -163,10 +182,6 @@ public class CameraXHelper extends ICameraXHelper {
 
                     surfaceTexture.setDefaultBufferSize(request.getResolution().getWidth(), request.getResolution().getHeight());
                     Surface surface = new Surface(surfaceTexture);
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                        surface.setFrameRate(fps, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE);
-                    }
-                    // surface.setFrameRate(fps, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE);
                     request.provideSurface(surface, ContextCompat.getMainExecutor(context), result -> {
                         surface.release();
                     });
@@ -200,6 +215,17 @@ public class CameraXHelper extends ICameraXHelper {
     public void startRecord() {
         if (videoCapture == null) return;
 
+        // Some devices cannot keep UHD when preview is bound in the same session.
+        if (appliedQuality == Quality.UHD && cameraProvider != null && activeCameraSelector != null) {
+            try {
+                cameraProvider.unbindAll();
+                cameraProvider.bindToLifecycle(lifecycleOwner, activeCameraSelector, videoCapture);
+                Log.i(TAG, "startRecord: rebinding to video-only for UHD");
+            } catch (Exception e) {
+                Log.w(TAG, "startRecord: failed to rebind video-only for UHD", e);
+            }
+        }
+
         File outputFile = new File(context.getExternalFilesDir(null), new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis()) + "_X.mp4");
         FileOutputOptions outputOptions = new FileOutputOptions.Builder(outputFile).build();
 
@@ -213,7 +239,13 @@ public class CameraXHelper extends ICameraXHelper {
                     if (videoRecordEvent instanceof VideoRecordEvent.Start) {
                         // Recording started
                     } else if (videoRecordEvent instanceof VideoRecordEvent.Finalize) {
-                        // Recording finished
+                        VideoRecordEvent.Finalize finalizeEvent = (VideoRecordEvent.Finalize) videoRecordEvent;
+                        if (finalizeEvent.hasError()) {
+                            Log.e(TAG, "Recording finalize error: " + finalizeEvent.getError()
+                                    + ", cause=" + finalizeEvent.getCause());
+                        } else {
+                            logRecordedVideoInfo(outputFile);
+                        }
                     }
                 });
     }
@@ -223,6 +255,17 @@ public class CameraXHelper extends ICameraXHelper {
         if (recording != null) {
             recording.stop();
             recording = null;
+        }
+
+        if (appliedQuality == Quality.UHD && cameraProvider != null && activeCameraSelector != null
+                && previewUseCase != null && videoCapture != null) {
+            try {
+                cameraProvider.unbindAll();
+                cameraProvider.bindToLifecycle(lifecycleOwner, activeCameraSelector, previewUseCase, videoCapture);
+                Log.i(TAG, "stopRecord: restored preview+video binding");
+            } catch (Exception e) {
+                Log.w(TAG, "stopRecord: failed to restore preview binding", e);
+            }
         }
     }
 
@@ -241,5 +284,27 @@ public class CameraXHelper extends ICameraXHelper {
     @Override
     public void setPreviewListener(IPreViewListener previewListener) {
         mPreviewListener = previewListener;
+    }
+
+    private void logRecordedVideoInfo(File file) {
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(file.getAbsolutePath());
+            String width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH);
+            String height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT);
+            String durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+            String bitrate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE);
+            Log.i(TAG, "Recorded file: " + file.getAbsolutePath());
+            Log.i(TAG, "Recorded meta: " + width + "x" + height
+                    + ", durationMs=" + durationMs + ", bitrate=" + bitrate);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to read recorded file metadata: " + file.getAbsolutePath(), e);
+        } finally {
+            try {
+                retriever.release();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 }

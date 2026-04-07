@@ -21,6 +21,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.util.Log;
+import android.util.Range;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.WindowManager;
@@ -123,6 +124,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
                     captureSession = session;
                     try {
                         previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+                        applyFpsToRequest(previewRequestBuilder);
                         session.setRepeatingRequest(previewRequestBuilder.build(), null, backgroundHandler);
                         notifyPreviewStarted();
                     } catch (CameraAccessException e) {
@@ -318,6 +320,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
             final CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
             builder.addTarget(previewSurface);
             builder.addTarget(recorderSurface);
+            applyFpsToRequest(builder);
 
             cameraDevice.createCaptureSession(Arrays.asList(previewSurface, recorderSurface), new CameraCaptureSession.StateCallback() {
                 @Override
@@ -371,6 +374,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
 
             final CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             builder.addTarget(previewSurface);
+            applyFpsToRequest(builder);
 
             cameraDevice.createCaptureSession(Collections.singletonList(previewSurface), new CameraCaptureSession.StateCallback() {
                 @Override
@@ -411,6 +415,16 @@ public class Camera2Strategy extends BaseCameraStrategy {
         mediaRecorder.setAudioEncodingBitRate(profile.audioBitRate);
         mediaRecorder.setAudioChannels(profile.audioChannels);
 
+        // mediaRecorder.setMaxFileSize();
+        mediaRecorder.setMaxDuration(1 * 1000);
+        mediaRecorder.setOnInfoListener(new MediaRecorder.OnInfoListener() {
+            @Override
+            public void onInfo(MediaRecorder mr, int what, int extra) {
+                Log.d(TAG, "onInfo: " + mr + " what=" + what + " extra=" + extra);
+            }
+        });
+
+
         File outputFile = CameraUtils.generateUniqueMediaFile("mp4");
         mediaRecorder.setOutputFile(outputFile.getAbsolutePath());
 
@@ -421,6 +435,49 @@ public class Camera2Strategy extends BaseCameraStrategy {
             return false;
         }
         return true;
+    }
+
+    private void applyFpsToRequest(CaptureRequest.Builder builder) {
+        Range<Integer> fpsRange = getBestFpsRange();
+        if (fpsRange == null) return;
+        try {
+            builder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fpsRange);
+        } catch (IllegalArgumentException e) {
+            logError("Unsupported FPS range for current camera: " + fpsRange, e);
+        }
+    }
+
+    private Range<Integer> getBestFpsRange() {
+        if (cameraDevice == null || currentConfig == null) return null;
+        try {
+            CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            if (manager == null) return null;
+            CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraDevice.getId());
+            Range<Integer>[] ranges = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
+            if (ranges == null || ranges.length == 0) return null;
+
+            int desiredFps = currentConfig.getFrameRate();
+            Range<Integer> bestRange = null;
+            int bestScore = Integer.MAX_VALUE;
+
+            for (Range<Integer> range : ranges) {
+                if (range == null) continue;
+                int lower = range.getLower();
+                int upper = range.getUpper();
+                int clamped = Math.max(lower, Math.min(desiredFps, upper));
+                int distance = Math.abs(clamped - desiredFps);
+                int span = upper - lower;
+                int score = distance * 1000 + span;
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestRange = range;
+                }
+            }
+            return bestRange;
+        } catch (CameraAccessException e) {
+            logError("Failed to query supported FPS ranges", e);
+            return null;
+        }
     }
 
     private void releaseMediaRecorder() {

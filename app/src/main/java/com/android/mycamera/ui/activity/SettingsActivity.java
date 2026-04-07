@@ -118,11 +118,13 @@ public class SettingsActivity extends AppCompatActivity {
     }
     
     private void setupFrameRateSpinner() {
-        List<Integer> frameRates = new ArrayList<>();
-        frameRates.add(15);
-        frameRates.add(24);
-        frameRates.add(30);
-        frameRates.add(60);
+        List<Integer> frameRates = cameraManager.getSupportedFrameRates();
+        if (frameRates == null || frameRates.isEmpty()) {
+            frameRates = new ArrayList<>();
+            frameRates.add(15);
+            frameRates.add(24);
+            frameRates.add(30);
+        }
         
         ArrayAdapter<Integer> adapter = new ArrayAdapter<>(
                 this, R.layout.spinner_item_light, frameRates);
@@ -130,7 +132,16 @@ public class SettingsActivity extends AppCompatActivity {
         
         frameRateSpinner.setAdapter(adapter);
 
-        int position = frameRates.indexOf(currentConfig.getFrameRate());
+        int selectedFps = currentConfig.getFrameRate();
+        if (!frameRates.contains(selectedFps)) {
+            selectedFps = frameRates.get(frameRates.size() - 1);
+            currentConfig = new CameraConfig.Builder(currentConfig)
+                    .setFrameRate(selectedFps)
+                    .build();
+            applyAndSaveChanges();
+        }
+
+        int position = frameRates.indexOf(selectedFps);
         if (position >= 0) {
             frameRateSpinner.setSelection(position, false);
         }
@@ -197,6 +208,7 @@ public class SettingsActivity extends AppCompatActivity {
                             .setQuality(selectedQuality)
                             .build();
                     applyAndSaveChanges();
+                    setupFrameRateSpinner();
                 }
             }
             
