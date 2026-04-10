@@ -165,7 +165,7 @@ public class MainActivity extends AppCompatActivity implements CameraStateObserv
         } else {
 
             if (mCameraManager != null) {
-                if (mCameraManager.isBackgroundRecordingEnabled() && mCameraManager.isBackgroundRecordingActive()) {
+                if (mCameraManager.isBackgroundRecordingEnabled()) {
                     return;
                 }
             }
@@ -190,7 +190,15 @@ public class MainActivity extends AppCompatActivity implements CameraStateObserv
     protected void onPause() {
         super.onPause();
         Log.d(TAG, "onPause: ");
+
+        /*if (mCameraManager.isBackgroundReviewEnabled()) {
+            return;
+        }
+
         if (mCameraManager.isBackgroundRecordingActive()) {
+            return;
+        }*/
+        if (mCameraManager.isBackgroundRecordingEnabled()) {
             return;
         }
 

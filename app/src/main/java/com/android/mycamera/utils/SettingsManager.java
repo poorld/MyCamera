@@ -23,8 +23,9 @@ public class SettingsManager {
     private static final String PREF_AUDIO_ENABLED = "audio_enabled";
     private static final String PREF_SAVE_LOCATION = "save_location";
     private static final String PREF_CAMERA_ID = "camera_id";
+    private static final String PREF_BACKGROUND_REVIEW = "background_review";
     private static final String PREF_BACKGROUND_RECORDING = "background_recording";
-    
+
     private final SharedPreferences preferences;
     
     public SettingsManager(Context context) {
@@ -44,8 +45,9 @@ public class SettingsManager {
         editor.putBoolean(PREF_AUDIO_ENABLED, config.isAudioEnabled());
         editor.putString(PREF_SAVE_LOCATION, config.getSaveLocation().getAbsolutePath());
         editor.putString(PREF_CAMERA_ID, config.getCameraId());
+        editor.putBoolean(PREF_BACKGROUND_REVIEW, config.isBackgroundReviewEnabled());
         editor.putBoolean(PREF_BACKGROUND_RECORDING, config.isBackgroundRecordingEnabled());
-        
+
         editor.apply();
     }
     
@@ -75,8 +77,9 @@ public class SettingsManager {
         
         String cameraId = preferences.getString(PREF_CAMERA_ID, "0");
         
+        boolean backgroundReviewEnabled = preferences.getBoolean(PREF_BACKGROUND_REVIEW, false);
         boolean backgroundRecordingEnabled = preferences.getBoolean(PREF_BACKGROUND_RECORDING, false);
-        
+
         return new CameraConfig.Builder()
                 .setApiType(apiType)
                 .setResolution(resolution)
@@ -85,6 +88,7 @@ public class SettingsManager {
                 .setAudioEnabled(audioEnabled)
                 .setSaveLocation(saveLocation)
                 .setCameraId(cameraId)
+                .setBackgroundReviewEnabled(backgroundReviewEnabled)
                 .setBackgroundRecordingEnabled(backgroundRecordingEnabled)
                 .build();
     }
@@ -154,6 +158,10 @@ public class SettingsManager {
      */
     public boolean isBackgroundRecordingEnabled() {
         return preferences.getBoolean(PREF_BACKGROUND_RECORDING, false);
+    }
+
+    public boolean isBackgroundReviewEnabled() {
+        return preferences.getBoolean(PREF_BACKGROUND_REVIEW, false);
     }
     
     /**

@@ -28,12 +28,13 @@
         android:hardwareAccelerated="true">
 
         <activity android:name=".MainAct"
-            android:exported="true">
-<!--            <intent-filter>-->
-<!--                <action android:name="android.intent.action.MAIN" />-->
+            android:exported="true"
+            android:screenOrientation="portrait">
+            <!--<intent-filter>
+                <action android:name="android.intent.action.MAIN" />
 
-<!--                <category android:name="android.intent.category.LAUNCHER" />-->
-<!--            </intent-filter>-->
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>-->
         </activity>
 
         <activity android:name=".ui.activity.MainActivity"
@@ -67,7 +68,8 @@
         </activity>
 
         <activity android:name="com.android.mycamera.camera.Cam2ApiActivity" />
-        <activity android:name=".record.VideoRecordActivity" />
+        <activity android:name=".record.VideoRecordActivity"
+            android:screenOrientation="portrait"/>
 
         <activity
             android:name=".bgr.BackgroudCameraActivity"

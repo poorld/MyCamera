@@ -32,6 +32,7 @@ public class SettingsActivity extends AppCompatActivity {
     private Spinner frameRateSpinner;
     private Spinner qualitySpinner;
     private Switch audioEnabledSwitch;
+    private Switch backgroundReviewSwitch;
     private Switch backgroundRecordingSwitch;
     private TextView resolutionLabel;
     private TextView qualityLabel;
@@ -55,6 +56,7 @@ public class SettingsActivity extends AppCompatActivity {
         frameRateSpinner = findViewById(R.id.frameRateSpinner);
         qualitySpinner = findViewById(R.id.qualitySpinner);
         audioEnabledSwitch = findViewById(R.id.audioEnabledSwitch);
+        backgroundReviewSwitch = findViewById(R.id.backgroundReviewSwitch);
         backgroundRecordingSwitch = findViewById(R.id.backgroundRecordingSwitch);
         resolutionLabel = findViewById(R.id.resolutionLabel);
         qualityLabel = findViewById(R.id.qualityLabel);
@@ -79,6 +81,7 @@ public class SettingsActivity extends AppCompatActivity {
         setupQualitySpinner();
         
         audioEnabledSwitch.setChecked(currentConfig.isAudioEnabled());
+        backgroundReviewSwitch.setChecked(currentConfig.isBackgroundReviewEnabled());
         backgroundRecordingSwitch.setChecked(currentConfig.isBackgroundRecordingEnabled());
     }
 
@@ -224,7 +227,15 @@ public class SettingsActivity extends AppCompatActivity {
                 applyAndSaveChanges();
             }
         });
-        
+
+        backgroundReviewSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked != currentConfig.isBackgroundReviewEnabled()) {
+                currentConfig = new CameraConfig.Builder(currentConfig)
+                        .setBackgroundReviewEnabled(isChecked)
+                        .build();
+                applyAndSaveChanges();
+            }
+        });
         backgroundRecordingSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (isChecked != currentConfig.isBackgroundRecordingEnabled()) {
                 currentConfig = new CameraConfig.Builder(currentConfig)

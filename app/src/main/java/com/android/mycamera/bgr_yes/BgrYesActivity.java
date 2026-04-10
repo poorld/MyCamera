@@ -309,6 +309,7 @@ public class BgrYesActivity extends BaseAct {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        Log.d(TAG, "onDestroy: ");
         recordingTimer.stop();
         if (isServiceBound) {
             recordService.stopPreview();

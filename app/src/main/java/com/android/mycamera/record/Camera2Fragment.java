@@ -227,13 +227,16 @@ public class Camera2Fragment extends Fragment implements IRecordingFragment, Sur
         try {
             SurfaceHolder holder = surfaceView.getHolder();
             if (holder == null || cameraDevice == null) return;
-
-            String[] dimensions = resolution.split("x");
-            // android.view.ViewRootImpl$CalledFromWrongThreadException: Only the original thread that created a view hierarchy can touch its views.
-            Context context = getContext();
-            if (context != null) {
-                ContextCompat.getMainExecutor(context).execute(() -> holder.setFixedSize(Integer.parseInt(dimensions[0]), Integer.parseInt(dimensions[1])));
+            Log.d(TAG, "createPreviewSession: resolution " + resolution);
+            if (resolution.contains("x")) {
+                String[] dimensions = resolution.split("x");
+                // android.view.ViewRootImpl$CalledFromWrongThreadException: Only the original thread that created a view hierarchy can touch its views.
+                Context context = getContext();
+                if (context != null) {
+                    ContextCompat.getMainExecutor(context).execute(() -> holder.setFixedSize(Integer.parseInt(dimensions[0]), Integer.parseInt(dimensions[1])));
+                }
             }
+
 
             final CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             builder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, Range.create(frameRate, frameRate));
