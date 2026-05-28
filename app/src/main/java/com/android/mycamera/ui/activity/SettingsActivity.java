@@ -11,6 +11,7 @@ import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.android.mycamera.MainAct;
 import com.android.mycamera.R;
 import com.android.mycamera.camera.CamSizeActivity;
 import com.android.mycamera.camera.config.CameraConfig;
@@ -64,6 +65,12 @@ public class SettingsActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 startActivity(new Intent(SettingsActivity.this, CamSizeActivity.class));
+            }
+        });
+        findViewById(R.id.old_cam).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(SettingsActivity.this, MainAct.class));
             }
         });
     }

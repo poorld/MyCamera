@@ -46,6 +46,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="顺序打开"/>
+
+            <EditText
+                android:id="@+id/et_delay"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:hint="延迟毫秒" />
         </LinearLayout>
 
         <!-- 控制按钮 -->

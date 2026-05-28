@@ -10,12 +10,14 @@ import android.hardware.camera2.CameraManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -34,6 +36,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -49,6 +53,7 @@ public class MultiCameraActivity extends AppCompatActivity {
     private Button startRecordButton;
     private Button stopRecordButton;
     private SwitchCompat switch_order;
+    private EditText et_delay;
     private boolean orderOpenCam;
     private AtomicBoolean hasTextureViewOpen = new AtomicBoolean();
     
@@ -59,6 +64,9 @@ public class MultiCameraActivity extends AppCompatActivity {
     private CameraManager cameraManager;
 
     private Handler handler;
+    private final ExecutorService cameraCloseExecutor = Executors.newSingleThreadExecutor();
+    private final AtomicBoolean isClosingCameras = new AtomicBoolean(false);
+    private volatile boolean isDestroyed = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -88,6 +96,8 @@ public class MultiCameraActivity extends AppCompatActivity {
         startRecordButton = findViewById(R.id.start_record_button);
         stopRecordButton = findViewById(R.id.stop_record_button);
         switch_order = findViewById(R.id.switch_order);
+        et_delay = findViewById(R.id.et_delay);
+        et_delay.setText("3000");
 
         startPreviewButton.setOnClickListener(v -> startPreview());
         stopPreviewButton.setOnClickListener(v -> stopPreview());
@@ -202,6 +212,11 @@ public class MultiCameraActivity extends AppCompatActivity {
     }
     
     private void startPreview() {
+        if (isClosingCameras.get()) {
+            Toast.makeText(this, "正在关闭摄像头，请稍后再打开", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         if (selectedCameras.isEmpty()) {
             Toast.makeText(this, "请先选择要预览的摄像头", Toast.LENGTH_SHORT).show();
             return;
@@ -222,9 +237,9 @@ public class MultiCameraActivity extends AppCompatActivity {
     }
 
     private void stopPreview() {
-        closeAllCameras();
-        
-        startPreviewButton.setEnabled(true);
+        closeAllCamerasAsync();
+
+        startPreviewButton.setEnabled(false);
         stopPreviewButton.setEnabled(false);
         startRecordButton.setEnabled(false);
     }
@@ -261,14 +276,25 @@ public class MultiCameraActivity extends AppCompatActivity {
                 public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
                     int delay = 0;
                     if (orderOpenCam) {
+                        String val = et_delay.getText().toString();
+
+
                         if (!hasTextureViewOpen.getAndSet(true)) {
                             delay = 0;
                         }else {
-                            delay = 3000;
+                            if (!TextUtils.isEmpty(val)) {
+                                delay = Integer.parseInt(val);
+                            } else {
+                                delay = 3000;
+                            }
                         }
                     }
                     Log.d(TAG, "onSurfaceTextureAvailable: delay " + delay);
                     handler.postDelayed(() -> {
+                        if (isClosingCameras.get() || !cameraViews.containsKey(cameraId)) {
+                            Log.w(TAG, "Skip open camera after stop/close: " + cameraId);
+                            return;
+                        }
                         Log.d(TAG, "SurfaceTexture available for camera: " + cameraId);
 
                         if (multiCameraHelper != null) {
@@ -306,12 +332,40 @@ public class MultiCameraActivity extends AppCompatActivity {
 
     
     private void closeAllCameras() {
-        if (multiCameraHelper != null) {
-            multiCameraHelper.closeAllCameras();
-        }
+        handler.removeCallbacksAndMessages(null);
         previewContainer.removeAllViews();
         cameraViews.clear();
         hasTextureViewOpen.set(false);
+    }
+
+    private void closeAllCamerasAsync() {
+        if (!isClosingCameras.compareAndSet(false, true)) {
+            Log.w(TAG, "closeAllCamerasAsync already running");
+            return;
+        }
+
+        closeAllCameras();
+        cameraCloseExecutor.execute(() -> {
+            long startMs = System.currentTimeMillis();
+            try {
+                Log.d(TAG, "closeAllCameras begin on background thread");
+                if (multiCameraHelper != null) {
+                    multiCameraHelper.closeAllCameras();
+                }
+                Log.d(TAG, "closeAllCameras done, cost=" + (System.currentTimeMillis() - startMs) + "ms");
+            } catch (Exception e) {
+                Log.e(TAG, "closeAllCameras failed", e);
+            } finally {
+                isClosingCameras.set(false);
+                if (!isDestroyed) {
+                    runOnUiThread(() -> {
+                        startPreviewButton.setEnabled(true);
+                        stopPreviewButton.setEnabled(false);
+                        startRecordButton.setEnabled(false);
+                    });
+                }
+            }
+        });
     }
     
     private void startRecording() {
@@ -384,10 +438,20 @@ public class MultiCameraActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        
+        isDestroyed = true;
+        handler.removeCallbacksAndMessages(null);
+
         if (multiCameraHelper != null) {
-            multiCameraHelper.closeAllCameras();
-            multiCameraHelper.stopBackgroundThread();
+            cameraCloseExecutor.execute(() -> {
+                try {
+                    multiCameraHelper.closeAllCameras();
+                } catch (Exception e) {
+                    Log.e(TAG, "closeAllCameras on destroy failed", e);
+                } finally {
+                    multiCameraHelper.stopBackgroundThread();
+                }
+            });
         }
+        cameraCloseExecutor.shutdown();
     }
 }

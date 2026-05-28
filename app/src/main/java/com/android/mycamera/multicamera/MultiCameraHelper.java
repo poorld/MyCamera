@@ -44,6 +44,7 @@ public class MultiCameraHelper {
     private Map<String, CameraCaptureSession> captureSessions = new ConcurrentHashMap<>();
     private Map<String, CaptureRequest.Builder> previewRequestBuilders = new ConcurrentHashMap<>();
     private Map<String, MediaRecorder> mediaRecorders = new ConcurrentHashMap<>();
+    private Set<String> openingCameraIds = ConcurrentHashMap.newKeySet();
     
     private Handler backgroundHandler;
     private HandlerThread backgroundThread;
@@ -93,15 +94,52 @@ public class MultiCameraHelper {
     
     @SuppressLint("MissingPermission")
     public void openSingleCamera(String cameraId) {
+        if (backgroundHandler == null) {
+            Log.w(TAG, "Background thread is not ready, skip open camera: " + cameraId);
+            return;
+        }
+
+        backgroundHandler.post(() -> openSingleCameraInternal(cameraId));
+    }
+
+    @SuppressLint("MissingPermission")
+    private void openSingleCameraInternal(String cameraId) {
+        if (cameraDevices.containsKey(cameraId)) {
+            Log.d(TAG, "Camera already opened, skip duplicate open: " + cameraId);
+            return;
+        }
+
+        if (!openingCameraIds.add(cameraId)) {
+            Log.d(TAG, "Camera is already opening, skip duplicate request: " + cameraId);
+            return;
+        }
+
         try {
+            if (!isCameraIdAvailable(cameraId)) {
+                Log.w(TAG, "Skip open unavailable camera: " + cameraId);
+                return;
+            }
+
             CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraId);
             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-            Size videoSize = chooseVideoSize(map.getOutputSizes(MediaRecorder.class));
+            if (map == null) {
+                Log.e(TAG, "No stream configuration map for camera: " + cameraId);
+                return;
+            }
+
+            Size videoSize = choosePreviewSize(cameraId, map);
+            if (videoSize == null) {
+                Log.e(TAG, "Cannot choose preview size for camera: " + cameraId);
+                return;
+            }
+
             videoSizes.put(cameraId, videoSize);
+            Log.d(TAG, "Selected preview size for camera " + cameraId + ": " + videoSize);
             
             cameraManager.openCamera(cameraId, new CameraDevice.StateCallback() {
                 @Override
                 public void onOpened(@NonNull CameraDevice camera) {
+                    openingCameraIds.remove(cameraId);
                     cameraDevices.put(cameraId, camera);
                     Log.d(TAG, "Single camera opened: " + cameraId);
                     createCameraPreviewSession(cameraId);
@@ -109,6 +147,7 @@ public class MultiCameraHelper {
                 
                 @Override
                 public void onDisconnected(@NonNull CameraDevice camera) {
+                    openingCameraIds.remove(cameraId);
                     camera.close();
                     cameraDevices.remove(cameraId);
                     Log.d(TAG, "Single camera disconnected: " + cameraId);
@@ -116,6 +155,7 @@ public class MultiCameraHelper {
                 
                 @Override
                 public void onError(@NonNull CameraDevice camera, int error) {
+                    openingCameraIds.remove(cameraId);
                     camera.close();
                     cameraDevices.remove(cameraId);
                     Log.e(TAG, "Single camera error: " + cameraId + ", error: " + error);
@@ -124,6 +164,33 @@ public class MultiCameraHelper {
             
         } catch (CameraAccessException e) {
             Log.e(TAG, "Error opening single camera: " + cameraId, e);
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Open camera skipped because camera id is unavailable: " + cameraId, e);
+        } catch (SecurityException e) {
+            Log.e(TAG, "Open camera permission error: " + cameraId, e);
+        } catch (RuntimeException e) {
+            Log.e(TAG, "Unexpected runtime error while opening camera: " + cameraId, e);
+        } finally {
+            if (!cameraDevices.containsKey(cameraId)) {
+                openingCameraIds.remove(cameraId);
+            }
+        }
+    }
+
+    private boolean isCameraIdAvailable(String cameraId) {
+        try {
+            for (String availableId : cameraManager.getCameraIdList()) {
+                if (cameraId.equals(availableId)) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (CameraAccessException e) {
+            Log.w(TAG, "Cannot query camera id list before opening: " + cameraId, e);
+            return false;
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Unexpected error while querying camera id list: " + cameraId, e);
+            return false;
         }
     }
 
@@ -332,6 +399,7 @@ public class MultiCameraHelper {
         videoSizes.clear();
         videoPaths.clear();
         textureViews.clear();
+        openingCameraIds.clear();
     }
     
     private String getVideoFilePath(String physicalCameraId) {
@@ -339,6 +407,68 @@ public class MultiCameraHelper {
         return context.getExternalFilesDir(null) + "/" + "camera_" + physicalCameraId + "_" + timeStamp + ".mp4";
     }
     
+    private Size choosePreviewSize(String cameraId, StreamConfigurationMap map) {
+        if (isTiny2cCamera(cameraId)) {
+            Size tiny2cSize = chooseTiny2cPreviewSize(map);
+            if (tiny2cSize != null) {
+                Log.d(TAG, "Tiny2C use A88-compatible preview size for camera " + cameraId + ": " + tiny2cSize);
+                return tiny2cSize;
+            }
+        }
+
+        return chooseVideoSize(map.getOutputSizes(MediaRecorder.class));
+    }
+
+    private boolean isTiny2cCamera(String cameraId) {
+        if ("3".equals(cameraId)) {
+            return true;
+        }
+
+        if (!"2".equals(cameraId)) {
+            return false;
+        }
+
+        try {
+            return cameraManager.getCameraIdList().length == 3;
+        } catch (CameraAccessException e) {
+            Log.w(TAG, "Cannot check camera count for Tiny2C detection", e);
+            return false;
+        }
+    }
+
+    private static Size chooseTiny2cPreviewSize(StreamConfigurationMap map) {
+        Size size = findSize(map.getOutputSizes(SurfaceTexture.class), 192, 144);
+        if (size != null) {
+            return size;
+        }
+
+        size = findSize(map.getOutputSizes(MediaRecorder.class), 192, 144);
+        if (size != null) {
+            return size;
+        }
+
+        size = findSize(map.getOutputSizes(SurfaceTexture.class), 256, 384);
+        if (size != null) {
+            return size;
+        }
+
+        return findSize(map.getOutputSizes(MediaRecorder.class), 256, 384);
+    }
+
+    private static Size findSize(Size[] choices, int width, int height) {
+        if (choices == null) {
+            return null;
+        }
+
+        for (Size size : choices) {
+            if (size.getWidth() == width && size.getHeight() == height) {
+                return size;
+            }
+        }
+
+        return null;
+    }
+
     private static Size chooseVideoSize(Size[] choices) {
         for (Size size : choices) {
             if (size.getWidth() == size.getHeight() * 4 / 3 && size.getWidth() <= 1080) {

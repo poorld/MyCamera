@@ -18,7 +18,8 @@ public class CameraConfig {
     private final File saveLocation;
     private final CameraApiType apiType;
     private final boolean backgroundRecordingEnabled;
-    
+    private final boolean backgroundReviewEnabled;
+
     private CameraConfig(Builder builder) {
         this.cameraId = builder.cameraId;
         this.resolution = builder.resolution;
@@ -28,6 +29,7 @@ public class CameraConfig {
         this.saveLocation = builder.saveLocation;
         this.apiType = builder.apiType;
         this.backgroundRecordingEnabled = builder.backgroundRecordingEnabled;
+        this.backgroundReviewEnabled = builder.backgroundReviewEnabled;
     }
     
     public String getCameraId() {
@@ -61,6 +63,9 @@ public class CameraConfig {
     public boolean isBackgroundRecordingEnabled() {
         return backgroundRecordingEnabled;
     }
+    public boolean isBackgroundReviewEnabled() {
+        return backgroundReviewEnabled;
+    }
     
     /**
      * Builder pattern for CameraConfig
@@ -74,7 +79,8 @@ public class CameraConfig {
         private File saveLocation = new File(android.os.Environment.getExternalStorageDirectory(), "DCIM/Camera");
         private CameraApiType apiType = CameraApiType.CAMERAX;
         private boolean backgroundRecordingEnabled = false;
-        
+        private boolean backgroundReviewEnabled = false;
+
         /**
          * Default constructor for Builder
          */
@@ -135,7 +141,11 @@ public class CameraConfig {
             this.backgroundRecordingEnabled = backgroundRecordingEnabled;
             return this;
         }
-        
+        public Builder setBackgroundReviewEnabled(boolean backgroundReviewEnabled) {
+            this.backgroundReviewEnabled = backgroundReviewEnabled;
+            return this;
+        }
+
         public CameraConfig build() {
             return new CameraConfig(this);
         }

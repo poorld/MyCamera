@@ -99,7 +99,6 @@ public class CamSizeActivity extends AppCompatActivity {
             e.printStackTrace();
         }
     }
-
     private List<Size> getSupportedPictureSize(StreamConfigurationMap s, int format) {
         if (s == null) {
             return null;

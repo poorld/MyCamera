@@ -39,7 +39,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.Collections;
 
 public class Camera2Strategy extends BaseCameraStrategy {
     
@@ -56,6 +55,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
     private boolean isFlashEnabled = false;
     private MediaRecorder mediaRecorder;
     private boolean isRecording = false;
+    private boolean isStoppingRecording = false;
 
     public Camera2Strategy(Context context) {
         super(context);
@@ -248,16 +248,10 @@ public class Camera2Strategy extends BaseCameraStrategy {
     public void closeCamera() {
         Log.d(TAG, "closeCamera: ");
         if (isRecording) {
-            stopRecording();
+            stopRecordingInternal(false);
         }
         if (captureSession != null) {
-            try {
-                captureSession.abortCaptures();
-            } catch (CameraAccessException e) {
-                logError("Failed to abort captures", e);
-            }
-            captureSession.close();
-            captureSession = null;
+            closeCaptureSession();
         }
         if (cameraDevice != null) {
             cameraDevice.close();
@@ -294,8 +288,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
     public void stopPreview() {
         Log.d(TAG, "stopPreview: ");
         if (captureSession != null) {
-            captureSession.close();
-            captureSession = null;
+            closeCaptureSession();
         }
     }
 
@@ -309,65 +302,109 @@ public class Camera2Strategy extends BaseCameraStrategy {
         try {
             if (!setupMediaRecorder()) return;
 
+            if (textureView == null) {
+                releaseMediaRecorder();
+                return;
+            }
             SurfaceTexture surfaceTexture = textureView.getSurfaceTexture();
-            if (surfaceTexture == null) return;
+            if (surfaceTexture == null) {
+                releaseMediaRecorder();
+                return;
+            }
             
             Resolution resolution = currentConfig.getResolution();
             surfaceTexture.setDefaultBufferSize(resolution.getWidth(), resolution.getHeight());
             Surface previewSurface = new Surface(surfaceTexture);
             Surface recorderSurface = mediaRecorder.getSurface();
 
+            closeCaptureSession();
+
             final CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
             builder.addTarget(previewSurface);
             builder.addTarget(recorderSurface);
+            builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO);
             applyFpsToRequest(builder);
 
             cameraDevice.createCaptureSession(Arrays.asList(previewSurface, recorderSurface), new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
                     captureSession = session;
+                    previewRequestBuilder = builder;
                     try {
                         session.setRepeatingRequest(builder.build(), null, backgroundHandler);
                         mediaRecorder.start();
                         isRecording = true;
                         notifyRecordingStarted();
                     } catch (CameraAccessException | IllegalStateException e) {
+                        closeCaptureSession();
                         releaseMediaRecorder();
+                        createPreviewSession();
                     }
                 }
 
                 @Override
                 public void onConfigureFailed(@NonNull CameraCaptureSession session) {
+                    session.close();
+                    releaseMediaRecorder();
+                    createPreviewSession();
+                    notifyError("Recording configuration failed");
                 }
             }, backgroundHandler);
         } catch (CameraAccessException e) {
-            e.printStackTrace();
+            logError("Failed to create recording session", e);
+            releaseMediaRecorder();
+            createPreviewSession();
         }
     }
 
     @Override
     public void stopRecording() {
         Log.d(TAG, "stopRecording: ");
-        if (!isRecording || mediaRecorder == null) return;
+        stopRecordingInternal(true);
+    }
 
+    private void stopRecordingInternal(boolean restartPreview) {
+        if ((!isRecording && mediaRecorder == null) || isStoppingRecording) return;
+
+        isStoppingRecording = true;
+        boolean wasRecording = isRecording;
         try {
-            captureSession.stopRepeating();
-            captureSession.abortCaptures();
-            mediaRecorder.stop();
-        } catch (Exception e) {
-            e.printStackTrace();
+            if (captureSession != null) {
+                try {
+                    captureSession.stopRepeating();
+                    captureSession.abortCaptures();
+                } catch (CameraAccessException | IllegalStateException e) {
+                    logError("Failed to stop recording session requests", e);
+                }
+            }
+            if (mediaRecorder != null) {
+                try {
+                    mediaRecorder.stop();
+                } catch (RuntimeException e) {
+                    logError("Failed to stop media recorder cleanly", e);
+                }
+            }
+            closeCaptureSession();
+            releaseMediaRecorder();
+            isRecording = false;
+            if (wasRecording) {
+                notifyRecordingStopped();
+            }
+            if (restartPreview) {
+                createPreviewSession();
+            }
+        } finally {
+            isStoppingRecording = false;
         }
-        releaseMediaRecorder();
-        isRecording = false;
-        notifyRecordingStopped();
-        createPreviewSession();
     }
 
     private void createPreviewSession() {
         Log.d(TAG, "createPreviewSession: ");
         try {
+            closeCaptureSession();
+            if (textureView == null || cameraDevice == null) return;
             SurfaceTexture surfaceTexture = textureView.getSurfaceTexture();
-            if (surfaceTexture == null || cameraDevice == null) return;
+            if (surfaceTexture == null) return;
             Resolution resolution = currentConfig.getResolution();
             surfaceTexture.setDefaultBufferSize(resolution.getWidth(), resolution.getHeight());
             Surface previewSurface = new Surface(surfaceTexture);
@@ -376,11 +413,21 @@ public class Camera2Strategy extends BaseCameraStrategy {
             builder.addTarget(previewSurface);
             applyFpsToRequest(builder);
 
-            cameraDevice.createCaptureSession(Collections.singletonList(previewSurface), new CameraCaptureSession.StateCallback() {
+            if (imageReader == null
+                    || imageReader.getWidth() != resolution.getWidth()
+                    || imageReader.getHeight() != resolution.getHeight()) {
+                if (imageReader != null) {
+                    imageReader.close();
+                }
+                imageReader = ImageReader.newInstance(resolution.getWidth(), resolution.getHeight(), android.graphics.ImageFormat.JPEG, 1);
+            }
+
+            cameraDevice.createCaptureSession(Arrays.asList(previewSurface, imageReader.getSurface()), new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
                     if (cameraDevice == null) return;
                     captureSession = session;
+                    previewRequestBuilder = builder;
                     try {
                         builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
                         session.setRepeatingRequest(builder.build(), null, backgroundHandler);
@@ -396,6 +443,19 @@ public class Camera2Strategy extends BaseCameraStrategy {
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
+    }
+
+    private void closeCaptureSession() {
+        if (captureSession == null) return;
+        try {
+            captureSession.stopRepeating();
+            captureSession.abortCaptures();
+        } catch (CameraAccessException | IllegalStateException e) {
+            logError("Failed to stop capture session", e);
+        }
+        captureSession.close();
+        captureSession = null;
+        previewRequestBuilder = null;
     }
 
     private boolean setupMediaRecorder() {
@@ -416,11 +476,19 @@ public class Camera2Strategy extends BaseCameraStrategy {
         mediaRecorder.setAudioChannels(profile.audioChannels);
 
         // mediaRecorder.setMaxFileSize();
-        mediaRecorder.setMaxDuration(1 * 1000);
+        // mediaRecorder.setMaxDuration(1 * 1000);
         mediaRecorder.setOnInfoListener(new MediaRecorder.OnInfoListener() {
             @Override
             public void onInfo(MediaRecorder mr, int what, int extra) {
                 Log.d(TAG, "onInfo: " + mr + " what=" + what + " extra=" + extra);
+                if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED
+                        || what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED) {
+                    if (backgroundHandler != null) {
+                        backgroundHandler.post(() -> stopRecordingInternal(true));
+                    } else {
+                        stopRecordingInternal(true);
+                    }
+                }
             }
         });
 
