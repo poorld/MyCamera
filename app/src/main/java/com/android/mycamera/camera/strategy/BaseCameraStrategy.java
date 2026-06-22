@@ -1,7 +1,12 @@
 package com.android.mycamera.camera.strategy;
 
 import android.content.Context;
+import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraManager;
 import android.util.Log;
+import android.view.OrientationEventListener;
+import android.view.Surface;
 
 import com.android.mycamera.camera.error.CameraErrorHandler;
 import com.android.mycamera.model.CameraState;
@@ -22,6 +27,8 @@ public abstract class BaseCameraStrategy implements CameraStrategy {
     protected final List<CameraStateListener> stateListeners = new ArrayList<>();
     protected final CameraErrorHandler errorHandler;
     protected volatile CameraState currentState = CameraState.IDLE;
+    private OrientationEventListener orientationEventListener;
+    private int deviceOrientationDegrees = 0;
     
     public BaseCameraStrategy(Context context) {
         this.context = context.getApplicationContext();
@@ -115,6 +122,59 @@ public abstract class BaseCameraStrategy implements CameraStrategy {
     }
     
     protected abstract String getTag();
+
+    protected void startOrientationUpdates() {
+        if (orientationEventListener == null) {
+            orientationEventListener = new OrientationEventListener(context) {
+                @Override
+                public void onOrientationChanged(int orientation) {
+                    if (orientation == ORIENTATION_UNKNOWN) {
+                        return;
+                    }
+                    deviceOrientationDegrees = ((orientation + 45) / 90 * 90) % 360;
+                }
+            };
+        }
+        if (orientationEventListener.canDetectOrientation()) {
+            orientationEventListener.enable();
+        }
+    }
+
+    protected void stopOrientationUpdates() {
+        if (orientationEventListener != null) {
+            orientationEventListener.disable();
+        }
+    }
+
+    protected int getCameraXTargetRotation() {
+        switch ((360 - deviceOrientationDegrees) % 360) {
+            case 90:
+                return Surface.ROTATION_90;
+            case 180:
+                return Surface.ROTATION_180;
+            case 270:
+                return Surface.ROTATION_270;
+            case 0:
+            default:
+                return Surface.ROTATION_0;
+        }
+    }
+
+    protected int getVideoOrientationHint(String cameraId) {
+        try {
+            CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            if (manager != null) {
+                CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
+                Integer sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
+                if (sensorOrientation != null) {
+                    return (sensorOrientation + deviceOrientationDegrees) % 360;
+                }
+            }
+        } catch (CameraAccessException e) {
+            logError("Failed to get camera sensor orientation", e);
+        }
+        return deviceOrientationDegrees;
+    }
     
     @Override
     public List<Resolution> getSupportedResolutions() {
@@ -122,9 +182,9 @@ public abstract class BaseCameraStrategy implements CameraStrategy {
         resolutions.add(Resolution.VGA_640x480);
         resolutions.add(Resolution.HD_720P);
         resolutions.add(Resolution.FULL_HD_1080P);
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-            resolutions.add(Resolution.UHD_4K);
-        }
+        resolutions.add(Resolution.QHD_2K);
+        resolutions.add(Resolution.UHD_4K);
+
         return resolutions;
     }
     

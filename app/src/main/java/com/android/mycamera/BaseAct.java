@@ -9,12 +9,16 @@ import android.view.WindowManager;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.android.mycamera.utils.LocaleUtils;
+import com.android.mycamera.utils.SettingsManager;
+
 public class BaseAct extends AppCompatActivity {
 
     private GestureDetector gestureDetector;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+        LocaleUtils.applySavedLanguage(this);
         super.onCreate(savedInstanceState);
 
         // 设置全屏和沉浸式模式
@@ -22,9 +26,14 @@ public class BaseAct extends AppCompatActivity {
 
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        applyKeepScreenOnSetting();
+    }
+
     private void setupFullScreenMode() {
-        // 保持屏幕常亮
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        applyKeepScreenOnSetting();
 
         // 设置沉浸式全屏模式
         View decorView = getWindow().getDecorView();
@@ -55,6 +64,14 @@ public class BaseAct extends AppCompatActivity {
                 return super.onFling(e1, e2, velocityX, velocityY);
             }
         });
+    }
+
+    private void applyKeepScreenOnSetting() {
+        if (new SettingsManager(this).isKeepScreenOnEnabled()) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
     }
 
     @Override

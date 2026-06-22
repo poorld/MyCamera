@@ -25,6 +25,12 @@ public class SettingsManager {
     private static final String PREF_CAMERA_ID = "camera_id";
     private static final String PREF_BACKGROUND_REVIEW = "background_review";
     private static final String PREF_BACKGROUND_RECORDING = "background_recording";
+    private static final String PREF_KEEP_SCREEN_ON = "keep_screen_on";
+    private static final String PREF_APP_LANGUAGE = "app_language";
+
+    public static final String LANGUAGE_SYSTEM = "system";
+    public static final String LANGUAGE_CHINESE = "zh";
+    public static final String LANGUAGE_ENGLISH = "en";
 
     private final SharedPreferences preferences;
     
@@ -169,6 +175,29 @@ public class SettingsManager {
      */
     public void setBackgroundRecordingEnabled(boolean enabled) {
         preferences.edit().putBoolean(PREF_BACKGROUND_RECORDING, enabled).apply();
+    }
+
+    public boolean isKeepScreenOnEnabled() {
+        return preferences.getBoolean(PREF_KEEP_SCREEN_ON, false);
+    }
+
+    public void setKeepScreenOnEnabled(boolean enabled) {
+        preferences.edit().putBoolean(PREF_KEEP_SCREEN_ON, enabled).apply();
+    }
+
+    public String getAppLanguage() {
+        String language = preferences.getString(PREF_APP_LANGUAGE, LANGUAGE_SYSTEM);
+        if (LANGUAGE_CHINESE.equals(language) || LANGUAGE_ENGLISH.equals(language)) {
+            return language;
+        }
+        return LANGUAGE_SYSTEM;
+    }
+
+    public void setAppLanguage(String language) {
+        if (!LANGUAGE_CHINESE.equals(language) && !LANGUAGE_ENGLISH.equals(language)) {
+            language = LANGUAGE_SYSTEM;
+        }
+        preferences.edit().putString(PREF_APP_LANGUAGE, language).apply();
     }
     
     /**

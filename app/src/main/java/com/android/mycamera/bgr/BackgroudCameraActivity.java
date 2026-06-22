@@ -14,6 +14,7 @@ import android.widget.Button;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 
 import com.android.mycamera.BaseAct;
 import com.android.mycamera.R;
@@ -86,7 +87,7 @@ public class BackgroudCameraActivity extends BaseAct {
     private void startServiceAndBind() {
         Log.d(TAG, "startServiceAndBind: ");
         Intent intent = new Intent(this, BackgroundRecordService.class);
-        startService(intent);
+        ContextCompat.startForegroundService(this, intent);
         bindService(intent, connection, Context.BIND_AUTO_CREATE);
     }
 

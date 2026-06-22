@@ -71,6 +71,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
     public void openCamera(CameraConfig config) {
         Log.d(TAG, "openCamera: ");
         this.currentConfig = config;
+        startOrientationUpdates();
         startBackgroundThread();
         CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
         try {
@@ -247,6 +248,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
     @Override
     public void closeCamera() {
         Log.d(TAG, "closeCamera: ");
+        stopOrientationUpdates();
         if (isRecording) {
             stopRecordingInternal(false);
         }
@@ -328,6 +330,11 @@ public class Camera2Strategy extends BaseCameraStrategy {
             cameraDevice.createCaptureSession(Arrays.asList(previewSurface, recorderSurface), new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
+                    if (cameraDevice == null || backgroundHandler == null) {
+                        session.close();
+                        return;
+                    }
+
                     captureSession = session;
                     previewRequestBuilder = builder;
                     try {
@@ -474,6 +481,9 @@ public class Camera2Strategy extends BaseCameraStrategy {
         mediaRecorder.setVideoEncodingBitRate(profile.videoBitRate);
         mediaRecorder.setAudioEncodingBitRate(profile.audioBitRate);
         mediaRecorder.setAudioChannels(profile.audioChannels);
+        int orientationHint = getVideoOrientationHint(currentConfig.getCameraId());
+        mediaRecorder.setOrientationHint(orientationHint);
+        Log.d(TAG, "setupMediaRecorder orientationHint=" + orientationHint);
 
         // mediaRecorder.setMaxFileSize();
         // mediaRecorder.setMaxDuration(1 * 1000);

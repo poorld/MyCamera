@@ -5,6 +5,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
@@ -33,8 +34,13 @@ public class BackgroundRecordService extends Service {
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("Recording Service")
                 .setContentText("Recording video in the background.")
+                .setSmallIcon(com.android.mycamera.R.mipmap.ic_launcher)
                 .build();
-        startForeground(1, notification);
+        startForeground(
+                1,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA | ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+        );
     }
 
     @Override

@@ -115,7 +115,10 @@ public class Camera2Helper implements ICameraHelper {
             if (surfaceTexture == null) return;
             String[] dimensions = resolution.split("x");
             surfaceTexture.setDefaultBufferSize(Integer.parseInt(dimensions[0]), Integer.parseInt(dimensions[1]));
+            // previewSurface 给TextureView做预览
             Surface previewSurface = new Surface(surfaceTexture);
+
+            // recorderSurface 给MediaRecorder做录像编码
             Surface recorderSurface = mediaRecorder.getSurface();
 
             final CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);

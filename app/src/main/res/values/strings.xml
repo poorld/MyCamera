@@ -2,4 +2,24 @@
     <string name="app_name">YourCamera</string>
     <string name="background_record">Background Record</string>
     <string name="video_record">Video Record</string>
+    <string name="camera_settings">Camera Settings</string>
+    <string name="app_settings">App Settings</string>
+    <string name="keep_screen_on">Keep Screen On</string>
+    <string name="language">Language</string>
+    <string name="language_follow_system">Follow System</string>
+    <string name="language_chinese">Chinese</string>
+    <string name="language_english">English</string>
+    <string name="resolution">Resolution</string>
+    <string name="frame_rate">Frame Rate</string>
+    <string name="video_quality">Video Quality</string>
+    <string name="recording">Recording</string>
+    <string name="enable_audio">Enable Audio</string>
+    <string name="background_review">Background Review</string>
+    <string name="background_recording">Background Recording</string>
+    <string name="save_location">Save Location</string>
+    <string name="performance">Performance</string>
+    <string name="hardware_acceleration">Hardware Acceleration</string>
+    <string name="memory_optimization">Memory Optimization</string>
+    <string name="camera_size">Camera Size</string>
+    <string name="old_camera">Old Camera</string>
 </resources>

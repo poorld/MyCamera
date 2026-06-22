@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
 
@@ -39,6 +41,7 @@
 
         <activity android:name=".ui.activity.MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:screenOrientation="portrait">
                 <intent-filter>
                     <action android:name="android.intent.action.MAIN" />
@@ -79,7 +82,8 @@
         <service
             android:name=".bgr.BackgroundRecordService"
             android:enabled="true"
-            android:exported="true" />
+            android:exported="true"
+            android:foregroundServiceType="camera|microphone" />
 
 
         <activity
@@ -95,12 +99,14 @@
         <service
             android:name=".bgr_yes.BgrYesRecordService"
             android:enabled="true"
-            android:exported="true" />
+            android:exported="true"
+            android:foregroundServiceType="camera|microphone" />
 
         <service
             android:name=".camera.strategy.BackgroundRecordingService"
             android:enabled="true"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="camera|microphone" />
 
 
     </application>

@@ -7,6 +7,8 @@ import android.content.ServiceConnection;
 import android.os.IBinder;
 import android.util.Log;
 
+import androidx.core.content.ContextCompat;
+
 import com.android.mycamera.camera.config.CameraConfig;
 import com.android.mycamera.camera.manager.CameraManager;
 import com.android.mycamera.camera.observer.CameraStateManager;
@@ -71,7 +73,7 @@ public class BackgroundRecordingHelper {
     
     private void startAndBindService() {
         Intent serviceIntent = new Intent(context, BackgroundRecordingService.class);
-        context.startService(serviceIntent);
+        ContextCompat.startForegroundService(context, serviceIntent);
         context.bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE);
     }
 

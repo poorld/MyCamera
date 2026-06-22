@@ -25,6 +25,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 
+import com.android.mycamera.BaseAct;
 import com.android.mycamera.R;
 import com.android.mycamera.camera.helper.BackgroundRecordingHelper;
 import com.android.mycamera.camera.manager.CameraManager;
@@ -34,7 +35,7 @@ import com.android.mycamera.model.CameraApiType;
 import com.android.mycamera.model.CameraState;
 import com.android.mycamera.utils.CameraUtils;
 
-public class MainActivity extends AppCompatActivity implements CameraStateObserver {
+public class MainActivity extends BaseAct implements CameraStateObserver {
     
     private static final String[] REQUIRED_PERMISSIONS = CameraUtils.getRequiredPermissions();
     private static final int REQUEST_CODE_PERMISSIONS = 10;
@@ -78,6 +79,13 @@ public class MainActivity extends AppCompatActivity implements CameraStateObserv
         recordingTimerHandler = new Handler(Looper.getMainLooper());
 
         CameraUtils.createCameraDirectory();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        Log.d(TAG, "onNewIntent: reuse existing MainActivity");
     }
     
     private void initializeViews() {

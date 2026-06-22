@@ -19,12 +19,19 @@ import com.android.mycamera.camera.manager.CameraManager;
 import com.android.mycamera.model.CameraApiType;
 import com.android.mycamera.model.Quality;
 import com.android.mycamera.model.Resolution;
+import com.android.mycamera.utils.LocaleUtils;
 import com.android.mycamera.utils.SettingsManager;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class SettingsActivity extends AppCompatActivity {
+
+    private static final String[] LANGUAGE_VALUES = {
+            SettingsManager.LANGUAGE_SYSTEM,
+            SettingsManager.LANGUAGE_CHINESE,
+            SettingsManager.LANGUAGE_ENGLISH
+    };
     
     private CameraManager cameraManager;
     private SettingsManager settingsManager;
@@ -35,6 +42,8 @@ public class SettingsActivity extends AppCompatActivity {
     private Switch audioEnabledSwitch;
     private Switch backgroundReviewSwitch;
     private Switch backgroundRecordingSwitch;
+    private Switch keepScreenOnSwitch;
+    private Spinner languageSpinner;
     private TextView resolutionLabel;
     private TextView qualityLabel;
     
@@ -42,6 +51,7 @@ public class SettingsActivity extends AppCompatActivity {
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        LocaleUtils.applySavedLanguage(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
         
@@ -59,6 +69,8 @@ public class SettingsActivity extends AppCompatActivity {
         audioEnabledSwitch = findViewById(R.id.audioEnabledSwitch);
         backgroundReviewSwitch = findViewById(R.id.backgroundReviewSwitch);
         backgroundRecordingSwitch = findViewById(R.id.backgroundRecordingSwitch);
+        keepScreenOnSwitch = findViewById(R.id.keepScreenOnSwitch);
+        languageSpinner = findViewById(R.id.languageSpinner);
         resolutionLabel = findViewById(R.id.resolutionLabel);
         qualityLabel = findViewById(R.id.qualityLabel);
         findViewById(R.id.cam_size).setOnClickListener(new View.OnClickListener() {
@@ -90,6 +102,8 @@ public class SettingsActivity extends AppCompatActivity {
         audioEnabledSwitch.setChecked(currentConfig.isAudioEnabled());
         backgroundReviewSwitch.setChecked(currentConfig.isBackgroundReviewEnabled());
         backgroundRecordingSwitch.setChecked(currentConfig.isBackgroundRecordingEnabled());
+        keepScreenOnSwitch.setChecked(settingsManager.isKeepScreenOnEnabled());
+        setupLanguageSpinner();
     }
 
     private void updateSettingsVisibility() {
@@ -113,6 +127,7 @@ public class SettingsActivity extends AppCompatActivity {
         resolutions.add(Resolution.VGA_640x480);
         resolutions.add(Resolution.HD_720P);
         resolutions.add(Resolution.FULL_HD_1080P);
+        resolutions.add(Resolution.QHD_2K);
         resolutions.add(Resolution.UHD_4K);
         
         ArrayAdapter<Resolution> adapter = new ArrayAdapter<>(
@@ -162,8 +177,9 @@ public class SettingsActivity extends AppCompatActivity {
         qualities.add(Quality.SD);
         qualities.add(Quality.HD);
         qualities.add(Quality.FULL_HD);
+        // qualities.add(Quality.QHD);
         qualities.add(Quality.UHD);
-        
+
         ArrayAdapter<Quality> adapter = new ArrayAdapter<>(
                 this, R.layout.spinner_item_light, qualities);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -174,6 +190,29 @@ public class SettingsActivity extends AppCompatActivity {
         if (position >= 0) {
             qualitySpinner.setSelection(position, false);
         }
+    }
+
+    private void setupLanguageSpinner() {
+        List<String> languages = new ArrayList<>();
+        languages.add(getString(R.string.language_follow_system));
+        languages.add(getString(R.string.language_chinese));
+        languages.add(getString(R.string.language_english));
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                this, R.layout.spinner_item_light, languages);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        languageSpinner.setAdapter(adapter);
+
+        String currentLanguage = settingsManager.getAppLanguage();
+        int position = 0;
+        for (int i = 0; i < LANGUAGE_VALUES.length; i++) {
+            if (LANGUAGE_VALUES[i].equals(currentLanguage)) {
+                position = i;
+                break;
+            }
+        }
+        languageSpinner.setSelection(position, false);
     }
     
     private void setupListeners() {
@@ -250,6 +289,26 @@ public class SettingsActivity extends AppCompatActivity {
                         .build();
                 applyAndSaveChanges();
             }
+        });
+
+        keepScreenOnSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked != settingsManager.isKeepScreenOnEnabled()) {
+                settingsManager.setKeepScreenOnEnabled(isChecked);
+            }
+        });
+
+        languageSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String selectedLanguage = LANGUAGE_VALUES[position];
+                if (!selectedLanguage.equals(settingsManager.getAppLanguage())) {
+                    settingsManager.setAppLanguage(selectedLanguage);
+                    LocaleUtils.applyAppLanguage(selectedLanguage);
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
         });
     }
     

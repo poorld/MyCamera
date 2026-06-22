@@ -3,10 +3,7 @@ package com.android.mycamera.camera;
 import android.os.Bundle;
 import android.util.DisplayMetrics;
 import android.util.Log;
-import android.view.WindowManager;
-import android.util.DisplayMetrics;
 import android.util.Size;
-import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.Toast;
 
@@ -53,8 +50,6 @@ public class CamXApiActivity extends BaseAct {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // 保持屏幕常亮
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_cam_x);
 
         previewView = findViewById(R.id.previewView);

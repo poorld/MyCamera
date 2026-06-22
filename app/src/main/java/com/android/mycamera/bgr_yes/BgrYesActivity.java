@@ -22,6 +22,7 @@ import android.widget.Toast;
 
 import androidx.camera.core.CameraInfo;
 import androidx.camera.video.Quality;
+import androidx.core.content.ContextCompat;
 
 import com.android.mycamera.BaseAct;
 import com.android.mycamera.R;
@@ -264,7 +265,7 @@ public class BgrYesActivity extends BaseAct {
 
     private void startAndBindService() {
         Intent intent = new Intent(this, BgrYesRecordService.class);
-        startService(intent);
+        ContextCompat.startForegroundService(this, intent);
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
     }
 

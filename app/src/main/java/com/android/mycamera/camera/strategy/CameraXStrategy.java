@@ -1,5 +1,8 @@
 package com.android.mycamera.camera.strategy;
 
+import static java.util.Arrays.asList;
+import static java.util.Collections.unmodifiableList;
+
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -10,6 +13,7 @@ import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
+import android.media.CamcorderProfile;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaRecorder;
 import android.util.Log;
@@ -104,6 +108,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
     public void openCamera(CameraConfig config) {
         Log.d(TAG, "openCamera: ");
         this.currentConfig = config;
+        startOrientationUpdates();
         this.videoCapture = null;
         this.previewUseCase = null;
         this.imageCapture = null;
@@ -148,7 +153,9 @@ public class CameraXStrategy extends BaseCameraStrategy {
                 logDebug("CameraX applied fps range=" + appliedFpsRange);
 
                 Resolution resolution = currentConfig.getResolution();
-                Preview.Builder previewBuilder = new Preview.Builder();
+                int targetRotation = getCameraXTargetRotation();
+                Preview.Builder previewBuilder = new Preview.Builder()
+                        .setTargetRotation(targetRotation);
                 if (finalQuality == Quality.UHD) {
                     // Keep UHD recording, but lower preview stream to improve stability on constrained devices.
                     previewBuilder.setTargetResolution(UHD_PREVIEW_SIZE);
@@ -159,9 +166,11 @@ public class CameraXStrategy extends BaseCameraStrategy {
                         .setQualitySelector(QualitySelector.from(finalQuality, FallbackStrategy.lowerQualityOrHigherThan(finalQuality)))
                         .build();
                 videoCapture = VideoCapture.withOutput(recorder);
+                videoCapture.setTargetRotation(targetRotation);
                 appliedVideoQuality = finalQuality;
                 ImageCapture.Builder imageCaptureBuilder = new ImageCapture.Builder()
                         .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                        .setTargetRotation(targetRotation)
                         .setTargetResolution(new Size(resolution.getWidth(), resolution.getHeight()));
                 Camera2Interop.Extender imageCaptureExtender = new Camera2Interop.Extender(imageCaptureBuilder);
                 imageCaptureExtender.setCaptureRequestOption(
@@ -175,6 +184,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
                 camera = cameraProvider.bindToLifecycle(this.lifecycleOwner, cameraSelector, previewUseCase, imageCapture);
                 applyFpsRangeToCamera(camera);
                 attachPreviewSurfaceProvider();
+                logDebug("CameraX target rotation=" + targetRotation);
                 notifyPreviewStarted();
             } catch (Exception e) {
                 logError("Failed to start CameraX preview", e);
@@ -252,6 +262,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
             try {
                 ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
                 cameraProvider.unbindAll();
+                videoCapture.setTargetRotation(getCameraXTargetRotation());
                 camera = cameraProvider.bindToLifecycle(lifecycleOwner, currentCameraSelector, previewUseCase, videoCapture);
                 applyFpsRangeToCamera(camera);
                 attachPreviewSurfaceProvider();
@@ -373,6 +384,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
 
                 ImageCapture.Builder dedicatedBuilder = new ImageCapture.Builder()
                         .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                        .setTargetRotation(getCameraXTargetRotation())
                         .setTargetResolution(new Size(resolution.getWidth(), resolution.getHeight()));
                 Camera2Interop.Extender dedicatedExtender = new Camera2Interop.Extender(dedicatedBuilder);
                 dedicatedExtender.setCaptureRequestOption(
@@ -415,6 +427,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
     @Override
     public void closeCamera() {
         Log.d(TAG, "closeCamera: ");
+        stopOrientationUpdates();
         if (camera != null) {
             camera.getCameraControl().cancelFocusAndMetering();
         }

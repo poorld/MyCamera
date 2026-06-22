@@ -6,6 +6,7 @@ package com.android.mycamera.model;
 public enum Resolution {
     HD_720P(1280, 720, "720p HD"),
     FULL_HD_1080P(1920, 1080, "1080p Full HD"),
+    QHD_2K(2560, 1440, "2K QHD"),
     UHD_4K(3840, 2160, "4K UHD"),
     VGA_640x480(640, 480, "VGA"),
     QVGA_320x240(320, 240, "QVGA");

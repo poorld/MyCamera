@@ -2,7 +2,6 @@ package com.android.mycamera.focus;
 
 import android.os.Bundle;
 import android.util.Log;
-import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.Toast;
 
@@ -45,8 +44,6 @@ public class FocusCameraActivity extends BaseAct {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // 保持屏幕常亮
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_focus_camera);
 
         previewView = findViewById(R.id.previewView);

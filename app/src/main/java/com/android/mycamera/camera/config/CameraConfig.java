@@ -100,6 +100,7 @@ public class CameraConfig {
             this.saveLocation = config.saveLocation;
             this.apiType = config.apiType;
             this.backgroundRecordingEnabled = config.backgroundRecordingEnabled;
+            this.backgroundReviewEnabled = config.backgroundReviewEnabled;
         }
         
         public Builder setCameraId(String cameraId) {
@@ -162,6 +163,7 @@ public class CameraConfig {
                 ", saveLocation=" + saveLocation +
                 ", apiType=" + apiType +
                 ", backgroundRecordingEnabled=" + backgroundRecordingEnabled +
+                ", backgroundReviewEnabled=" + backgroundReviewEnabled +
                 '}';
     }
 }

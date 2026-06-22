@@ -12,8 +12,8 @@
         <item name="android:windowTranslucentStatus">true</item>
         <item name="android:windowTranslucentNavigation">true</item>
 
-        <!-- 保持屏幕常亮 -->
-        <item name="android:keepScreenOn">true</item>
+        <!-- 默认不保持屏幕常亮，由设置项控制 -->
+        <item name="android:keepScreenOn">false</item>
     </style>
 
     <style name="Theme.MyCamera" parent="Base.Theme.MyCamera" />
