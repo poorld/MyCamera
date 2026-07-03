@@ -67,6 +67,10 @@ public class BackgroundRecordingHelper {
     
     public void initialize(Callback callback) {
         this.callback = callback;
+        if (isServiceBound && backgroundRecordingService != null) {
+            callback.onServiceConn();
+            return;
+        }
 
         startAndBindService();
     }
@@ -126,10 +130,10 @@ public class BackgroundRecordingHelper {
     }
 
     public boolean isBackgroundRecordingServiceReady() {
-        return isServiceBound && backgroundRecordingService.isReady();
+        return isServiceBound && backgroundRecordingService != null && backgroundRecordingService.isReady();
     }
     public boolean isBackgroundRecordingActive() {
-        return isServiceBound && backgroundRecordingService.isRecording();
+        return isServiceBound && backgroundRecordingService != null && backgroundRecordingService.isRecording();
     }
 
     public void updateBackgroundRecordingConfig(CameraConfig config) {

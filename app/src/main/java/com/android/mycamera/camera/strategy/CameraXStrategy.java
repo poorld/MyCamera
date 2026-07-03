@@ -16,6 +16,7 @@ import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.CamcorderProfile;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaRecorder;
+import android.os.Environment;
 import android.util.Log;
 import android.util.Range;
 import android.util.Size;
@@ -41,6 +42,7 @@ import androidx.camera.core.impl.CameraInfoInternal;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.video.FileOutputOptions;
 import androidx.camera.video.FallbackStrategy;
+import androidx.camera.video.PendingRecording;
 import androidx.camera.video.Quality;
 import androidx.camera.video.QualitySelector;
 import androidx.camera.video.Recorder;
@@ -181,10 +183,11 @@ public class CameraXStrategy extends BaseCameraStrategy {
 
                 cameraProvider.unbindAll();
 
-                camera = cameraProvider.bindToLifecycle(this.lifecycleOwner, cameraSelector, previewUseCase, imageCapture);
+                camera = cameraProvider.bindToLifecycle(this.lifecycleOwner, cameraSelector, previewUseCase, videoCapture);
                 applyFpsRangeToCamera(camera);
                 attachPreviewSurfaceProvider();
                 logDebug("CameraX target rotation=" + targetRotation);
+                notifyStateChanged(CameraState.PREVIEW_STARTED);
                 notifyPreviewStarted();
             } catch (Exception e) {
                 logError("Failed to start CameraX preview", e);
@@ -258,21 +261,23 @@ public class CameraXStrategy extends BaseCameraStrategy {
     public void startRecording() {
         Log.d(TAG, "startRecording: videoCapture=" + videoCapture);
         if (videoCapture == null || previewUseCase == null || currentCameraSelector == null || lifecycleOwner == null) return;
+        if (recording != null) return;
         cameraProviderFuture.addListener(() -> {
             try {
-                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
-                cameraProvider.unbindAll();
                 videoCapture.setTargetRotation(getCameraXTargetRotation());
-                camera = cameraProvider.bindToLifecycle(lifecycleOwner, currentCameraSelector, previewUseCase, videoCapture);
-                applyFpsRangeToCamera(camera);
-                attachPreviewSurfaceProvider();
+                isUserStopping = false;
+                firstStart = true;
 
-                outputFile = CameraUtils.generateUniqueMediaFile("mp4");
+                outputFile = generateCameraXVideoFile();
                 FileOutputOptions outputOptions = new FileOutputOptions.Builder(outputFile).build();
-                recording = videoCapture.getOutput()
-                        .prepareRecording(context, outputOptions)
-                        .withAudioEnabled()
-                        .start(ContextCompat.getMainExecutor(context), this::checkEvent);
+                PendingRecording pendingRecording = videoCapture.getOutput()
+                        .prepareRecording(context, outputOptions);
+                if (currentConfig.isAudioEnabled()
+                        && ActivityCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO)
+                        == PackageManager.PERMISSION_GRANTED) {
+                    pendingRecording = pendingRecording.withAudioEnabled();
+                }
+                recording = pendingRecording.start(ContextCompat.getMainExecutor(context), this::checkEvent);
             } catch (Exception e) {
                 logError("Failed to start CameraX recording", e);
             }
@@ -311,15 +316,19 @@ public class CameraXStrategy extends BaseCameraStrategy {
 
         if (event instanceof VideoRecordEvent.Finalize) {
             if (((VideoRecordEvent.Finalize) event).hasError()) {
-                Log.d(TAG, "Recording failed: ");
-                notifyError("Recording failed");
+                VideoRecordEvent.Finalize finalizeEvent = (VideoRecordEvent.Finalize) event;
+                Log.d(TAG, "Recording failed: " + finalizeEvent.getError() + ", " + finalizeEvent.getCause());
+                recording = null;
+                firstStart = true;
+                notifyError("Recording failed: " + finalizeEvent.getError());
             } else {
+                recording = null;
+                firstStart = true;
                 logRecordedVideoInfo(outputFile);
                 if (isSplitting) {
                     Log.d(TAG, "Segment finalized, starting next segment...");
                     startNextSegment();
                 } else {
-                    restorePhotoUseCases();
                     notifyRecordingStopped();
                     notifyPhotoCaptured(outputFile.getAbsolutePath());
                 }
@@ -360,13 +369,13 @@ public class CameraXStrategy extends BaseCameraStrategy {
     private void restorePhotoUseCases() {
         if (cameraProviderFuture == null || !cameraProviderFuture.isDone()
                 || lifecycleOwner == null || currentCameraSelector == null
-                || previewUseCase == null || imageCapture == null) {
+                || previewUseCase == null || videoCapture == null) {
             return;
         }
         try {
             ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
             cameraProvider.unbindAll();
-            camera = cameraProvider.bindToLifecycle(lifecycleOwner, currentCameraSelector, previewUseCase, imageCapture);
+            camera = cameraProvider.bindToLifecycle(lifecycleOwner, currentCameraSelector, previewUseCase, videoCapture);
             applyFpsRangeToCamera(camera);
             attachPreviewSurfaceProvider();
         } catch (Exception e) {
@@ -376,7 +385,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
 
     @Override
     public void capturePhoto() {
-        if (imageCapture == null || cameraProviderFuture == null || lifecycleOwner == null || currentCameraSelector == null) return;
+        if (recording != null || cameraProviderFuture == null || lifecycleOwner == null || currentCameraSelector == null) return;
         cameraProviderFuture.addListener(() -> {
             try {
                 ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
@@ -655,6 +664,17 @@ public class CameraXStrategy extends BaseCameraStrategy {
             }
         }
         return best;
+    }
+
+    private File generateCameraXVideoFile() {
+        File cameraDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
+        if (cameraDir == null) {
+            cameraDir = context.getFilesDir();
+        }
+        if (!cameraDir.exists()) {
+            cameraDir.mkdirs();
+        }
+        return new File(cameraDir, CameraUtils.generateUniqueFileName("mp4").replaceFirst("^CAM_", "CAMX_"));
     }
 
     private void attachPreviewSurfaceProvider() {

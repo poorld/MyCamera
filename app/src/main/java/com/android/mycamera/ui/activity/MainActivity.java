@@ -65,6 +65,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
 
     private boolean isVideoMode = false;
     private boolean isRecording = false;
+    private boolean isSyncingApiSelection = false;
     private Handler recordingTimerHandler;
     private long recordingStartTime = 0;
     
@@ -147,6 +148,9 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         });
 
         apiRadioGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            if (isSyncingApiSelection) {
+                return;
+            }
             CameraApiType selectedApi = CameraApiType.CAMERAX;
             if (checkedId == R.id.apiCamera1) {
                 selectedApi = CameraApiType.CAMERA1;
@@ -183,6 +187,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             initializeCamera();
 
             CameraApiType cameraApiType = mCameraManager.getCameraApiType();
+            isSyncingApiSelection = true;
             if (cameraApiType == CameraApiType.CAMERA1) {
                 apiCamera1.setChecked(true);
             } else if (cameraApiType == CameraApiType.CAMERA2) {
@@ -190,6 +195,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             } else if (cameraApiType == CameraApiType.CAMERAX) {
                 apiCameraX.setChecked(true);
             }
+            isSyncingApiSelection = false;
         }
 
     }

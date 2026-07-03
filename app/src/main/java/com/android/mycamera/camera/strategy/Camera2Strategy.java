@@ -19,6 +19,7 @@ import android.media.ImageReader;
 import android.media.MediaRecorder;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.Environment;
 import android.os.Looper;
 import android.util.Log;
 import android.util.Range;
@@ -56,6 +57,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
     private MediaRecorder mediaRecorder;
     private boolean isRecording = false;
     private boolean isStoppingRecording = false;
+    private File recordingOutputFile;
 
     public Camera2Strategy(Context context) {
         super(context);
@@ -70,6 +72,11 @@ public class Camera2Strategy extends BaseCameraStrategy {
     @Override
     public void openCamera(CameraConfig config) {
         Log.d(TAG, "openCamera: ");
+        if (cameraDevice != null && currentState != CameraState.ERROR && currentState != CameraState.CLOSED) {
+            Log.d(TAG, "openCamera: camera already opened, state=" + currentState);
+            notifyStateChanged(currentState);
+            return;
+        }
         this.currentConfig = config;
         startOrientationUpdates();
         startBackgroundThread();
@@ -106,6 +113,10 @@ public class Camera2Strategy extends BaseCameraStrategy {
     public void startPreview(TextureView textureView, Object lifecycleOwner) {
         Log.d(TAG, "startPreview: cameraDevice=" + cameraDevice);
         if (cameraDevice == null) return;
+        if (captureSession != null && currentState == CameraState.PREVIEW_STARTED) {
+            Log.d(TAG, "startPreview: preview already started");
+            return;
+        }
         this.textureView = textureView;
         try {
             SurfaceTexture texture = textureView.getSurfaceTexture();
@@ -127,6 +138,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
                         previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
                         applyFpsToRequest(previewRequestBuilder);
                         session.setRepeatingRequest(previewRequestBuilder.build(), null, backgroundHandler);
+                        notifyStateChanged(CameraState.PREVIEW_STARTED);
                         notifyPreviewStarted();
                     } catch (CameraAccessException e) {
                         logError("Failed to start preview", e);
@@ -305,11 +317,13 @@ public class Camera2Strategy extends BaseCameraStrategy {
             if (!setupMediaRecorder()) return;
 
             if (textureView == null) {
+                logError("Cannot start Camera2 recording: textureView is null", null);
                 releaseMediaRecorder();
                 return;
             }
             SurfaceTexture surfaceTexture = textureView.getSurfaceTexture();
             if (surfaceTexture == null) {
+                logError("Cannot start Camera2 recording: surfaceTexture is null", null);
                 releaseMediaRecorder();
                 return;
             }
@@ -343,6 +357,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
                         isRecording = true;
                         notifyRecordingStarted();
                     } catch (CameraAccessException | IllegalStateException e) {
+                        logError("Failed to start Camera2 media recorder", e);
                         closeCaptureSession();
                         releaseMediaRecorder();
                         createPreviewSession();
@@ -359,6 +374,10 @@ public class Camera2Strategy extends BaseCameraStrategy {
             }, backgroundHandler);
         } catch (CameraAccessException e) {
             logError("Failed to create recording session", e);
+            releaseMediaRecorder();
+            createPreviewSession();
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            logError("Failed to start Camera2 recording", e);
             releaseMediaRecorder();
             createPreviewSession();
         }
@@ -396,6 +415,9 @@ public class Camera2Strategy extends BaseCameraStrategy {
             isRecording = false;
             if (wasRecording) {
                 notifyRecordingStopped();
+                if (recordingOutputFile != null) {
+                    notifyPhotoCaptured(recordingOutputFile.getAbsolutePath());
+                }
             }
             if (restartPreview) {
                 createPreviewSession();
@@ -467,20 +489,29 @@ public class Camera2Strategy extends BaseCameraStrategy {
 
     private boolean setupMediaRecorder() {
         mediaRecorder = new MediaRecorder();
-        mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+        boolean useAudio = currentConfig.isAudioEnabled()
+                && ActivityCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED;
+        if (useAudio) {
+            mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+        }
         mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
 
         CamcorderProfile profile = CamcorderProfile.get(Integer.parseInt(currentConfig.getCameraId()), CamcorderProfile.QUALITY_HIGH);
         mediaRecorder.setOutputFormat(profile.fileFormat);
-        mediaRecorder.setAudioEncoder(profile.audioCodec);
+        if (useAudio) {
+            mediaRecorder.setAudioEncoder(profile.audioCodec);
+        }
         mediaRecorder.setVideoEncoder(profile.videoCodec);
 
         Resolution resolution = currentConfig.getResolution();
         mediaRecorder.setVideoSize(resolution.getWidth(), resolution.getHeight());
         mediaRecorder.setVideoFrameRate(currentConfig.getFrameRate());
         mediaRecorder.setVideoEncodingBitRate(profile.videoBitRate);
-        mediaRecorder.setAudioEncodingBitRate(profile.audioBitRate);
-        mediaRecorder.setAudioChannels(profile.audioChannels);
+        if (useAudio) {
+            mediaRecorder.setAudioEncodingBitRate(profile.audioBitRate);
+            mediaRecorder.setAudioChannels(profile.audioChannels);
+        }
         int orientationHint = getVideoOrientationHint(currentConfig.getCameraId());
         mediaRecorder.setOrientationHint(orientationHint);
         Log.d(TAG, "setupMediaRecorder orientationHint=" + orientationHint);
@@ -503,16 +534,33 @@ public class Camera2Strategy extends BaseCameraStrategy {
         });
 
 
-        File outputFile = CameraUtils.generateUniqueMediaFile("mp4");
+        File outputFile = generateCamera2VideoFile();
+        recordingOutputFile = outputFile;
+        Log.d(TAG, "setupMediaRecorder outputFile=" + outputFile.getAbsolutePath()
+                + ", size=" + resolution.getWidth() + "x" + resolution.getHeight()
+                + ", fps=" + currentConfig.getFrameRate()
+                + ", useAudio=" + useAudio);
         mediaRecorder.setOutputFile(outputFile.getAbsolutePath());
 
         try {
             mediaRecorder.prepare();
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
+            logError("MediaRecorder prepare failed: " + outputFile.getAbsolutePath(), e);
             releaseMediaRecorder();
             return false;
         }
         return true;
+    }
+
+    private File generateCamera2VideoFile() {
+        File cameraDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
+        if (cameraDir == null) {
+            cameraDir = context.getFilesDir();
+        }
+        if (!cameraDir.exists() && !cameraDir.mkdirs()) {
+            logError("Failed to create Camera2 video directory: " + cameraDir.getAbsolutePath(), null);
+        }
+        return new File(cameraDir, CameraUtils.generateUniqueFileName("mp4").replaceFirst("^CAM_", "CAM2_"));
     }
 
     private void applyFpsToRequest(CaptureRequest.Builder builder) {

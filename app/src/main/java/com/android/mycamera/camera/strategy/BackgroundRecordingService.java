@@ -75,6 +75,11 @@ public class BackgroundRecordingService extends LifecycleService {
         if (cameraStrategy == null) {
             return;
         }
+        CameraState state = cameraStrategy.getCurrentState();
+        if (state == CameraState.OPENED || state == CameraState.PREVIEW_STARTED || state == CameraState.RECORDING) {
+            Log.d(TAG, "openCamera: already active, state=" + state);
+            return;
+        }
         cameraStrategy.openCamera(config);
     }
     
@@ -98,28 +103,48 @@ public class BackgroundRecordingService extends LifecycleService {
     }
     
     public boolean isReady() {
+        if (cameraStrategy == null) {
+            return false;
+        }
         Log.d(TAG, "isReady: "+ cameraStrategy.getCurrentState());
-        return cameraStrategy != null && (cameraStrategy.getCurrentState() == CameraState.OPENED || cameraStrategy.getCurrentState() == CameraState.PREVIEW_STARTED);
+        return cameraStrategy.getCurrentState() == CameraState.OPENED || cameraStrategy.getCurrentState() == CameraState.PREVIEW_STARTED;
     }
     
     public boolean isRecording() {
+        if (cameraStrategy == null) {
+            return false;
+        }
         Log.d(TAG, "isRecording: " + cameraStrategy.getCurrentState());
-        return cameraStrategy != null && cameraStrategy.getCurrentState() == CameraState.RECORDING;
+        return cameraStrategy.getCurrentState() == CameraState.RECORDING;
     }
 
 
     public void startPreview(Object textureView) {
         Log.d(TAG, "startPreview: ");
+        if (cameraStrategy == null) {
+            return;
+        }
+        if (cameraStrategy.getCurrentState() == CameraState.PREVIEW_STARTED
+                || cameraStrategy.getCurrentState() == CameraState.RECORDING) {
+            Log.d(TAG, "startPreview: already active, state=" + cameraStrategy.getCurrentState());
+            return;
+        }
         cameraStrategy.startPreview((android.view.TextureView) textureView, this);
     }
 
     public void stopPreview() {
         Log.d(TAG, "stopPreview: ");
+        if (cameraStrategy == null) {
+            return;
+        }
         cameraStrategy.stopPreview();
     }
 
     public void closeCamera() {
         Log.d(TAG, "closeCamera: ");
+        if (cameraStrategy == null) {
+            return;
+        }
         cameraStrategy.closeCamera();
     }
     
