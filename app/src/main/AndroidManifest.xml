@@ -55,6 +55,18 @@
         </activity>
 
         <activity
+            android:name=".ui.activity.MediaCodecTestActivity"
+            android:exported="true"
+            android:screenOrientation="portrait">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+<!--                <category android:name="android.intent.category.LAUNCHER" />-->
+            </intent-filter>
+        </activity>
+
+        <activity
             android:name=".camera.Cam1ApiActivity"
             android:exported="true">
 
@@ -95,6 +107,8 @@
             android:name=".multicamera.MultiCameraActivity"
             android:exported="true" />
         <activity android:name="com.android.mycamera.camera.MultipleCam2ApiActivity" />
+        <activity android:name="com.android.mycamera.ui.activity.GoogleMediaCodecTestActivity"
+            android:exported="true"/>
 
         <service
             android:name=".bgr_yes.BgrYesRecordService"

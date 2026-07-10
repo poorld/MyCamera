@@ -27,6 +27,7 @@ public class SettingsManager {
     private static final String PREF_BACKGROUND_RECORDING = "background_recording";
     private static final String PREF_KEEP_SCREEN_ON = "keep_screen_on";
     private static final String PREF_APP_LANGUAGE = "app_language";
+    private static final String PREF_CAMERA2_CUSTOM_RESOLUTION = "camera2_custom_resolution";
 
     public static final String LANGUAGE_SYSTEM = "system";
     public static final String LANGUAGE_CHINESE = "zh";
@@ -68,6 +69,9 @@ public class SettingsManager {
         Resolution resolution = Resolution.fromString(
                 preferences.getString(PREF_RESOLUTION, Resolution.FULL_HD_1080P.toString())
         );
+        if (apiType != CameraApiType.CAMERA2 && !resolution.isFixed()) {
+            resolution = Resolution.FULL_HD_1080P;
+        }
         
         int frameRate = preferences.getInt(PREF_FRAME_RATE, 30);
         
@@ -183,6 +187,14 @@ public class SettingsManager {
 
     public void setKeepScreenOnEnabled(boolean enabled) {
         preferences.edit().putBoolean(PREF_KEEP_SCREEN_ON, enabled).apply();
+    }
+
+    public boolean isCamera2CustomResolutionEnabled() {
+        return preferences.getBoolean(PREF_CAMERA2_CUSTOM_RESOLUTION, false);
+    }
+
+    public void setCamera2CustomResolutionEnabled(boolean enabled) {
+        preferences.edit().putBoolean(PREF_CAMERA2_CUSTOM_RESOLUTION, enabled).apply();
     }
 
     public String getAppLanguage() {

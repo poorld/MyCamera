@@ -10,6 +10,7 @@
     <string name="language_chinese">Chinese</string>
     <string name="language_english">English</string>
     <string name="resolution">Resolution</string>
+    <string name="custom_camera2_resolution">Custom Camera2 Resolution</string>
     <string name="frame_rate">Frame Rate</string>
     <string name="video_quality">Video Quality</string>
     <string name="recording">Recording</string>

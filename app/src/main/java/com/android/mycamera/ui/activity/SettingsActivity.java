@@ -1,7 +1,14 @@
 package com.android.mycamera.ui.activity;
 
+import android.content.Context;
 import android.content.Intent;
+import android.graphics.ImageFormat;
+import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.params.StreamConfigurationMap;
+import android.media.MediaRecorder;
 import android.os.Bundle;
+import android.util.Size;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -23,7 +30,11 @@ import com.android.mycamera.utils.LocaleUtils;
 import com.android.mycamera.utils.SettingsManager;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class SettingsActivity extends AppCompatActivity {
 
@@ -43,11 +54,13 @@ public class SettingsActivity extends AppCompatActivity {
     private Switch backgroundReviewSwitch;
     private Switch backgroundRecordingSwitch;
     private Switch keepScreenOnSwitch;
+    private Switch customResolutionSwitch;
     private Spinner languageSpinner;
     private TextView resolutionLabel;
     private TextView qualityLabel;
     
     private CameraConfig currentConfig;
+    private boolean isUpdatingResolutionSpinner = false;
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,6 +83,7 @@ public class SettingsActivity extends AppCompatActivity {
         backgroundReviewSwitch = findViewById(R.id.backgroundReviewSwitch);
         backgroundRecordingSwitch = findViewById(R.id.backgroundRecordingSwitch);
         keepScreenOnSwitch = findViewById(R.id.keepScreenOnSwitch);
+        customResolutionSwitch = findViewById(R.id.customResolutionSwitch);
         languageSpinner = findViewById(R.id.languageSpinner);
         resolutionLabel = findViewById(R.id.resolutionLabel);
         qualityLabel = findViewById(R.id.qualityLabel);
@@ -103,6 +117,7 @@ public class SettingsActivity extends AppCompatActivity {
         backgroundReviewSwitch.setChecked(currentConfig.isBackgroundReviewEnabled());
         backgroundRecordingSwitch.setChecked(currentConfig.isBackgroundRecordingEnabled());
         keepScreenOnSwitch.setChecked(settingsManager.isKeepScreenOnEnabled());
+        customResolutionSwitch.setChecked(shouldUseCamera2CustomResolutions());
         setupLanguageSpinner();
     }
 
@@ -114,32 +129,44 @@ public class SettingsActivity extends AppCompatActivity {
             resolutionSpinner.setVisibility(View.VISIBLE);
             qualityLabel.setVisibility(View.GONE);
             qualitySpinner.setVisibility(View.GONE);
+            customResolutionSwitch.setVisibility(apiType == CameraApiType.CAMERA2 ? View.VISIBLE : View.GONE);
         } else { // CameraX
             resolutionLabel.setVisibility(View.GONE);
             resolutionSpinner.setVisibility(View.GONE);
+            customResolutionSwitch.setVisibility(View.GONE);
             qualityLabel.setVisibility(View.VISIBLE);
             qualitySpinner.setVisibility(View.VISIBLE);
         }
     }
     
     private void setupResolutionSpinner() {
-        List<Resolution> resolutions = new ArrayList<>();
-        resolutions.add(Resolution.VGA_640x480);
-        resolutions.add(Resolution.HD_720P);
-        resolutions.add(Resolution.FULL_HD_1080P);
-        resolutions.add(Resolution.QHD_2K);
-        resolutions.add(Resolution.UHD_4K);
+        List<Resolution> resolutions = shouldUseCamera2CustomResolutions()
+                ? getCamera2Resolutions(currentConfig.getCameraId())
+                : getFixedResolutions();
+        if (resolutions.isEmpty()) {
+            resolutions = getFixedResolutions();
+        }
         
         ArrayAdapter<Resolution> adapter = new ArrayAdapter<>(
                 this, R.layout.spinner_item_light, resolutions);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         
+        isUpdatingResolutionSpinner = true;
         resolutionSpinner.setAdapter(adapter);
         
         int position = resolutions.indexOf(currentConfig.getResolution());
-        if (position >= 0) {
-            resolutionSpinner.setSelection(position, false);
+        if (position < 0) {
+            Resolution fallback = resolutions.contains(Resolution.FULL_HD_1080P)
+                    ? Resolution.FULL_HD_1080P
+                    : resolutions.get(0);
+            currentConfig = new CameraConfig.Builder(currentConfig)
+                    .setResolution(fallback)
+                    .build();
+            applyAndSaveChanges();
+            position = resolutions.indexOf(fallback);
         }
+        resolutionSpinner.setSelection(Math.max(position, 0), false);
+        isUpdatingResolutionSpinner = false;
     }
     
     private void setupFrameRateSpinner() {
@@ -219,12 +246,16 @@ public class SettingsActivity extends AppCompatActivity {
         resolutionSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (isUpdatingResolutionSpinner) {
+                    return;
+                }
                 Resolution selectedResolution = (Resolution) parent.getItemAtPosition(position);
                 if (!selectedResolution.equals(currentConfig.getResolution())) {
                     currentConfig = new CameraConfig.Builder(currentConfig)
                             .setResolution(selectedResolution)
                             .build();
                     applyAndSaveChanges();
+                    setupFrameRateSpinner();
                 }
             }
             
@@ -297,6 +328,17 @@ public class SettingsActivity extends AppCompatActivity {
             }
         });
 
+        customResolutionSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (currentConfig.getApiType() != CameraApiType.CAMERA2) {
+                return;
+            }
+            if (isChecked != settingsManager.isCamera2CustomResolutionEnabled()) {
+                settingsManager.setCamera2CustomResolutionEnabled(isChecked);
+                setupResolutionSpinner();
+                setupFrameRateSpinner();
+            }
+        });
+
         languageSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -315,6 +357,86 @@ public class SettingsActivity extends AppCompatActivity {
     private void applyAndSaveChanges() {
         cameraManager.updateConfiguration(currentConfig);
         settingsManager.saveCameraConfig(currentConfig);
+    }
+
+    private boolean shouldUseCamera2CustomResolutions() {
+        return currentConfig != null
+                && currentConfig.getApiType() == CameraApiType.CAMERA2
+                && settingsManager.isCamera2CustomResolutionEnabled();
+    }
+
+    private List<Resolution> getFixedResolutions() {
+        List<Resolution> resolutions = new ArrayList<>();
+        resolutions.add(Resolution.VGA_640x480);
+        resolutions.add(Resolution.HD_720P);
+        resolutions.add(Resolution.FULL_HD_1080P);
+        resolutions.add(Resolution.QHD_2K);
+        resolutions.add(Resolution.UHD_4K);
+        return resolutions;
+    }
+
+    private List<Resolution> getCamera2Resolutions(String cameraId) {
+        List<Resolution> resolutions = new ArrayList<>();
+        android.hardware.camera2.CameraManager systemCameraManager =
+                (android.hardware.camera2.CameraManager) getSystemService(Context.CAMERA_SERVICE);
+        if (systemCameraManager == null) {
+            return resolutions;
+        }
+
+        try {
+            CameraCharacteristics characteristics = systemCameraManager.getCameraCharacteristics(cameraId);
+            StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+            if (map == null) {
+                return resolutions;
+            }
+
+            Size[] recorderSizes = map.getOutputSizes(MediaRecorder.class);
+            Size[] jpegSizes = map.getOutputSizes(ImageFormat.JPEG);
+            if (recorderSizes == null || recorderSizes.length == 0) {
+                recorderSizes = jpegSizes;
+            }
+
+            Set<String> jpegSizeKeys = toSizeKeys(jpegSizes);
+            Set<String> added = new HashSet<>();
+            if (recorderSizes != null) {
+                for (Size size : recorderSizes) {
+                    if (size == null) continue;
+                    String key = size.getWidth() + "x" + size.getHeight();
+                    if (!jpegSizeKeys.isEmpty() && !jpegSizeKeys.contains(key)) continue;
+                    if (added.add(key)) {
+                        resolutions.add(Resolution.of(size.getWidth(), size.getHeight()));
+                    }
+                }
+            }
+
+            Collections.sort(resolutions, new Comparator<Resolution>() {
+                @Override
+                public int compare(Resolution left, Resolution right) {
+                    long rightArea = (long) right.getWidth() * right.getHeight();
+                    long leftArea = (long) left.getWidth() * left.getHeight();
+                    int areaCompare = Long.compare(rightArea, leftArea);
+                    if (areaCompare != 0) return areaCompare;
+                    return Integer.compare(right.getWidth(), left.getWidth());
+                }
+            });
+        } catch (CameraAccessException | IllegalArgumentException e) {
+            e.printStackTrace();
+        }
+
+        return resolutions;
+    }
+
+    private Set<String> toSizeKeys(Size[] sizes) {
+        Set<String> keys = new HashSet<>();
+        if (sizes == null) {
+            return keys;
+        }
+        for (Size size : sizes) {
+            if (size != null) {
+                keys.add(size.getWidth() + "x" + size.getHeight());
+            }
+        }
+        return keys;
     }
 
     

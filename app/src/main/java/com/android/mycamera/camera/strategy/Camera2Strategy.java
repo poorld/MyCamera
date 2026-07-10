@@ -3,6 +3,7 @@ package com.android.mycamera.camera.strategy;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.ImageFormat;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
@@ -14,6 +15,7 @@ import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.MeteringRectangle;
+import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.CamcorderProfile;
 import android.media.ImageReader;
 import android.media.MediaRecorder;
@@ -23,6 +25,7 @@ import android.os.Environment;
 import android.os.Looper;
 import android.util.Log;
 import android.util.Range;
+import android.util.Size;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.WindowManager;
@@ -39,7 +42,13 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 public class Camera2Strategy extends BaseCameraStrategy {
     
@@ -671,6 +680,73 @@ public class Camera2Strategy extends BaseCameraStrategy {
     @Override
     public boolean isCameraAvailable() {
         return cameraDevice != null;
+    }
+
+    @Override
+    public List<Resolution> getSupportedResolutions() {
+        if (currentConfig == null) {
+            return super.getSupportedResolutions();
+        }
+
+        List<Resolution> resolutions = new ArrayList<>();
+        try {
+            CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            if (manager == null) {
+                return super.getSupportedResolutions();
+            }
+            CameraCharacteristics characteristics = manager.getCameraCharacteristics(currentConfig.getCameraId());
+            StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+            if (map == null) {
+                return super.getSupportedResolutions();
+            }
+
+            Size[] recorderSizes = map.getOutputSizes(MediaRecorder.class);
+            Size[] jpegSizes = map.getOutputSizes(ImageFormat.JPEG);
+            if (recorderSizes == null || recorderSizes.length == 0) {
+                recorderSizes = jpegSizes;
+            }
+
+            Set<String> jpegSizeKeys = toSizeKeys(jpegSizes);
+            Set<String> added = new HashSet<>();
+            if (recorderSizes != null) {
+                for (Size size : recorderSizes) {
+                    if (size == null) continue;
+                    String key = size.getWidth() + "x" + size.getHeight();
+                    if (!jpegSizeKeys.isEmpty() && !jpegSizeKeys.contains(key)) continue;
+                    if (added.add(key)) {
+                        resolutions.add(Resolution.of(size.getWidth(), size.getHeight()));
+                    }
+                }
+            }
+
+            Collections.sort(resolutions, new Comparator<Resolution>() {
+                @Override
+                public int compare(Resolution left, Resolution right) {
+                    long rightArea = (long) right.getWidth() * right.getHeight();
+                    long leftArea = (long) left.getWidth() * left.getHeight();
+                    int areaCompare = Long.compare(rightArea, leftArea);
+                    if (areaCompare != 0) return areaCompare;
+                    return Integer.compare(right.getWidth(), left.getWidth());
+                }
+            });
+        } catch (CameraAccessException | IllegalArgumentException e) {
+            logError("Failed to query Camera2 supported resolutions", e);
+        }
+
+        return resolutions.isEmpty() ? super.getSupportedResolutions() : resolutions;
+    }
+
+    private Set<String> toSizeKeys(Size[] sizes) {
+        Set<String> keys = new HashSet<>();
+        if (sizes == null) {
+            return keys;
+        }
+        for (Size size : sizes) {
+            if (size != null) {
+                keys.add(size.getWidth() + "x" + size.getHeight());
+            }
+        }
+        return keys;
     }
 
     @Override

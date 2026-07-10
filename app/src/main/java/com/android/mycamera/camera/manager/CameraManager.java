@@ -132,12 +132,15 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
             currentStrategy = getCameraStrategy(newApiType);
             Log.d(TAG, "switchCameraApi newStrategy: " + currentStrategy);
             currentStrategy.addStateListener(this);
-            currentConfig = new CameraConfig.Builder(currentConfig)
-                    .setApiType(newApiType)
-                    .build();
+            CameraConfig.Builder configBuilder = new CameraConfig.Builder(currentConfig)
+                    .setApiType(newApiType);
+            if (newApiType != CameraApiType.CAMERA2 && !currentConfig.getResolution().isFixed()) {
+                configBuilder.setResolution(Resolution.FULL_HD_1080P);
+            }
+            currentConfig = configBuilder.build();
             
             // Save new configuration
-            settingsManager.setCameraApiType(newApiType);
+            settingsManager.saveCameraConfig(currentConfig);
 
             if (isBackgroundRecordingEnabled() && isBackgroundRecordingServiceReady()) {
                 backgroundRecordingHelper.setCurrentStrategy(currentStrategy);

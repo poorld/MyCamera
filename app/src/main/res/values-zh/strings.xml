@@ -10,6 +10,7 @@
     <string name="language_chinese">中文</string>
     <string name="language_english">英文</string>
     <string name="resolution">分辨率</string>
+    <string name="custom_camera2_resolution">自定义 Camera2 分辨率</string>
     <string name="frame_rate">帧率</string>
     <string name="video_quality">视频质量</string>
     <string name="recording">录制</string>

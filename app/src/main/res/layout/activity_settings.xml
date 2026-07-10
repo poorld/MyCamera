@@ -65,6 +65,14 @@
             android:textColor="@color/white"
             android:layout_marginBottom="8dp"/>
 
+        <Switch
+            android:id="@+id/customResolutionSwitch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/custom_camera2_resolution"
+            android:textColor="@color/white"
+            android:layout_marginBottom="12dp"/>
+
         <Spinner
             android:id="@+id/resolutionSpinner"
             android:layout_width="match_parent"

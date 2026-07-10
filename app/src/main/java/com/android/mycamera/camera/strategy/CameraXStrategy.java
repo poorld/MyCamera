@@ -520,17 +520,16 @@ public class CameraXStrategy extends BaseCameraStrategy {
 
     private Quality convertResolutionToCameraXQuality(Resolution resolution) {
         if (resolution == null) return null;
-        switch (resolution) {
-            case UHD_4K:
-                return Quality.UHD;
-            case FULL_HD_1080P:
-                return Quality.FHD;
-            case HD_720P:
-                return Quality.HD;
-            case VGA_640x480:
-            default:
-                return Quality.SD;
+        if (resolution.equals(Resolution.UHD_4K)) {
+            return Quality.UHD;
         }
+        if (resolution.equals(Resolution.FULL_HD_1080P)) {
+            return Quality.FHD;
+        }
+        if (resolution.equals(Resolution.HD_720P)) {
+            return Quality.HD;
+        }
+        return Quality.SD;
     }
 
     private Quality chooseBestSupportedQuality(Quality desiredQuality, List<Quality> supportedQualities) {
