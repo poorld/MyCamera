@@ -180,13 +180,14 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS);
         } else {
 
+            initializeCameraManager();
+
             if (mCameraManager != null) {
                 if (mCameraManager.isBackgroundRecordingEnabled()) {
                     return;
                 }
             }
 
-            initializeCameraManager();
 
             initializeCamera();
 

@@ -13,6 +13,8 @@ import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
+import android.media.Image;
+import android.media.ImageReader;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
@@ -24,6 +26,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
+import android.util.Range;
 import android.util.Size;
 import android.view.Surface;
 import android.view.TextureView;
@@ -62,6 +65,8 @@ public class PreviewMCActivity extends BaseAct {
     private static final int DEFAULT_VIDEO_FPS = 30;
     private static final int DEFAULT_VIDEO_BIT_RATE = 12_000_000;
     private static final int I_FRAME_INTERVAL = 1;
+    private static final boolean ENABLE_YUV_PREVIEW_CALLBACK = true;
+    private static final int YUV_READER_MAX_IMAGES = 3;
     private static final ResolutionOption[] RESOLUTION_OPTIONS = {
             // new ResolutionOption("2560x1440p30", 2560, 1440, 1920, 1080, 30, 14_000_000),
             // new ResolutionOption("1920x1080p30", 1920, 1080),
@@ -76,8 +81,14 @@ public class PreviewMCActivity extends BaseAct {
     private HandlerThread cameraThread;
     private Handler cameraHandler;
     private CameraDevice cameraDevice;
+    private CameraCharacteristics cameraCharacteristics;
     private CameraCaptureSession captureSession;
     private Surface previewSurface;
+    private ImageReader yuvImageReader;
+    private HandlerThread yuvThread;
+    private Handler yuvHandler;
+    private int yuvFrameCount;
+    private long yuvFpsStartNs;
 
     private MediaCodec encoder;
     private Surface encoderSurface;
@@ -138,7 +149,7 @@ public class PreviewMCActivity extends BaseAct {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_media_codec_test);
+        setContentView(R.layout.activity_preview_mc);
 
         previewView = findViewById(R.id.codecPreview);
         recordButton = findViewById(R.id.codecRecordButton);
@@ -216,6 +227,7 @@ public class PreviewMCActivity extends BaseAct {
             if (!hasHardcodedId && manager.getCameraIdList().length > 0) {
                 cameraId = manager.getCameraIdList()[0];
             }
+            cameraCharacteristics = manager.getCameraCharacteristics(cameraId);
             dumpCameraCapabilities(manager, cameraId);
             manager.openCamera(cameraId, cameraStateCallback, cameraHandler);
             setStatus("Opening camera " + cameraId);
@@ -233,9 +245,17 @@ public class PreviewMCActivity extends BaseAct {
             Log.w(TAG, "camera " + cameraId + " has no stream configuration map");
             return;
         }
+        Range<Integer>[] fpsRanges =
+                characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
+        Log.d(TAG, "camera " + cameraId + " fps ranges=" + Arrays.toString(fpsRanges));
         logTargetSizes("SurfaceTexture", map.getOutputSizes(SurfaceTexture.class));
         logTargetSizes("MediaRecorder", map.getOutputSizes(MediaRecorder.class));
+        logTargetSizes("YUV_420_888", map.getOutputSizes(ImageFormat.YUV_420_888));
         logTargetSizes("JPEG", map.getOutputSizes(ImageFormat.JPEG));
+        logMinFrameDuration("SurfaceTexture", map, SurfaceTexture.class,
+                getPreviewWidth(), getPreviewHeight());
+        logMinFrameDuration("YUV_420_888", map, ImageFormat.YUV_420_888,
+                getPreviewWidth(), getPreviewHeight());
     }
 
     private void logTargetSizes(String output, Size[] sizes) {
@@ -254,6 +274,29 @@ public class PreviewMCActivity extends BaseAct {
             }
         }
         return false;
+    }
+
+    private void logMinFrameDuration(String output, StreamConfigurationMap map,
+            Class<?> klass, int width, int height) {
+        long durationNs = map.getOutputMinFrameDuration(klass, new Size(width, height));
+        Log.d(TAG, "camera " + output + " " + width + "x" + height
+                + " minFrameDurationNs=" + durationNs
+                + " maxFpsByDuration=" + toFps(durationNs));
+    }
+
+    private void logMinFrameDuration(String output, StreamConfigurationMap map,
+            int format, int width, int height) {
+        long durationNs = map.getOutputMinFrameDuration(format, new Size(width, height));
+        Log.d(TAG, "camera " + output + " " + width + "x" + height
+                + " minFrameDurationNs=" + durationNs
+                + " maxFpsByDuration=" + toFps(durationNs));
+    }
+
+    private long toFps(long frameDurationNs) {
+        if (frameDurationNs <= 0) {
+            return 0;
+        }
+        return 1_000_000_000L / frameDurationNs;
     }
 
     private void startRecording() {
@@ -326,6 +369,11 @@ public class PreviewMCActivity extends BaseAct {
 
             List<Surface> surfaces = new ArrayList<>();
             surfaces.add(previewSurface);
+            Surface yuvSurface = null;
+            if (ENABLE_YUV_PREVIEW_CALLBACK && !isRecording) {
+                yuvSurface = createYuvPreviewSurface();
+                surfaces.add(yuvSurface);
+            }
             if (isRecording && encoderSurface != null) {
                 surfaces.add(encoderSurface);
             }
@@ -333,11 +381,19 @@ public class PreviewMCActivity extends BaseAct {
             int template = isRecording ? CameraDevice.TEMPLATE_RECORD : CameraDevice.TEMPLATE_PREVIEW;
             CaptureRequest.Builder requestBuilder = cameraDevice.createCaptureRequest(template);
             requestBuilder.addTarget(previewSurface);
+            if (yuvSurface != null) {
+                requestBuilder.addTarget(yuvSurface);
+            }
             if (isRecording && encoderSurface != null) {
                 requestBuilder.addTarget(encoderSurface);
             }
-            requestBuilder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
-                    new android.util.Range<>(getVideoFps(), getVideoFps()));
+            Range<Integer> fpsRange = getTargetFpsRange();
+            requestBuilder.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO);
+            requestBuilder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fpsRange);
+            Log.d(TAG, "startCameraSession target fps range=" + fpsRange
+                    + " surfaces=" + surfaces.size()
+                    + " yuv=" + (yuvSurface != null)
+                    + " recording=" + isRecording);
 
             cameraDevice.createCaptureSession(surfaces, new CameraCaptureSession.StateCallback() {
                 @Override
@@ -360,6 +416,152 @@ public class PreviewMCActivity extends BaseAct {
             Log.e(TAG, "startCameraSession failed", e);
             setStatus("Session failed: " + e.getMessage());
         }
+    }
+
+    private Surface createYuvPreviewSurface() {
+        closeYuvImageReader();
+        Size yuvSize = chooseYuvCallbackSize();
+        yuvImageReader = ImageReader.newInstance(yuvSize.getWidth(), yuvSize.getHeight(),
+                ImageFormat.YUV_420_888, YUV_READER_MAX_IMAGES);
+        resetYuvFpsCounter();
+        yuvImageReader.setOnImageAvailableListener(this::onYuvImageAvailable, yuvHandler);
+        Log.d(TAG, "YUV callback ImageReader size=" + yuvSize.getWidth()
+                + "x" + yuvSize.getHeight());
+        return yuvImageReader.getSurface();
+    }
+
+    private Size chooseYuvCallbackSize() {
+        StreamConfigurationMap map = cameraCharacteristics == null ? null
+                : cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+        Size fallback = new Size(getPreviewWidth(), getPreviewHeight());
+        if (map == null) {
+            return fallback;
+        }
+
+        Size[] sizes = map.getOutputSizes(ImageFormat.YUV_420_888);
+        if (sizes == null || sizes.length == 0) {
+            return fallback;
+        }
+
+        Size target = new Size(getPreviewWidth(), getPreviewHeight());
+        Size best = null;
+        for (Size size : sizes) {
+            long minFrameDurationNs = map.getOutputMinFrameDuration(ImageFormat.YUV_420_888, size);
+            if (minFrameDurationNs > 0
+                    && 1_000_000_000L / minFrameDurationNs < getVideoFps()) {
+                continue;
+            }
+            if (size.getWidth() > target.getWidth() || size.getHeight() > target.getHeight()) {
+                continue;
+            }
+            if (!isSameAspect(size, target)) {
+                continue;
+            }
+            if (best == null || getArea(size) > getArea(best)) {
+                best = size;
+            }
+        }
+
+        if (best != null) {
+            return best;
+        }
+
+        for (Size size : sizes) {
+            long minFrameDurationNs = map.getOutputMinFrameDuration(ImageFormat.YUV_420_888, size);
+            if (minFrameDurationNs > 0
+                    && 1_000_000_000L / minFrameDurationNs < getVideoFps()) {
+                continue;
+            }
+            if (best == null || getArea(size) > getArea(best)) {
+                best = size;
+            }
+        }
+
+        if (best != null) {
+            Log.w(TAG, "No same-aspect YUV size reaches " + getVideoFps()
+                    + "fps, use " + best);
+            return best;
+        }
+
+        Log.w(TAG, "No YUV size reports " + getVideoFps()
+                + "fps by minFrameDuration, fallback to preview size " + fallback);
+        return fallback;
+    }
+
+    private boolean isSameAspect(Size size, Size target) {
+        return size.getWidth() * target.getHeight() == size.getHeight() * target.getWidth();
+    }
+
+    private int getArea(Size size) {
+        return size.getWidth() * size.getHeight();
+    }
+
+    private void onYuvImageAvailable(ImageReader reader) {
+        try (Image image = reader.acquireLatestImage()) {
+            if (image == null) {
+                return;
+            }
+            countYuvFrame(image.getWidth(), image.getHeight());
+        } catch (Exception e) {
+            Log.e(TAG, "onYuvImageAvailable failed", e);
+        }
+    }
+
+    private void resetYuvFpsCounter() {
+        yuvFrameCount = 0;
+        yuvFpsStartNs = 0;
+    }
+
+    private void countYuvFrame(int width, int height) {
+        long nowNs = System.nanoTime();
+        if (yuvFpsStartNs == 0) {
+            yuvFpsStartNs = nowNs;
+        }
+        yuvFrameCount++;
+        long elapsedNs = nowNs - yuvFpsStartNs;
+        if (elapsedNs < 1_000_000_000L) {
+            return;
+        }
+        double fps = yuvFrameCount * 1_000_000_000.0 / elapsedNs;
+        Log.d(TAG, String.format(Locale.US, "YUV callback fps=%.1f size=%dx%d",
+                fps, width, height));
+        yuvFrameCount = 0;
+        yuvFpsStartNs = nowNs;
+    }
+
+    private Range<Integer> getTargetFpsRange() {
+        Range<Integer>[] ranges = cameraCharacteristics == null ? null
+                : cameraCharacteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
+        int targetFps = getVideoFps();
+        if (ranges == null || ranges.length == 0) {
+            return new Range<>(targetFps, targetFps);
+        }
+
+        Range<Integer> best = null;
+        for (Range<Integer> range : ranges) {
+            if (range.getLower() > targetFps || range.getUpper() < targetFps) {
+                continue;
+            }
+            if (best == null
+                    || range.getLower() > best.getLower()
+                    || range.getLower().equals(best.getLower())
+                    && range.getUpper() < best.getUpper()) {
+                best = range;
+            }
+        }
+        if (best != null) {
+            return best;
+        }
+
+        Range<Integer> highest = ranges[0];
+        for (Range<Integer> range : ranges) {
+            if (range.getUpper() > highest.getUpper()) {
+                highest = range;
+            }
+        }
+        Log.w(TAG, "target fps " + targetFps + " not in supported ranges "
+                + Arrays.toString(ranges) + ", use " + highest);
+        return highest;
     }
 
     private void setupEncoder() throws IOException {
@@ -819,6 +1021,15 @@ public class PreviewMCActivity extends BaseAct {
             previewSurface.release();
             previewSurface = null;
         }
+        closeYuvImageReader();
+    }
+
+    private void closeYuvImageReader() {
+        resetYuvFpsCounter();
+        if (yuvImageReader != null) {
+            yuvImageReader.close();
+            yuvImageReader = null;
+        }
     }
 
     private void releaseEncoder() {
@@ -859,6 +1070,9 @@ public class PreviewMCActivity extends BaseAct {
         cameraThread = new HandlerThread("MediaCodecCameraThread");
         cameraThread.start();
         cameraHandler = new Handler(cameraThread.getLooper());
+        yuvThread = new HandlerThread("PreviewMCYuvThread");
+        yuvThread.start();
+        yuvHandler = new Handler(yuvThread.getLooper());
     }
 
     private void stopCameraThread() {
@@ -873,6 +1087,16 @@ public class PreviewMCActivity extends BaseAct {
         }
         cameraThread = null;
         cameraHandler = null;
+        if (yuvThread != null) {
+            yuvThread.quitSafely();
+            try {
+                yuvThread.join();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            yuvThread = null;
+            yuvHandler = null;
+        }
     }
 
     private void setStatus(String message) {
