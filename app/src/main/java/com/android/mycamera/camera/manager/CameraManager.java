@@ -476,6 +476,13 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         return settingsManager.isBackgroundRecordingEnabled();
     }
 
+    /**
+     * Check if camera preview should remain active while the activity is backgrounded.
+     */
+    public boolean isBackgroundReviewEnabled() {
+        return settingsManager.isBackgroundReviewEnabled();
+    }
+
 
     /**
      * Check if background recording service is ready

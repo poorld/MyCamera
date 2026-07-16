@@ -9,6 +9,7 @@ import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraConstrainedHighSpeedCaptureSession;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
@@ -350,6 +351,11 @@ public class Camera2Strategy extends BaseCameraStrategy {
             builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO);
             applyFpsToRequest(builder);
 
+            if (isCurrentHighSpeedVideoConfiguration()) {
+                startConstrainedHighSpeedRecording(previewSurface, recorderSurface, builder);
+                return;
+            }
+
             cameraDevice.createCaptureSession(Arrays.asList(previewSurface, recorderSurface), new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
@@ -390,6 +396,101 @@ public class Camera2Strategy extends BaseCameraStrategy {
             releaseMediaRecorder();
             createPreviewSession();
         }
+    }
+
+    private void startConstrainedHighSpeedRecording(
+            Surface previewSurface,
+            Surface recorderSurface,
+            CaptureRequest.Builder builder) throws CameraAccessException {
+        final int highSpeedFps = currentConfig.getFrameRate();
+        Range<Integer> highSpeedRange = getCurrentHighSpeedFpsRange();
+        if (highSpeedRange == null) {
+            throw new IllegalStateException("No high-speed FPS range for " + highSpeedFps + " FPS");
+        }
+        builder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
+                highSpeedRange);
+
+        cameraDevice.createConstrainedHighSpeedCaptureSession(
+                Arrays.asList(previewSurface, recorderSurface),
+                new CameraCaptureSession.StateCallback() {
+                    @Override
+                    public void onConfigured(@NonNull CameraCaptureSession session) {
+                        if (!(session instanceof CameraConstrainedHighSpeedCaptureSession)
+                                || cameraDevice == null || backgroundHandler == null) {
+                            session.close();
+                            releaseMediaRecorder();
+                            createPreviewSession();
+                            notifyError("High-speed recording configuration failed");
+                            return;
+                        }
+
+                        captureSession = session;
+                        previewRequestBuilder = builder;
+                        CameraConstrainedHighSpeedCaptureSession highSpeedSession =
+                                (CameraConstrainedHighSpeedCaptureSession) session;
+                        try {
+                            List<CaptureRequest> requests =
+                                    highSpeedSession.createHighSpeedRequestList(builder.build());
+                            highSpeedSession.setRepeatingBurst(requests, null, backgroundHandler);
+                            mediaRecorder.start();
+                            isRecording = true;
+                            notifyRecordingStarted();
+                        } catch (CameraAccessException | IllegalStateException e) {
+                            logError("Failed to start constrained high-speed recording", e);
+                            closeCaptureSession();
+                            releaseMediaRecorder();
+                            createPreviewSession();
+                        }
+                    }
+
+                    @Override
+                    public void onConfigureFailed(@NonNull CameraCaptureSession session) {
+                        session.close();
+                        releaseMediaRecorder();
+                        createPreviewSession();
+                        notifyError("High-speed recording configuration failed");
+                    }
+                }, backgroundHandler);
+    }
+
+    private boolean isCurrentHighSpeedVideoConfiguration() {
+        return getCurrentHighSpeedFpsRange() != null;
+    }
+
+    private Range<Integer> getCurrentHighSpeedFpsRange() {
+        if (currentConfig == null) {
+            return null;
+        }
+        try {
+            CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            if (manager == null) {
+                return null;
+            }
+            CameraCharacteristics characteristics =
+                    manager.getCameraCharacteristics(currentConfig.getCameraId());
+            StreamConfigurationMap map =
+                    characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+            if (map == null) {
+                return null;
+            }
+            Size size = new Size(currentConfig.getResolution().getWidth(),
+                    currentConfig.getResolution().getHeight());
+            Range<Integer> bestRange = null;
+            for (Range<Integer> range : map.getHighSpeedVideoFpsRangesFor(size)) {
+                if (range != null && range.getUpper() == currentConfig.getFrameRate()) {
+                    if (range.getLower().equals(range.getUpper())) {
+                        return range;
+                    }
+                    if (bestRange == null) {
+                        bestRange = range;
+                    }
+                }
+            }
+            return bestRange;
+        } catch (CameraAccessException | IllegalArgumentException e) {
+            logError("Failed to query high-speed video capability", e);
+        }
+        return null;
     }
 
     @Override

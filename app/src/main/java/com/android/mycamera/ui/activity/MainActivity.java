@@ -56,7 +56,6 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     private TextView statusText;
     private View apiSwitcherPanel;
     private ImageButton apiSwitcherButton;
-    private TextView mediaCodecTestButton;
     private RadioGroup apiRadioGroup;
     private RadioButton apiCamera1;
     private RadioButton apiCamera2;
@@ -81,6 +80,8 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         recordingTimerHandler = new Handler(Looper.getMainLooper());
 
         CameraUtils.createCameraDirectory();
+
+
     }
 
     @Override
@@ -104,7 +105,6 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         statusText = findViewById(R.id.statusText);
         apiSwitcherPanel = findViewById(R.id.apiSwitcherPanel);
         apiSwitcherButton = findViewById(R.id.apiSwitcherButton);
-        mediaCodecTestButton = findViewById(R.id.mediaCodecTestButton);
         apiRadioGroup = findViewById(R.id.apiRadioGroup);
         apiCamera1 = findViewById(R.id.apiCamera1);
         apiCamera2 = findViewById(R.id.apiCamera2);
@@ -137,8 +137,6 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
                 apiSwitcherPanel.setVisibility(View.VISIBLE);
             }
         });
-        mediaCodecTestButton.setOnClickListener(v ->
-                startActivity(new Intent(this, MediaCodecTestActivity.class)));
         
         cameraPreview.setOnTouchListener((v, event) -> {
             if (event.getAction() == MotionEvent.ACTION_DOWN) {
@@ -180,15 +178,14 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS);
         } else {
 
-            initializeCameraManager();
 
-            if (mCameraManager != null) {
-                if (mCameraManager.isBackgroundRecordingEnabled()) {
-                    return;
-                }
+            if (mCameraManager != null
+                    && (mCameraManager.isBackgroundReviewEnabled()
+                    || mCameraManager.isBackgroundRecordingEnabled())) {
+                return;
             }
 
-
+            initializeCameraManager();
             initializeCamera();
 
             CameraApiType cameraApiType = mCameraManager.getCameraApiType();
@@ -210,14 +207,9 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         super.onPause();
         Log.d(TAG, "onPause: ");
 
-        /*if (mCameraManager.isBackgroundReviewEnabled()) {
-            return;
-        }
-
-        if (mCameraManager.isBackgroundRecordingActive()) {
-            return;
-        }*/
-        if (mCameraManager.isBackgroundRecordingEnabled()) {
+        if (mCameraManager != null
+                && (mCameraManager.isBackgroundReviewEnabled()
+                || mCameraManager.isBackgroundRecordingEnabled())) {
             return;
         }
 

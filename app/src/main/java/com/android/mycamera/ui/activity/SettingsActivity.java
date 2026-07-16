@@ -8,6 +8,7 @@ import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.MediaRecorder;
 import android.os.Bundle;
+import android.util.Range;
 import android.util.Size;
 import android.view.View;
 import android.widget.AdapterView;
@@ -33,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -61,6 +63,7 @@ public class SettingsActivity extends AppCompatActivity {
     
     private CameraConfig currentConfig;
     private boolean isUpdatingResolutionSpinner = false;
+    private List<ResolutionOption> resolutionOptions = Collections.emptyList();
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -140,51 +143,69 @@ public class SettingsActivity extends AppCompatActivity {
     }
     
     private void setupResolutionSpinner() {
-        List<Resolution> resolutions = shouldUseCamera2CustomResolutions()
-                ? getCamera2Resolutions(currentConfig.getCameraId())
-                : getFixedResolutions();
-        if (resolutions.isEmpty()) {
-            resolutions = getFixedResolutions();
+        resolutionOptions = shouldUseCamera2CustomResolutions()
+                ? getCamera2ResolutionOptions(currentConfig.getCameraId())
+                : getFixedResolutionOptions();
+        if (resolutionOptions.isEmpty()) {
+            resolutionOptions = getFixedResolutionOptions();
         }
         
-        ArrayAdapter<Resolution> adapter = new ArrayAdapter<>(
-                this, R.layout.spinner_item_light, resolutions);
+        ArrayAdapter<ResolutionOption> adapter = new ArrayAdapter<>(
+                this, R.layout.spinner_item_light, resolutionOptions);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         
         isUpdatingResolutionSpinner = true;
         resolutionSpinner.setAdapter(adapter);
         
-        int position = resolutions.indexOf(currentConfig.getResolution());
+        int position = findResolutionOptionIndex(currentConfig);
         if (position < 0) {
-            Resolution fallback = resolutions.contains(Resolution.FULL_HD_1080P)
-                    ? Resolution.FULL_HD_1080P
-                    : resolutions.get(0);
+            ResolutionOption fallback = findRegularOption(Resolution.FULL_HD_1080P);
+            if (fallback == null) {
+                fallback = resolutionOptions.get(0);
+            }
             currentConfig = new CameraConfig.Builder(currentConfig)
-                    .setResolution(fallback)
+                    .setResolution(fallback.resolution)
+                    .setFrameRate(fallback.fixedHighSpeedFps != null
+                            ? fallback.fixedHighSpeedFps : currentConfig.getFrameRate())
                     .build();
             applyAndSaveChanges();
-            position = resolutions.indexOf(fallback);
+            position = resolutionOptions.indexOf(fallback);
         }
         resolutionSpinner.setSelection(Math.max(position, 0), false);
         isUpdatingResolutionSpinner = false;
     }
     
     private void setupFrameRateSpinner() {
-        List<Integer> frameRates = cameraManager.getSupportedFrameRates();
-        if (frameRates == null || frameRates.isEmpty()) {
-            frameRates = new ArrayList<>();
-            frameRates.add(15);
-            frameRates.add(24);
-            frameRates.add(30);
+        Integer fixedHighSpeedFps = getSelectedHighSpeedFps();
+        List<Integer> frameRates;
+        if (fixedHighSpeedFps != null) {
+            frameRates = Collections.singletonList(fixedHighSpeedFps);
+        } else {
+            frameRates = cameraManager.getSupportedFrameRates();
+            if (frameRates == null || frameRates.isEmpty()) {
+                frameRates = new ArrayList<>();
+                frameRates.add(15);
+                frameRates.add(24);
+                frameRates.add(30);
+            }
+        }
+
+        List<FrameRateOption> frameRateOptions = new ArrayList<>();
+        for (Integer frameRate : frameRates) {
+            if (frameRate != null) {
+                frameRateOptions.add(new FrameRateOption(frameRate, fixedHighSpeedFps != null));
+            }
         }
         
-        ArrayAdapter<Integer> adapter = new ArrayAdapter<>(
-                this, R.layout.spinner_item_light, frameRates);
+        ArrayAdapter<FrameRateOption> adapter = new ArrayAdapter<>(
+                this, R.layout.spinner_item_light, frameRateOptions);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         
         frameRateSpinner.setAdapter(adapter);
+        frameRateSpinner.setEnabled(fixedHighSpeedFps == null);
+        frameRateSpinner.setAlpha(fixedHighSpeedFps == null ? 1.0f : 0.6f);
 
-        int selectedFps = currentConfig.getFrameRate();
+        int selectedFps = fixedHighSpeedFps != null ? fixedHighSpeedFps : currentConfig.getFrameRate();
         if (!frameRates.contains(selectedFps)) {
             selectedFps = frameRates.get(frameRates.size() - 1);
             currentConfig = new CameraConfig.Builder(currentConfig)
@@ -193,7 +214,7 @@ public class SettingsActivity extends AppCompatActivity {
             applyAndSaveChanges();
         }
 
-        int position = frameRates.indexOf(selectedFps);
+        int position = findFrameRateOptionIndex(frameRateOptions, selectedFps);
         if (position >= 0) {
             frameRateSpinner.setSelection(position, false);
         }
@@ -249,10 +270,14 @@ public class SettingsActivity extends AppCompatActivity {
                 if (isUpdatingResolutionSpinner) {
                     return;
                 }
-                Resolution selectedResolution = (Resolution) parent.getItemAtPosition(position);
-                if (!selectedResolution.equals(currentConfig.getResolution())) {
+                ResolutionOption selectedOption = (ResolutionOption) parent.getItemAtPosition(position);
+                int selectedFps = selectedOption.fixedHighSpeedFps != null
+                        ? selectedOption.fixedHighSpeedFps : currentConfig.getFrameRate();
+                if (!selectedOption.resolution.equals(currentConfig.getResolution())
+                        || selectedFps != currentConfig.getFrameRate()) {
                     currentConfig = new CameraConfig.Builder(currentConfig)
-                            .setResolution(selectedResolution)
+                            .setResolution(selectedOption.resolution)
+                            .setFrameRate(selectedFps)
                             .build();
                     applyAndSaveChanges();
                     setupFrameRateSpinner();
@@ -266,10 +291,10 @@ public class SettingsActivity extends AppCompatActivity {
         frameRateSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                Integer selectedFrameRate = (Integer) parent.getItemAtPosition(position);
-                if (selectedFrameRate != currentConfig.getFrameRate()) {
+                FrameRateOption selectedFrameRate = (FrameRateOption) parent.getItemAtPosition(position);
+                if (selectedFrameRate.fps != currentConfig.getFrameRate()) {
                     currentConfig = new CameraConfig.Builder(currentConfig)
-                            .setFrameRate(selectedFrameRate)
+                            .setFrameRate(selectedFrameRate.fps)
                             .build();
                     applyAndSaveChanges();
                 }
@@ -365,78 +390,173 @@ public class SettingsActivity extends AppCompatActivity {
                 && settingsManager.isCamera2CustomResolutionEnabled();
     }
 
-    private List<Resolution> getFixedResolutions() {
-        List<Resolution> resolutions = new ArrayList<>();
-        resolutions.add(Resolution.VGA_640x480);
-        resolutions.add(Resolution.HD_720P);
-        resolutions.add(Resolution.FULL_HD_1080P);
-        resolutions.add(Resolution.QHD_2K);
-        resolutions.add(Resolution.UHD_4K);
-        return resolutions;
+    private List<ResolutionOption> getFixedResolutionOptions() {
+        List<ResolutionOption> options = new ArrayList<>();
+        options.add(new ResolutionOption(Resolution.VGA_640x480, null));
+        options.add(new ResolutionOption(Resolution.HD_720P, null));
+        options.add(new ResolutionOption(Resolution.FULL_HD_1080P, null));
+        options.add(new ResolutionOption(Resolution.QHD_2K, null));
+        options.add(new ResolutionOption(Resolution.UHD_4K, null));
+        return options;
     }
 
-    private List<Resolution> getCamera2Resolutions(String cameraId) {
-        List<Resolution> resolutions = new ArrayList<>();
+    private List<ResolutionOption> getCamera2ResolutionOptions(String cameraId) {
+        Set<Resolution> resolutions = new LinkedHashSet<>();
+        List<ResolutionOption> highSpeedOptions = new ArrayList<>();
         android.hardware.camera2.CameraManager systemCameraManager =
                 (android.hardware.camera2.CameraManager) getSystemService(Context.CAMERA_SERVICE);
         if (systemCameraManager == null) {
-            return resolutions;
+            return Collections.emptyList();
         }
 
         try {
             CameraCharacteristics characteristics = systemCameraManager.getCameraCharacteristics(cameraId);
             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
             if (map == null) {
-                return resolutions;
+                return Collections.emptyList();
             }
 
             Size[] recorderSizes = map.getOutputSizes(MediaRecorder.class);
             Size[] jpegSizes = map.getOutputSizes(ImageFormat.JPEG);
-            if (recorderSizes == null || recorderSizes.length == 0) {
-                recorderSizes = jpegSizes;
-            }
+            Size[] highResolutionJpegSizes = map.getHighResolutionOutputSizes(ImageFormat.JPEG);
+            addSizes(resolutions, recorderSizes);
+            addSizes(resolutions, jpegSizes);
+            addSizes(resolutions, highResolutionJpegSizes);
 
-            Set<String> jpegSizeKeys = toSizeKeys(jpegSizes);
-            Set<String> added = new HashSet<>();
-            if (recorderSizes != null) {
-                for (Size size : recorderSizes) {
+            Size[] highSpeedSizes = map.getHighSpeedVideoSizes();
+            if (highSpeedSizes != null) {
+                for (Size size : highSpeedSizes) {
                     if (size == null) continue;
-                    String key = size.getWidth() + "x" + size.getHeight();
-                    if (!jpegSizeKeys.isEmpty() && !jpegSizeKeys.contains(key)) continue;
-                    if (added.add(key)) {
-                        resolutions.add(Resolution.of(size.getWidth(), size.getHeight()));
+                    Set<Integer> fixedFpsValues = new HashSet<>();
+                    for (Range<Integer> range : map.getHighSpeedVideoFpsRangesFor(size)) {
+                        if (range != null && range.getUpper() > 30) {
+                            fixedFpsValues.add(range.getUpper());
+                        }
+                    }
+                    List<Integer> sortedFpsValues = new ArrayList<>(fixedFpsValues);
+                    Collections.sort(sortedFpsValues, Collections.reverseOrder());
+                    for (Integer fps : sortedFpsValues) {
+                        highSpeedOptions.add(new ResolutionOption(
+                                Resolution.of(size.getWidth(), size.getHeight()), fps));
                     }
                 }
             }
 
-            Collections.sort(resolutions, new Comparator<Resolution>() {
+            List<Resolution> sortedResolutions = new ArrayList<>(resolutions);
+            sortResolutions(sortedResolutions);
+            Collections.sort(highSpeedOptions, new Comparator<ResolutionOption>() {
                 @Override
-                public int compare(Resolution left, Resolution right) {
-                    long rightArea = (long) right.getWidth() * right.getHeight();
-                    long leftArea = (long) left.getWidth() * left.getHeight();
-                    int areaCompare = Long.compare(rightArea, leftArea);
-                    if (areaCompare != 0) return areaCompare;
-                    return Integer.compare(right.getWidth(), left.getWidth());
+                public int compare(ResolutionOption left, ResolutionOption right) {
+                    int resolutionCompare = compareResolutions(left.resolution, right.resolution);
+                    if (resolutionCompare != 0) return resolutionCompare;
+                    return Integer.compare(right.fixedHighSpeedFps, left.fixedHighSpeedFps);
                 }
             });
+
+            List<ResolutionOption> options = new ArrayList<>();
+            options.addAll(highSpeedOptions);
+            for (Resolution resolution : sortedResolutions) {
+                options.add(new ResolutionOption(resolution, null));
+            }
+            return options;
         } catch (CameraAccessException | IllegalArgumentException e) {
             e.printStackTrace();
         }
 
-        return resolutions;
+        return Collections.emptyList();
     }
 
-    private Set<String> toSizeKeys(Size[] sizes) {
-        Set<String> keys = new HashSet<>();
+    private void addSizes(Set<Resolution> resolutions, Size[] sizes) {
         if (sizes == null) {
-            return keys;
+            return;
         }
         for (Size size : sizes) {
             if (size != null) {
-                keys.add(size.getWidth() + "x" + size.getHeight());
+                resolutions.add(Resolution.of(size.getWidth(), size.getHeight()));
             }
         }
-        return keys;
+    }
+
+    private void sortResolutions(List<Resolution> resolutions) {
+        Collections.sort(resolutions, this::compareResolutions);
+    }
+
+    private int compareResolutions(Resolution left, Resolution right) {
+        long rightArea = (long) right.getWidth() * right.getHeight();
+        long leftArea = (long) left.getWidth() * left.getHeight();
+        int areaCompare = Long.compare(rightArea, leftArea);
+        return areaCompare != 0 ? areaCompare : Integer.compare(right.getWidth(), left.getWidth());
+    }
+
+    private int findResolutionOptionIndex(CameraConfig config) {
+        for (int i = 0; i < resolutionOptions.size(); i++) {
+            ResolutionOption option = resolutionOptions.get(i);
+            if (option.resolution.equals(config.getResolution())
+                    && option.fixedHighSpeedFps != null
+                    && option.fixedHighSpeedFps == config.getFrameRate()) {
+                return i;
+            }
+        }
+        ResolutionOption regularOption = findRegularOption(config.getResolution());
+        if (regularOption != null) {
+            return resolutionOptions.indexOf(regularOption);
+        }
+        return -1;
+    }
+
+    private ResolutionOption findRegularOption(Resolution resolution) {
+        for (ResolutionOption option : resolutionOptions) {
+            if (option.fixedHighSpeedFps == null && option.resolution.equals(resolution)) {
+                return option;
+            }
+        }
+        return null;
+    }
+
+    private Integer getSelectedHighSpeedFps() {
+        Object selectedItem = resolutionSpinner.getSelectedItem();
+        return selectedItem instanceof ResolutionOption
+                ? ((ResolutionOption) selectedItem).fixedHighSpeedFps : null;
+    }
+
+    private int findFrameRateOptionIndex(List<FrameRateOption> options, int fps) {
+        for (int i = 0; i < options.size(); i++) {
+            if (options.get(i).fps == fps) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static final class ResolutionOption {
+        private final Resolution resolution;
+        private final Integer fixedHighSpeedFps;
+
+        private ResolutionOption(Resolution resolution, Integer fixedHighSpeedFps) {
+            this.resolution = resolution;
+            this.fixedHighSpeedFps = fixedHighSpeedFps;
+        }
+
+        @Override
+        public String toString() {
+            return fixedHighSpeedFps == null ? resolution.toString()
+                    : resolution + " [HFR " + fixedHighSpeedFps + " FPS]";
+        }
+    }
+
+    private static final class FrameRateOption {
+        private final int fps;
+        private final boolean fixed;
+
+        private FrameRateOption(int fps, boolean fixed) {
+            this.fps = fps;
+            this.fixed = fixed;
+        }
+
+        @Override
+        public String toString() {
+            return fixed ? fps + " FPS (fixed)" : fps + " FPS";
+        }
     }
 
     

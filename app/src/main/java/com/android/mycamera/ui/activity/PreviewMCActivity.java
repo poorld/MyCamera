@@ -30,6 +30,7 @@ import android.util.Range;
 import android.util.Size;
 import android.view.Surface;
 import android.view.TextureView;
+import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -70,7 +71,9 @@ public class PreviewMCActivity extends BaseAct {
     private static final ResolutionOption[] RESOLUTION_OPTIONS = {
             // new ResolutionOption("2560x1440p30", 2560, 1440, 1920, 1080, 30, 14_000_000),
             // new ResolutionOption("1920x1080p30", 1920, 1080),
-            new ResolutionOption("2304x1296p30", 2304, 1296),
+            new ResolutionOption("2304x1296p30", 2304, 1296, 1920, 1080, 30, DEFAULT_VIDEO_BIT_RATE),
+            new ResolutionOption("2304x1296p24", 2304, 1296, 1920, 1080, 24, DEFAULT_VIDEO_BIT_RATE),
+            new ResolutionOption("2304x1296p20", 2304, 1296, 1920, 1080, 20, DEFAULT_VIDEO_BIT_RATE),
     };
 
     private TextureView previewView;
@@ -165,6 +168,8 @@ public class PreviewMCActivity extends BaseAct {
                 startRecording();
             }
         });
+
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON, WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
     }
 
@@ -433,7 +438,7 @@ public class PreviewMCActivity extends BaseAct {
     private Size chooseYuvCallbackSize() {
         StreamConfigurationMap map = cameraCharacteristics == null ? null
                 : cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-        Size fallback = new Size(getPreviewWidth(), getPreviewHeight());
+        Size fallback = new Size(getVideoWidth(), getVideoHeight());
         if (map == null) {
             return fallback;
         }
@@ -443,7 +448,7 @@ public class PreviewMCActivity extends BaseAct {
             return fallback;
         }
 
-        Size target = new Size(getPreviewWidth(), getPreviewHeight());
+        Size target = new Size(getVideoWidth(), getVideoHeight());
         Size best = null;
         for (Size size : sizes) {
             long minFrameDurationNs = map.getOutputMinFrameDuration(ImageFormat.YUV_420_888, size);
@@ -1070,6 +1075,7 @@ public class PreviewMCActivity extends BaseAct {
         cameraThread = new HandlerThread("MediaCodecCameraThread");
         cameraThread.start();
         cameraHandler = new Handler(cameraThread.getLooper());
+
         yuvThread = new HandlerThread("PreviewMCYuvThread");
         yuvThread.start();
         yuvHandler = new Handler(yuvThread.getLooper());
