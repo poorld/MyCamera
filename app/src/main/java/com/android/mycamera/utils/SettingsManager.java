@@ -34,9 +34,11 @@ public class SettingsManager {
     public static final String LANGUAGE_ENGLISH = "en";
 
     private final SharedPreferences preferences;
+    private final Context context;
     
     public SettingsManager(Context context) {
-        this.preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        this.context = context.getApplicationContext();
+        this.preferences = PreferenceManager.getDefaultSharedPreferences(this.context);
     }
     
     /**
@@ -81,8 +83,8 @@ public class SettingsManager {
         
         boolean audioEnabled = preferences.getBoolean(PREF_AUDIO_ENABLED, true);
         
-        String saveLocationPath = preferences.getString(PREF_SAVE_LOCATION, 
-                new File(android.os.Environment.getExternalStorageDirectory(), "DCIM/Camera").getAbsolutePath());
+        File defaultSaveLocation = CameraUtils.createCameraDirectory(context);
+        String saveLocationPath = preferences.getString(PREF_SAVE_LOCATION, defaultSaveLocation.getAbsolutePath());
         File saveLocation = new File(saveLocationPath);
         
         String cameraId = preferences.getString(PREF_CAMERA_ID, "0");

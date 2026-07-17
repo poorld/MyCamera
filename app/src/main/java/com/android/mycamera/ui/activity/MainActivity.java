@@ -49,6 +49,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     private ImageButton settingsButton;
     private ImageButton switchCameraButton;
     private ImageButton flashButton;
+    private ImageButton galleryButton;
     private ImageButton photoModeButton;
     private ImageButton videoModeButton;
     private ProgressBar loadingIndicator;
@@ -79,7 +80,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         
         recordingTimerHandler = new Handler(Looper.getMainLooper());
 
-        CameraUtils.createCameraDirectory();
+        CameraUtils.createCameraDirectory(this);
 
 
     }
@@ -98,6 +99,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         settingsButton = findViewById(R.id.settingsButton);
         switchCameraButton = findViewById(R.id.switchCameraButton);
         flashButton = findViewById(R.id.flashButton);
+        galleryButton = findViewById(R.id.galleryButton);
         photoModeButton = findViewById(R.id.photoModeButton);
         videoModeButton = findViewById(R.id.videoModeButton);
         loadingIndicator = findViewById(R.id.loadingIndicator);
@@ -122,12 +124,12 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         mCameraManager.preInitializeCamera();
     }
     
-    @SuppressLint("ClickableViewAccessibility")
     private void setupClickListeners() {
         captureButton.setOnClickListener(v -> handleCaptureAction());
         settingsButton.setOnClickListener(v -> openSettings());
         switchCameraButton.setOnClickListener(v -> switchCamera());
         flashButton.setOnClickListener(v -> toggleFlash());
+        galleryButton.setOnClickListener(v -> startActivity(new Intent(this, GalleryActivity.class)));
         photoModeButton.setOnClickListener(v -> setPhotoMode());
         videoModeButton.setOnClickListener(v -> setVideoMode());
         apiSwitcherButton.setOnClickListener(v -> {
@@ -326,6 +328,8 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     private void toggleFlash() {
         if (mCameraManager != null) {
             mCameraManager.toggleFlash();
+            updateFlashButton();
+            flashButton.postDelayed(this::updateFlashButton, 100);
         }
     }
 

@@ -126,7 +126,7 @@ public class CamXApiActivity extends BaseAct {
         // 创建带时间戳的文件名
         String name = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS", Locale.US)
                 .format(new Date());
-        File photoFile = Utils.getOutputMediaFile();
+        File photoFile = Utils.getOutputMediaFile(this);
         if (photoFile == null) {
             Log.e(TAG, "错误：无法创建文件，请检查存储权限。");
             return;

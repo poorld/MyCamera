@@ -178,7 +178,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
                     ByteBuffer buffer = image.getPlanes()[0].getBuffer();
                     byte[] bytes = new byte[buffer.remaining()];
                     buffer.get(bytes);
-                    File outputFile = CameraUtils.generateUniqueMediaFile("jpg");
+                    File outputFile = CameraUtils.generateUniqueMediaFile(context, "jpg");
                     try (FileOutputStream fos = new FileOutputStream(outputFile)) {
                         fos.write(bytes);
                     }
@@ -663,10 +663,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
     }
 
     private File generateCamera2VideoFile() {
-        File cameraDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
-        if (cameraDir == null) {
-            cameraDir = context.getFilesDir();
-        }
+        File cameraDir = CameraUtils.createCameraDirectory(context);
         if (!cameraDir.exists() && !cameraDir.mkdirs()) {
             logError("Failed to create Camera2 video directory: " + cameraDir.getAbsolutePath(), null);
         }
@@ -888,22 +885,17 @@ public class Camera2Strategy extends BaseCameraStrategy {
     }
 
     private int getJpegOrientation() {
-        WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
-        if (windowManager == null) return 0;
-        int rotation = windowManager.getDefaultDisplay().getRotation();
-        int degrees = 0;
-        switch (rotation) {
-            case Surface.ROTATION_0: degrees = 0; break;
-            case Surface.ROTATION_90: degrees = 90; break;
-            case Surface.ROTATION_180: degrees = 180; break;
-            case Surface.ROTATION_270: degrees = 270; break;
-        }
+        int degrees = (360 - getDeviceOrientationDegrees()) % 360;
         try {
             CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
             CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraDevice.getId());
             Integer sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
             if (sensorOrientation != null) {
-                return (sensorOrientation + degrees + 270) % 360;
+                Integer lensFacing = characteristics.get(CameraCharacteristics.LENS_FACING);
+                if (lensFacing != null && lensFacing == CameraCharacteristics.LENS_FACING_FRONT) {
+                    return (sensorOrientation + degrees) % 360;
+                }
+                return (sensorOrientation - degrees + 360) % 360;
             }
         } catch (CameraAccessException e) {
             logError("Failed to get sensor orientation", e);

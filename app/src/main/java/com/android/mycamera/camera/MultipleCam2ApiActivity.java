@@ -257,7 +257,7 @@ public class MultipleCam2ApiActivity extends BaseAct {
     };
 
     // 用于在后台线程保存图片的 Runnable
-    private static class ImageSaver implements Runnable {
+    private class ImageSaver implements Runnable {
         private final Image image;
 
         ImageSaver(Image image) {
@@ -271,7 +271,7 @@ public class MultipleCam2ApiActivity extends BaseAct {
             buffer.get(bytes);
             FileOutputStream output = null;
             try {
-                File file = Utils.getOutputMediaFile();
+                File file = Utils.getOutputMediaFile(MultipleCam2ApiActivity.this);
                 fileName = file.getAbsolutePath();
                 if (file == null) {
                     Log.e(TAG, "Error creating media file, check storage permissions.");

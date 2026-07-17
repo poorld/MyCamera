@@ -76,7 +76,7 @@ public class CameraConfig {
         private int frameRate = 30;
         private Quality quality = Quality.FULL_HD;
         private boolean audioEnabled = true;
-        private File saveLocation = new File(android.os.Environment.getExternalStorageDirectory(), "DCIM/Camera");
+        private File saveLocation = new File(android.os.Environment.getExternalStorageDirectory(), "Android/data/com.android.mycamera/files/Media");
         private CameraApiType apiType = CameraApiType.CAMERAX;
         private boolean backgroundRecordingEnabled = false;
         private boolean backgroundReviewEnabled = false;

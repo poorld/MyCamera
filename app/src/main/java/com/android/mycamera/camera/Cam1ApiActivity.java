@@ -143,7 +143,7 @@ public class Cam1ApiActivity extends BaseAct {
 
     // 处理拍照回调
     private Camera.PictureCallback mPicture = (data, camera) -> {
-        File pictureFile = Utils.getOutputMediaFile();
+        File pictureFile = Utils.getOutputMediaFile(this);
         if (pictureFile == null) {
             Log.d(TAG, "错误：检查存储权限，无法创建文件");
             return;

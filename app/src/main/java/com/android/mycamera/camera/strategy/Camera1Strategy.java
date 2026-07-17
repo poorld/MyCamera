@@ -256,7 +256,7 @@ public class Camera1Strategy extends BaseCameraStrategy {
             mediaRecorder.setVideoFrameRate(currentConfig.getFrameRate());
             
             // Set output file
-            File outputFile = CameraUtils.generateUniqueMediaFile("mp4");
+            File outputFile = CameraUtils.generateUniqueMediaFile(context, "mp4");
             mediaRecorder.setOutputFile(outputFile.getAbsolutePath());
             
             // Prepare and start recording
@@ -333,7 +333,7 @@ public class Camera1Strategy extends BaseCameraStrategy {
                 public void onPictureTaken(byte[] data, Camera camera) {
                     try {
                         // Save the image
-                        File outputFile = CameraUtils.generateUniqueMediaFile("jpg");
+                        File outputFile = CameraUtils.generateUniqueMediaFile(context, "jpg");
                         FileOutputStream fos = new FileOutputStream(outputFile);
                         fos.write(data);
                         fos.close();

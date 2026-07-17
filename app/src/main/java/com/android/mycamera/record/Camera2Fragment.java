@@ -28,6 +28,7 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.android.mycamera.R;
+import com.android.mycamera.utils.CameraUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -210,7 +211,7 @@ public class Camera2Fragment extends Fragment implements IRecordingFragment, Sur
             mediaRecorder.setVideoSize(Integer.parseInt(dimensions[0]), Integer.parseInt(dimensions[1]));
         }
         mediaRecorder.setVideoFrameRate(frameRate); // Allow user to override frame rate
-        outputFile = new File(requireActivity().getExternalFilesDir(null), new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis()) + "_C2.mp4");
+        outputFile = CameraUtils.generateUniqueMediaFile(requireContext(), "mp4");
         mediaRecorder.setOutputFile(outputFile.getAbsolutePath());
 
         try {
@@ -317,4 +318,3 @@ public class Camera2Fragment extends Fragment implements IRecordingFragment, Sur
         }
     }
 }
-

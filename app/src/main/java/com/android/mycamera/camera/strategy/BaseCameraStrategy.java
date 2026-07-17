@@ -160,6 +160,10 @@ public abstract class BaseCameraStrategy implements CameraStrategy {
         }
     }
 
+    protected int getDeviceOrientationDegrees() {
+        return deviceOrientationDegrees;
+    }
+
     protected int getVideoOrientationHint(String cameraId) {
         try {
             CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);

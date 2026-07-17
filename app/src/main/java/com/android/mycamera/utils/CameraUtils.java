@@ -50,16 +50,15 @@ public class CameraUtils {
     /**
      * Create camera directory if it doesn't exist
      */
-    public static File createCameraDirectory() {
-        Log.d("TAG", "createCameraDirectory: ");
-        File cameraDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "Camera");
-        // File cameraDir = new File("/storage/B985-11F6/DCIM/Camera");
+    public static File createCameraDirectory(Context context) {
+        File cameraDir = context.getExternalFilesDir("Media");
+        if (cameraDir == null) {
+            cameraDir = new File(context.getFilesDir(), "Media");
+        }
         if (!cameraDir.exists()) {
             cameraDir.mkdirs();
         }
-        Log.d("TAG", "createCameraDirectory: " + cameraDir.getPath());
-        Log.d("TAG", "cameraDir: " + cameraDir.exists());
-        return cameraDir.exists() ? cameraDir : Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM);
+        return cameraDir;
     }
     
     /**
@@ -73,8 +72,8 @@ public class CameraUtils {
     /**
      * Generate unique file path for media
      */
-    public static File generateUniqueMediaFile(String extension) {
-        File cameraDir = createCameraDirectory();
+    public static File generateUniqueMediaFile(Context context, String extension) {
+        File cameraDir = createCameraDirectory(context);
         String fileName = generateUniqueFileName(extension);
         return new File(cameraDir, fileName);
     }

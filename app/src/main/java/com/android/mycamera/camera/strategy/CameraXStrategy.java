@@ -406,7 +406,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
                 cameraProvider.unbindAll();
                 camera = cameraProvider.bindToLifecycle(lifecycleOwner, currentCameraSelector, dedicatedCapture);
 
-                File outputFile = CameraUtils.generateUniqueMediaFile("jpg");
+                File outputFile = CameraUtils.generateUniqueMediaFile(context, "jpg");
                 ImageCapture.OutputFileOptions outputOptions = new ImageCapture.OutputFileOptions.Builder(outputFile).build();
                 dedicatedCapture.takePicture(outputOptions, ContextCompat.getMainExecutor(context), new ImageCapture.OnImageSavedCallback() {
                     @Override
@@ -666,10 +666,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
     }
 
     private File generateCameraXVideoFile() {
-        File cameraDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
-        if (cameraDir == null) {
-            cameraDir = context.getFilesDir();
-        }
+        File cameraDir = CameraUtils.createCameraDirectory(context);
         if (!cameraDir.exists()) {
             cameraDir.mkdirs();
         }

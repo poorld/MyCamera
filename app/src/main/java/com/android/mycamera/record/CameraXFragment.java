@@ -31,6 +31,7 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.android.mycamera.R;
+import com.android.mycamera.utils.CameraUtils;
 import com.google.common.util.concurrent.ListenableFuture;
 import java.io.File;
 import java.text.SimpleDateFormat;
@@ -169,7 +170,7 @@ public class CameraXFragment extends Fragment implements IRecordingFragment {
     public void startRecording(String resolution, int frameRate) {
         if (videoCapture == null) return;
 
-        File outputFile = new File(requireActivity().getExternalFilesDir(null), new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis()) + "_X.mp4");
+        File outputFile = CameraUtils.generateUniqueMediaFile(requireContext(), "mp4");
         FileOutputOptions outputOptions = new FileOutputOptions.Builder(outputFile).build();
 
         if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
