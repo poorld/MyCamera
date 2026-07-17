@@ -34,6 +34,7 @@ import androidx.camera.core.ImageCaptureException;
 import androidx.camera.core.MeteringPoint;
 import androidx.camera.core.MeteringPointFactory;
 import androidx.camera.core.Preview;
+import androidx.camera.core.ZoomState;
 import androidx.camera.core.SurfaceOrientedMeteringPointFactory;
 import androidx.camera.camera2.interop.Camera2Interop;
 import androidx.camera.camera2.interop.Camera2CameraControl;
@@ -95,6 +96,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
 
     private boolean firstStart = true;
     private File outputFile;
+    private float requestedZoomRatio = 1f;
 
     public CameraXStrategy(Context context) {
         super(context);
@@ -185,6 +187,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
 
                 camera = cameraProvider.bindToLifecycle(this.lifecycleOwner, cameraSelector, previewUseCase, videoCapture);
                 applyFpsRangeToCamera(camera);
+                applyStoredZoom();
                 attachPreviewSurfaceProvider();
                 logDebug("CameraX target rotation=" + targetRotation);
                 notifyStateChanged(CameraState.PREVIEW_STARTED);
@@ -377,6 +380,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
             cameraProvider.unbindAll();
             camera = cameraProvider.bindToLifecycle(lifecycleOwner, currentCameraSelector, previewUseCase, videoCapture);
             applyFpsRangeToCamera(camera);
+            applyStoredZoom();
             attachPreviewSurfaceProvider();
         } catch (Exception e) {
             logError("Failed to restore CameraX photo use cases", e);
@@ -408,7 +412,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
 
                 File outputFile = CameraUtils.generateUniqueMediaFile(context, "jpg");
                 ImageCapture.OutputFileOptions outputOptions = new ImageCapture.OutputFileOptions.Builder(outputFile).build();
-                dedicatedCapture.takePicture(outputOptions, ContextCompat.getMainExecutor(context), new ImageCapture.OnImageSavedCallback() {
+                applyStoredZoom().addListener(() -> dedicatedCapture.takePicture(outputOptions, ContextCompat.getMainExecutor(context), new ImageCapture.OnImageSavedCallback() {
                     @Override
                     public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputResults) {
                         BitmapFactory.Options options = new BitmapFactory.Options();
@@ -424,7 +428,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
                         restorePhotoUseCases();
                         notifyError("Photo capture failed: " + exc.getMessage());
                     }
-                });
+                }), ContextCompat.getMainExecutor(context));
             } catch (Exception e) {
                 logError("Failed to capture CameraX photo", e);
                 restorePhotoUseCases();
@@ -459,6 +463,10 @@ public class CameraXStrategy extends BaseCameraStrategy {
     @Override
     public boolean switchCamera(String cameraId) {
         Log.d(TAG, "switchCamera: " + cameraId);
+        requestedZoomRatio = 1f;
+        if (camera != null) {
+            camera.getCameraControl().setLinearZoom(0f);
+        }
         currentConfig = new CameraConfig.Builder(currentConfig).setCameraId(cameraId).build();
         if (lifecycleOwner != null && cameraPreview != null) {
             startPreview(cameraPreview, lifecycleOwner);
@@ -483,6 +491,61 @@ public class CameraXStrategy extends BaseCameraStrategy {
     @Override
     public boolean isFlashEnabled() {
         return camera != null && camera.getCameraInfo().getTorchState().getValue() == androidx.camera.core.TorchState.ON;
+    }
+
+    @Override
+    public boolean isZoomSupported() {
+        ZoomState zoomState = getZoomState();
+        return zoomState != null && zoomState.getMaxZoomRatio() > zoomState.getMinZoomRatio();
+    }
+
+    @Override
+    public float getMinZoom() {
+        ZoomState zoomState = getZoomState();
+        return zoomState == null ? 1f : zoomState.getMinZoomRatio();
+    }
+
+    @Override
+    public float getMaxZoom() {
+        ZoomState zoomState = getZoomState();
+        return zoomState == null ? 1f : zoomState.getMaxZoomRatio();
+    }
+
+    @Override
+    public float getZoom() {
+        return requestedZoomRatio;
+    }
+
+    @Override
+    public void setZoom(float zoomRatio) {
+        if (camera == null) {
+            requestedZoomRatio = zoomRatio;
+            return;
+        }
+        float clampedZoom = Math.max(getMinZoom(), Math.min(zoomRatio, getMaxZoom()));
+        requestedZoomRatio = clampedZoom;
+        if (clampedZoom <= getMinZoom() + 0.01f) {
+            camera.getCameraControl().setLinearZoom(0f);
+        } else {
+            camera.getCameraControl().setZoomRatio(clampedZoom);
+        }
+    }
+
+    private ZoomState getZoomState() {
+        return camera == null ? null : camera.getCameraInfo().getZoomState().getValue();
+    }
+
+    private ListenableFuture<Void> applyStoredZoom() {
+        ZoomState zoomState = getZoomState();
+        if (zoomState == null || camera == null) {
+            throw new IllegalStateException("CameraX camera is not ready for zoom");
+        }
+        float minZoom = zoomState.getMinZoomRatio();
+        float clampedZoom = Math.max(minZoom, Math.min(requestedZoomRatio, zoomState.getMaxZoomRatio()));
+        requestedZoomRatio = clampedZoom;
+        return clampedZoom <= minZoom + 0.01f
+                ? camera.getCameraControl().setLinearZoom(0f)
+                : camera.getCameraControl().setZoomRatio(clampedZoom);
     }
 
     private CameraSelector createCameraSelector(ProcessCameraProvider cameraProvider, String cameraId) {

@@ -68,6 +68,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
     private boolean isRecording = false;
     private boolean isStoppingRecording = false;
     private File recordingOutputFile;
+    private float zoomRatio = 1f;
 
     public Camera2Strategy(Context context) {
         super(context);
@@ -172,6 +173,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
             captureBuilder.addTarget(imageReader.getSurface());
             captureBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
             captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getJpegOrientation());
+            applyZoom(captureBuilder);
 
             imageReader.setOnImageAvailableListener(reader -> {
                 try (android.media.Image image = reader.acquireNextImage()) {
@@ -723,6 +725,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
 
     @Override
     public boolean switchCamera(String cameraId) {
+        zoomRatio = 1f;
         closeCamera();
         currentConfig = new CameraConfig.Builder(currentConfig).setCameraId(cameraId).build();
         openCamera(currentConfig);
@@ -901,5 +904,61 @@ public class Camera2Strategy extends BaseCameraStrategy {
             logError("Failed to get sensor orientation", e);
         }
         return 0;
+    }
+
+    @Override
+    public boolean isZoomSupported() {
+        return getMaxZoom() > 1f;
+    }
+
+    @Override
+    public float getMaxZoom() {
+        if (cameraDevice == null) return 1f;
+        try {
+            CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            Float maxZoom = manager.getCameraCharacteristics(cameraDevice.getId())
+                    .get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM);
+            return maxZoom == null ? 1f : Math.max(1f, maxZoom);
+        } catch (CameraAccessException e) {
+            return 1f;
+        }
+    }
+
+    @Override
+    public float getZoom() {
+        return zoomRatio;
+    }
+
+    @Override
+    public void setZoom(float requestedZoom) {
+        zoomRatio = Math.max(1f, Math.min(requestedZoom, getMaxZoom()));
+        if (previewRequestBuilder == null || captureSession == null) return;
+        applyZoom(previewRequestBuilder);
+        try {
+            captureSession.setRepeatingRequest(previewRequestBuilder.build(), null, backgroundHandler);
+        } catch (CameraAccessException e) {
+            logError("Failed to apply zoom", e);
+        }
+    }
+
+    private void applyZoom(CaptureRequest.Builder builder) {
+        if (cameraDevice == null) return;
+        try {
+            CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            Rect sensor = manager.getCameraCharacteristics(cameraDevice.getId())
+                    .get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+            if (sensor == null) return;
+            if (zoomRatio <= 1f) {
+                builder.set(CaptureRequest.SCALER_CROP_REGION, sensor);
+                return;
+            }
+            int cropWidth = Math.round(sensor.width() / zoomRatio);
+            int cropHeight = Math.round(sensor.height() / zoomRatio);
+            int left = sensor.centerX() - cropWidth / 2;
+            int top = sensor.centerY() - cropHeight / 2;
+            builder.set(CaptureRequest.SCALER_CROP_REGION, new Rect(left, top, left + cropWidth, top + cropHeight));
+        } catch (CameraAccessException e) {
+            logError("Failed to calculate zoom crop", e);
+        }
     }
 }

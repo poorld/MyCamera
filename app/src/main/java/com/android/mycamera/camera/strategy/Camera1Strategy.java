@@ -518,6 +518,30 @@ public class Camera1Strategy extends BaseCameraStrategy {
         return isFlashEnabled;
     }
 
+    @Override
+    public boolean isZoomSupported() {
+        return camera != null && camera.getParameters().isZoomSupported();
+    }
+
+    @Override
+    public float getMaxZoom() {
+        return isZoomSupported() ? camera.getParameters().getMaxZoom() + 1f : 1f;
+    }
+
+    @Override
+    public float getZoom() {
+        return isZoomSupported() ? camera.getParameters().getZoom() + 1f : 1f;
+    }
+
+    @Override
+    public void setZoom(float zoomRatio) {
+        if (!isZoomSupported()) return;
+        Camera.Parameters parameters = camera.getParameters();
+        int zoom = Math.round(Math.max(1f, Math.min(zoomRatio, getMaxZoom())) - 1f);
+        parameters.setZoom(zoom);
+        camera.setParameters(parameters);
+    }
+
     public void setFocusPoint(float x, float y) {
         if (camera == null || textureView == null) return;
 

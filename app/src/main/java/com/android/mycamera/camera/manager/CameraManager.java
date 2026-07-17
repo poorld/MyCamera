@@ -294,6 +294,28 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         return currentStrategy != null && currentStrategy.isFlashEnabled();
     }
 
+    public boolean isZoomSupported() {
+        return currentStrategy != null && currentStrategy.isZoomSupported();
+    }
+
+    public float getMinZoom() {
+        return currentStrategy != null ? currentStrategy.getMinZoom() : 1f;
+    }
+
+    public float getMaxZoom() {
+        return currentStrategy != null ? currentStrategy.getMaxZoom() : 1f;
+    }
+
+    public float getZoom() {
+        return currentStrategy != null ? currentStrategy.getZoom() : 1f;
+    }
+
+    public void setZoom(float zoomRatio) {
+        if (currentStrategy != null) {
+            currentStrategy.setZoom(zoomRatio);
+        }
+    }
+
     public boolean isFocusSupported() {
         Log.d(TAG, "isFocusSupported: " + currentStrategy.isFocusSupported());
         return currentStrategy != null && currentStrategy.isFocusSupported();

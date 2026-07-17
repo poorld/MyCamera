@@ -33,7 +33,10 @@ import com.android.mycamera.camera.observer.CameraStateObserver;
 import com.android.mycamera.focus.GeminiFocusView;
 import com.android.mycamera.model.CameraApiType;
 import com.android.mycamera.model.CameraState;
+import com.android.mycamera.ui.view.ZoomDialView;
 import com.android.mycamera.utils.CameraUtils;
+
+import java.util.Locale;
 
 public class MainActivity extends BaseAct implements CameraStateObserver {
     
@@ -63,12 +66,22 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     private RadioButton apiCameraX;
     private TextView settingsResolutionText;
     private TextView settingsFramerateText;
+    private View zoomQuickBar;
+    private ZoomDialView zoomDial;
+    private TextView zoomMinText;
+    private TextView zoomCurrentText;
+    private TextView zoomThirdText;
+    private TextView zoomMaxText;
 
     private boolean isVideoMode = false;
     private boolean isRecording = false;
     private boolean isSyncingApiSelection = false;
     private Handler recordingTimerHandler;
     private long recordingStartTime = 0;
+    private final Runnable hideZoomDialRunnable = () -> {
+        if (zoomDial != null) zoomDial.setVisibility(View.GONE);
+    };
+    private float[] zoomStops = new float[]{1f};
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -113,6 +126,12 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         apiCameraX = findViewById(R.id.apiCameraX);
         settingsResolutionText = findViewById(R.id.settings_resolution_text);
         settingsFramerateText = findViewById(R.id.settings_framerate_text);
+        zoomQuickBar = findViewById(R.id.zoomQuickBar);
+        zoomDial = findViewById(R.id.zoomDial);
+        zoomMinText = findViewById(R.id.zoomMinText);
+        zoomCurrentText = findViewById(R.id.zoomCurrentText);
+        zoomThirdText = findViewById(R.id.zoomThirdText);
+        zoomMaxText = findViewById(R.id.zoomMaxText);
 
         updateModeButtons();
     }
@@ -169,6 +188,8 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
                 }
             }, 1000);
         });
+
+        zoomQuickBar.setOnTouchListener((view, event) -> handleZoomTouch(event));
 
 
     }
@@ -319,6 +340,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             }
             int nextIndex = (currentIndex + 1) % cameraIds.length;
             mCameraManager.switchCamera(cameraIds[nextIndex]);
+            cameraPreview.postDelayed(this::updateZoomUi, 500);
         } catch (CameraAccessException e) {
             e.printStackTrace();
             Toast.makeText(this, "切换摄像头失败", Toast.LENGTH_SHORT).show();
@@ -395,6 +417,65 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             flashButton.setImageResource(R.drawable.ic_flash_off);
         }
     }
+
+    private boolean handleZoomTouch(MotionEvent event) {
+        if (mCameraManager == null || !mCameraManager.isZoomSupported()) return false;
+        if (event.getAction() == MotionEvent.ACTION_DOWN || event.getAction() == MotionEvent.ACTION_MOVE) {
+            recordingTimerHandler.removeCallbacks(hideZoomDialRunnable);
+            float progress = Math.max(0f, Math.min(1f, event.getX() / zoomQuickBar.getWidth()));
+            int stopIndex = Math.round(progress * (zoomStops.length - 1));
+            float zoom = zoomStops[stopIndex];
+            mCameraManager.setZoom(zoom);
+            updateZoomUi();
+            zoomDial.setVisibility(View.VISIBLE);
+            return true;
+        }
+        if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
+            recordingTimerHandler.postDelayed(hideZoomDialRunnable, 900);
+            return true;
+        }
+        return true;
+    }
+
+    private void updateZoomUi() {
+        if (mCameraManager == null || !mCameraManager.isZoomSupported()) {
+            zoomQuickBar.setVisibility(View.GONE);
+            zoomDial.setVisibility(View.GONE);
+            return;
+        }
+        float minZoom = mCameraManager.getMinZoom();
+        float maxZoom = mCameraManager.getMaxZoom();
+        float zoom = mCameraManager.getZoom();
+        zoomStops = createZoomStops(minZoom, maxZoom);
+        zoomQuickBar.setVisibility(View.VISIBLE);
+        updateZoomLabel(zoomMinText, zoomStops[0], zoom);
+        updateZoomLabel(zoomCurrentText, zoomStops[Math.min(1, zoomStops.length - 1)], zoom);
+        updateZoomLabel(zoomThirdText, zoomStops[Math.min(2, zoomStops.length - 1)], zoom);
+        updateZoomLabel(zoomMaxText, zoomStops[zoomStops.length - 1], zoom);
+        zoomDial.setZoom(minZoom, maxZoom, zoom);
+    }
+
+    private float[] createZoomStops(float minZoom, float maxZoom) {
+        java.util.ArrayList<Float> stops = new java.util.ArrayList<>();
+        stops.add(minZoom);
+        if (minZoom < 2f && maxZoom > 2f) stops.add(2f);
+        if (minZoom < 3f && maxZoom > 3f) stops.add(3f);
+        if (Math.abs(stops.get(stops.size() - 1) - maxZoom) > 0.05f) stops.add(maxZoom);
+        float[] result = new float[stops.size()];
+        for (int i = 0; i < stops.size(); i++) result[i] = stops.get(i);
+        return result;
+    }
+
+    private void updateZoomLabel(TextView label, float value, float zoom) {
+        label.setText(formatZoom(value));
+        boolean selected = Math.abs(value - zoom) < 0.12f;
+        label.setTextColor(getColor(selected ? R.color.zoom_active : R.color.white));
+        label.setTextSize(selected ? 15f : 13f);
+    }
+
+    private String formatZoom(float zoom) {
+        return zoom < 10f ? String.format(Locale.US, "%.1fx", zoom) : String.format(Locale.US, "%.0fx", zoom);
+    }
     
     private void switchCameraApi(CameraApiType apiType) {
         loadingIndicator.setVisibility(View.VISIBLE);
@@ -454,6 +535,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
                     statusText.setText("Camera ready");
                     mCameraManager.startPreview(cameraPreview, this);
                     updateFlashButton();
+                    updateZoomUi();
                     updateSettingsDisplay();
                     updateSwitchCameraButtonIcon();
                     break;
@@ -514,6 +596,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             loadingIndicator.setVisibility(View.GONE);
             statusText.setText("Ready");
             updateFlashButton();
+            updateZoomUi();
         });
     }
 

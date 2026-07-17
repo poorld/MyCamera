@@ -89,6 +89,16 @@ public interface CameraStrategy {
      */
     boolean isFlashEnabled();
 
+    default boolean isZoomSupported() { return false; }
+
+    default float getMinZoom() { return 1f; }
+
+    default float getMaxZoom() { return 1f; }
+
+    default float getZoom() { return 1f; }
+
+    default void setZoom(float zoomRatio) { }
+
     void setFocusPoint(float x, float y);
 
     boolean isFocusSupported();
