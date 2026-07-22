@@ -97,6 +97,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
     private boolean firstStart = true;
     private File outputFile;
     private float requestedZoomRatio = 1f;
+    private boolean requestedFlashEnabled = false;
 
     public CameraXStrategy(Context context) {
         super(context);
@@ -188,6 +189,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
                 camera = cameraProvider.bindToLifecycle(this.lifecycleOwner, cameraSelector, previewUseCase, videoCapture);
                 applyFpsRangeToCamera(camera);
                 applyStoredZoom();
+                applyRequestedFlash();
                 attachPreviewSurfaceProvider();
                 logDebug("CameraX target rotation=" + targetRotation);
                 notifyStateChanged(CameraState.PREVIEW_STARTED);
@@ -381,6 +383,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
             camera = cameraProvider.bindToLifecycle(lifecycleOwner, currentCameraSelector, previewUseCase, videoCapture);
             applyFpsRangeToCamera(camera);
             applyStoredZoom();
+            applyRequestedFlash();
             attachPreviewSurfaceProvider();
         } catch (Exception e) {
             logError("Failed to restore CameraX photo use cases", e);
@@ -409,6 +412,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
                 // Temporarily bind only ImageCapture to avoid stream-combination downgrades.
                 cameraProvider.unbindAll();
                 camera = cameraProvider.bindToLifecycle(lifecycleOwner, currentCameraSelector, dedicatedCapture);
+                applyRequestedFlash();
 
                 File outputFile = CameraUtils.generateUniqueMediaFile(context, "jpg");
                 ImageCapture.OutputFileOptions outputOptions = new ImageCapture.OutputFileOptions.Builder(outputFile).build();
@@ -443,7 +447,9 @@ public class CameraXStrategy extends BaseCameraStrategy {
         stopOrientationUpdates();
         if (camera != null) {
             camera.getCameraControl().cancelFocusAndMetering();
+            camera.getCameraControl().enableTorch(false);
         }
+        requestedFlashEnabled = false;
 
         if (cameraProviderFuture != null && cameraProviderFuture.isDone()) {
             try {
@@ -464,8 +470,10 @@ public class CameraXStrategy extends BaseCameraStrategy {
     public boolean switchCamera(String cameraId) {
         Log.d(TAG, "switchCamera: " + cameraId);
         requestedZoomRatio = 1f;
+        requestedFlashEnabled = false;
         if (camera != null) {
             camera.getCameraControl().setLinearZoom(0f);
+            camera.getCameraControl().enableTorch(false);
         }
         currentConfig = new CameraConfig.Builder(currentConfig).setCameraId(cameraId).build();
         if (lifecycleOwner != null && cameraPreview != null) {
@@ -477,9 +485,21 @@ public class CameraXStrategy extends BaseCameraStrategy {
     @Override
     public boolean toggleFlash() {
         if (camera != null && camera.getCameraInfo().hasFlashUnit()) {
-            camera.getCameraControl().enableTorch(!isFlashEnabled());
+            boolean previousFlashEnabled = requestedFlashEnabled;
+            requestedFlashEnabled = !requestedFlashEnabled;
+            ListenableFuture<Void> torchFuture = camera.getCameraControl().enableTorch(requestedFlashEnabled);
+            torchFuture.addListener(() -> {
+                try {
+                    torchFuture.get();
+                    logDebug("Flash toggled: " + (requestedFlashEnabled ? "ON" : "OFF"));
+                } catch (Exception e) {
+                    requestedFlashEnabled = previousFlashEnabled;
+                    logError("Failed to toggle flash", e);
+                }
+            }, ContextCompat.getMainExecutor(context));
             return true;
         }
+        requestedFlashEnabled = false;
         return false;
     }
 
@@ -490,7 +510,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
 
     @Override
     public boolean isFlashEnabled() {
-        return camera != null && camera.getCameraInfo().getTorchState().getValue() == androidx.camera.core.TorchState.ON;
+        return camera != null && requestedFlashEnabled;
     }
 
     @Override
@@ -546,6 +566,24 @@ public class CameraXStrategy extends BaseCameraStrategy {
         return clampedZoom <= minZoom + 0.01f
                 ? camera.getCameraControl().setLinearZoom(0f)
                 : camera.getCameraControl().setZoomRatio(clampedZoom);
+    }
+
+    private void applyRequestedFlash() {
+        if (camera == null || !camera.getCameraInfo().hasFlashUnit()) {
+            requestedFlashEnabled = false;
+            return;
+        }
+        if (!requestedFlashEnabled) return;
+
+        ListenableFuture<Void> torchFuture = camera.getCameraControl().enableTorch(true);
+        torchFuture.addListener(() -> {
+            try {
+                torchFuture.get();
+            } catch (Exception e) {
+                requestedFlashEnabled = false;
+                logError("Failed to restore flash", e);
+            }
+        }, ContextCompat.getMainExecutor(context));
     }
 
     private CameraSelector createCameraSelector(ProcessCameraProvider cameraProvider, String cameraId) {

@@ -35,6 +35,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/keep_screen_on"
+            android:thumb="@drawable/settings_switch_thumb"
+            android:track="@drawable/settings_switch_track"
             android:textColor="@color/white"
             android:layout_marginBottom="16dp"/>
 
@@ -70,6 +72,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/custom_camera2_resolution"
+            android:thumb="@drawable/settings_switch_thumb"
+            android:track="@drawable/settings_switch_track"
             android:textColor="@color/white"
             android:layout_marginBottom="12dp"/>
 
@@ -127,6 +131,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/enable_audio"
+            android:thumb="@drawable/settings_switch_thumb"
+            android:track="@drawable/settings_switch_track"
             android:textColor="@color/white"
             android:layout_marginBottom="16dp"/>
 
@@ -136,6 +142,8 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="24dp"
             android:text="@string/background_review"
+            android:thumb="@drawable/settings_switch_thumb"
+            android:track="@drawable/settings_switch_track"
             android:textColor="@color/white" />
 
         <!-- Save Location -->
@@ -145,6 +153,8 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="24dp"
             android:text="@string/background_recording"
+            android:thumb="@drawable/settings_switch_thumb"
+            android:track="@drawable/settings_switch_track"
             android:textColor="@color/white" />
 
         <TextView
@@ -181,6 +191,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/hardware_acceleration"
+            android:thumb="@drawable/settings_switch_thumb"
+            android:track="@drawable/settings_switch_track"
             android:textColor="@color/white"
             android:checked="true"
             android:layout_marginBottom="16dp"/>
@@ -190,6 +202,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/memory_optimization"
+            android:thumb="@drawable/settings_switch_thumb"
+            android:track="@drawable/settings_switch_track"
             android:textColor="@color/white"
             android:checked="true"
             android:layout_marginBottom="24dp"/>

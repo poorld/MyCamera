@@ -148,6 +148,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
                     try {
                         previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
                         applyFpsToRequest(previewRequestBuilder);
+                        applyFlashToRequest(previewRequestBuilder);
                         session.setRepeatingRequest(previewRequestBuilder.build(), null, backgroundHandler);
                         notifyStateChanged(CameraState.PREVIEW_STARTED);
                         notifyPreviewStarted();
@@ -174,6 +175,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
             captureBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
             captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getJpegOrientation());
             applyZoom(captureBuilder);
+            applyFlashToRequest(captureBuilder);
 
             imageReader.setOnImageAvailableListener(reader -> {
                 try (android.media.Image image = reader.acquireNextImage()) {
@@ -352,6 +354,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
             builder.addTarget(recorderSurface);
             builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO);
             applyFpsToRequest(builder);
+            applyFlashToRequest(builder);
 
             if (isCurrentHighSpeedVideoConfiguration()) {
                 startConstrainedHighSpeedRecording(previewSurface, recorderSurface, builder);
@@ -553,6 +556,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
             final CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             builder.addTarget(previewSurface);
             applyFpsToRequest(builder);
+            applyFlashToRequest(builder);
 
             if (imageReader == null
                     || imageReader.getWidth() != resolution.getWidth()
@@ -682,6 +686,28 @@ public class Camera2Strategy extends BaseCameraStrategy {
         }
     }
 
+    private void applyFlashToRequest(CaptureRequest.Builder builder) {
+        if (builder == null) return;
+        builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
+        builder.set(CaptureRequest.FLASH_MODE,
+                isFlashEnabled ? CaptureRequest.FLASH_MODE_TORCH : CaptureRequest.FLASH_MODE_OFF);
+    }
+
+    private void submitRepeatingRequest(CaptureRequest.Builder builder) throws CameraAccessException {
+        if (captureSession == null || builder == null) return;
+        CaptureRequest request = builder.build();
+        if (captureSession instanceof CameraConstrainedHighSpeedCaptureSession) {
+            CameraConstrainedHighSpeedCaptureSession highSpeedSession =
+                    (CameraConstrainedHighSpeedCaptureSession) captureSession;
+            highSpeedSession.setRepeatingBurst(
+                    highSpeedSession.createHighSpeedRequestList(request),
+                    null,
+                    backgroundHandler);
+        } else {
+            captureSession.setRepeatingRequest(request, null, backgroundHandler);
+        }
+    }
+
     private Range<Integer> getBestFpsRange() {
         if (cameraDevice == null || currentConfig == null) return null;
         try {
@@ -734,24 +760,16 @@ public class Camera2Strategy extends BaseCameraStrategy {
 
     @Override
     public boolean toggleFlash() {
-        if (cameraDevice == null) return false;
+        if (cameraDevice == null || !isFlashAvailable()) return false;
         try {
-            CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
-            
             isFlashEnabled = !isFlashEnabled;
-            manager.setTorchMode(cameraDevice.getId(), isFlashEnabled);
-            logDebug("Flash toggled: " + (isFlashEnabled ? "ON" : "OFF"));
-            
+
             if (previewRequestBuilder != null && captureSession != null) {
-                if (isFlashEnabled) {
-                    previewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
-                    previewRequestBuilder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_TORCH);
-                } else {
-                    previewRequestBuilder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF);
-                }
-                captureSession.setRepeatingRequest(previewRequestBuilder.build(), null, backgroundHandler);
+                applyFlashToRequest(previewRequestBuilder);
+                submitRepeatingRequest(previewRequestBuilder);
             }
-            
+
+            logDebug("Flash toggled: " + (isFlashEnabled ? "ON" : "OFF"));
             return true;
         } catch (CameraAccessException e) {
             logError("Failed to toggle flash", e);
