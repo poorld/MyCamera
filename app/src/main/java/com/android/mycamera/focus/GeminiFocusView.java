@@ -26,7 +26,7 @@ public class GeminiFocusView extends View {
         invalidate();
     };
 
-    private static final int BASE_RADIUS = 40;
+    private static final int BASE_RADIUS = 26;
     private static final int HIDE_TIMEOUT = 1000; // 3 seconds
 
     public GeminiFocusView(Context context) {
@@ -47,7 +47,7 @@ public class GeminiFocusView extends View {
     private void init() {
         paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(4);
+        paint.setStrokeWidth(2);
         paint.setColor(Color.WHITE);
         isFocusing = false;
     }
@@ -72,7 +72,7 @@ public class GeminiFocusView extends View {
             animator.cancel();
         }
         
-        animator = ValueAnimator.ofFloat(BASE_RADIUS * 1.3f, BASE_RADIUS);
+        animator = ValueAnimator.ofFloat(BASE_RADIUS * 1.2f, BASE_RADIUS);
         animator.setDuration(300);
         animator.setInterpolator(new DecelerateInterpolator());
         animator.addUpdateListener(animation -> {

@@ -14,6 +14,7 @@ import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.MeteringRectangle;
 import android.hardware.camera2.params.StreamConfigurationMap;
@@ -24,6 +25,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Environment;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 import android.util.Range;
 import android.util.Size;
@@ -69,6 +71,24 @@ public class Camera2Strategy extends BaseCameraStrategy {
     private boolean isStoppingRecording = false;
     private File recordingOutputFile;
     private float zoomRatio = 1f;
+    private Range<Integer> supportedIsoRange;
+    private Range<Long> supportedExposureTimeRange;
+    private boolean manualExposureSupported;
+    private boolean manualExposureEnabled;
+    private int manualIso = 100;
+    private long manualExposureTimeNs = 10_000_000L;
+    private Range<Integer> autoBrightnessCompensationRange;
+    private int autoBrightnessCompensationIndex;
+    private long lastAutoBrightnessAdjustmentMs;
+    private final CameraCaptureSession.CaptureCallback autoBrightnessCaptureCallback =
+            new CameraCaptureSession.CaptureCallback() {
+                @Override
+                public void onCaptureCompleted(@NonNull CameraCaptureSession session,
+                                               @NonNull CaptureRequest request,
+                                               @NonNull TotalCaptureResult result) {
+                    adjustAutoBrightness(result);
+                }
+            };
 
     public Camera2Strategy(Context context) {
         super(context);
@@ -89,6 +109,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
             return;
         }
         this.currentConfig = config;
+        loadManualExposureCapabilities(config.getCameraId());
         startOrientationUpdates();
         startBackgroundThread();
         CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
@@ -149,7 +170,8 @@ public class Camera2Strategy extends BaseCameraStrategy {
                         previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
                         applyFpsToRequest(previewRequestBuilder);
                         applyFlashToRequest(previewRequestBuilder);
-                        session.setRepeatingRequest(previewRequestBuilder.build(), null, backgroundHandler);
+                        session.setRepeatingRequest(previewRequestBuilder.build(),
+                                autoBrightnessCaptureCallback, backgroundHandler);
                         notifyStateChanged(CameraState.PREVIEW_STARTED);
                         notifyPreviewStarted();
                     } catch (CameraAccessException e) {
@@ -688,9 +710,159 @@ public class Camera2Strategy extends BaseCameraStrategy {
 
     private void applyFlashToRequest(CaptureRequest.Builder builder) {
         if (builder == null) return;
-        builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
+        if (manualExposureSupported && manualExposureEnabled) {
+            builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF);
+            builder.set(CaptureRequest.SENSOR_SENSITIVITY, manualIso);
+            builder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, manualExposureTimeNs);
+            builder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, 0);
+        } else {
+            builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
+            builder.set(CaptureRequest.CONTROL_AE_LOCK, false);
+            builder.set(CaptureRequest.SENSOR_SENSITIVITY, null);
+            builder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, null);
+            builder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION,
+                    autoBrightnessCompensationIndex);
+        }
         builder.set(CaptureRequest.FLASH_MODE,
                 isFlashEnabled ? CaptureRequest.FLASH_MODE_TORCH : CaptureRequest.FLASH_MODE_OFF);
+    }
+
+    private void loadManualExposureCapabilities(String cameraId) {
+        manualExposureSupported = false;
+        supportedIsoRange = null;
+        supportedExposureTimeRange = null;
+        autoBrightnessCompensationRange = null;
+        autoBrightnessCompensationIndex = 0;
+        try {
+            CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            if (manager == null) return;
+            CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
+            autoBrightnessCompensationRange = characteristics.get(
+                    CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE);
+            int[] capabilities = characteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES);
+            if (!hasManualSensorCapability(capabilities)) return;
+
+            supportedIsoRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
+            supportedExposureTimeRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE);
+            manualExposureSupported = supportedIsoRange != null && supportedExposureTimeRange != null;
+            if (manualExposureSupported) {
+                manualIso = supportedIsoRange.clamp(manualIso);
+                manualExposureTimeNs = supportedExposureTimeRange.clamp(manualExposureTimeNs);
+            }
+        } catch (CameraAccessException e) {
+            logError("Failed to query manual exposure capabilities", e);
+        }
+    }
+
+    private boolean hasManualSensorCapability(int[] capabilities) {
+        if (capabilities == null) return false;
+        for (int capability : capabilities) {
+            if (capability == CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void adjustAutoBrightness(TotalCaptureResult result) {
+        if (manualExposureEnabled || previewRequestBuilder == null || captureSession == null
+                || autoBrightnessCompensationRange == null) {
+            return;
+        }
+        Integer iso = result.get(CaptureResult.SENSOR_SENSITIVITY);
+        Long exposureTimeNs = result.get(CaptureResult.SENSOR_EXPOSURE_TIME);
+        if (iso == null || exposureTimeNs == null) return;
+
+        int brighterIndex = autoBrightnessCompensationRange.clamp(1);
+        int targetIndex = autoBrightnessCompensationIndex;
+        if (autoBrightnessCompensationIndex == 0
+                && (iso >= 800 || exposureTimeNs >= 25_000_000L)) {
+            targetIndex = brighterIndex;
+        } else if (autoBrightnessCompensationIndex != 0
+                && iso <= 250 && exposureTimeNs <= 5_000_000L) {
+            targetIndex = 0;
+        }
+        if (targetIndex == autoBrightnessCompensationIndex
+                || SystemClock.elapsedRealtime() - lastAutoBrightnessAdjustmentMs < 800) {
+            return;
+        }
+
+        autoBrightnessCompensationIndex = targetIndex;
+        lastAutoBrightnessAdjustmentMs = SystemClock.elapsedRealtime();
+        applyFlashToRequest(previewRequestBuilder);
+        try {
+            submitRepeatingRequest(previewRequestBuilder);
+            logDebug("Auto dark-scene compensation=" + targetIndex + ", ISO=" + iso
+                    + ", exposureNs=" + exposureTimeNs);
+        } catch (CameraAccessException e) {
+            logError("Failed to apply auto dark-scene compensation", e);
+        }
+    }
+
+    @Override
+    public boolean isManualExposureSupported() {
+        return manualExposureSupported;
+    }
+
+    @Override
+    public Range<Integer> getSupportedIsoRange() {
+        return supportedIsoRange;
+    }
+
+    @Override
+    public Range<Long> getSupportedExposureTimeRange() {
+        return supportedExposureTimeRange;
+    }
+
+    @Override
+    public int getManualIso() {
+        return manualIso;
+    }
+
+    @Override
+    public long getManualExposureTimeNs() {
+        return manualExposureTimeNs;
+    }
+
+    @Override
+    public boolean isManualExposureEnabled() {
+        return manualExposureEnabled;
+    }
+
+    @Override
+    public void setManualExposure(int iso, long exposureTimeNs) {
+        if (!manualExposureSupported) return;
+        manualIso = supportedIsoRange.clamp(iso);
+        manualExposureTimeNs = supportedExposureTimeRange.clamp(exposureTimeNs);
+        manualExposureEnabled = true;
+        submitManualExposureChange();
+    }
+
+    @Override
+    public void resetAutoExposure() {
+        if (!manualExposureSupported) return;
+        manualIso = supportedIsoRange.clamp(100);
+        manualExposureTimeNs = supportedExposureTimeRange.clamp(10_000_000L);
+        manualExposureEnabled = false;
+        autoBrightnessCompensationIndex = 0;
+        submitManualExposureChange();
+    }
+
+    private void submitManualExposureChange() {
+        Runnable applyChange = () -> {
+            if (previewRequestBuilder == null || captureSession == null) return;
+            applyFlashToRequest(previewRequestBuilder);
+            try {
+                submitRepeatingRequest(previewRequestBuilder);
+            } catch (CameraAccessException e) {
+                logError("Failed to apply manual exposure", e);
+            }
+        };
+        if (backgroundHandler != null) {
+            backgroundHandler.post(applyChange);
+        } else {
+            applyChange.run();
+        }
     }
 
     private void submitRepeatingRequest(CaptureRequest.Builder builder) throws CameraAccessException {
@@ -704,7 +876,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
                     null,
                     backgroundHandler);
         } else {
-            captureSession.setRepeatingRequest(request, null, backgroundHandler);
+            captureSession.setRepeatingRequest(request, autoBrightnessCaptureCallback, backgroundHandler);
         }
     }
 

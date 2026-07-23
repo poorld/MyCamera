@@ -56,6 +56,16 @@
             android:contentDescription="Switch API"
             android:tint="@color/white" />
 
+        <ImageButton
+            android:id="@+id/exposureButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:padding="8dp"
+            android:src="@drawable/ic_manual_exposure"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Manual exposure"
+            android:visibility="gone" />
+
 
 
         <Space
@@ -271,6 +281,155 @@
         app:layout_constraintEnd_toEndOf="parent" />
 
     <!-- API Switcher Panel -->
+    <LinearLayout
+        android:id="@+id/exposureControlsPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:elevation="8dp"
+        android:paddingStart="16dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="12dp"
+        android:background="@drawable/api_switcher_background"
+        app:layout_constraintTop_toBottomOf="@id/topControls">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_manual_exposure"
+                android:contentDescription="" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:text="曝光控制"
+                android:textColor="@color/white"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/exposureAutoButton"
+                android:layout_width="80dp"
+                android:layout_height="40dp"
+                android:text="AUTO"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/sceneSnapshotButton"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:text="抓拍"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/sceneHandheldNightButton"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="夜景"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/sceneTripodLongExposureButton"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:text="曝光"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/sceneSunnyOutdoorButton"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="户外"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="52dp"
+                android:layout_height="wrap_content"
+                android:text="ISO"
+                android:textColor="@color/white"
+                android:textSize="14sp" />
+
+            <SeekBar
+                android:id="@+id/isoSeekBar"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/isoValueText"
+                android:layout_width="74dp"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:textColor="@color/white"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="52dp"
+                android:layout_height="wrap_content"
+                android:text="Shutter"
+                android:textColor="@color/white"
+                android:textSize="14sp" />
+
+            <SeekBar
+                android:id="@+id/shutterSeekBar"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/shutterValueText"
+                android:layout_width="74dp"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:textColor="@color/white"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </LinearLayout>
+
     <LinearLayout
         android:id="@+id/apiSwitcherPanel"
         android:layout_width="match_parent"

@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Looper;
 import android.util.Log;
+import android.util.Range;
 
 import com.android.mycamera.camera.config.CameraConfig;
 import com.android.mycamera.camera.factory.CameraFactory;
@@ -313,6 +314,42 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
     public void setZoom(float zoomRatio) {
         if (currentStrategy != null) {
             currentStrategy.setZoom(zoomRatio);
+        }
+    }
+
+    public boolean isManualExposureSupported() {
+        return currentStrategy != null && currentStrategy.isManualExposureSupported();
+    }
+
+    public Range<Integer> getSupportedIsoRange() {
+        return currentStrategy != null ? currentStrategy.getSupportedIsoRange() : null;
+    }
+
+    public Range<Long> getSupportedExposureTimeRange() {
+        return currentStrategy != null ? currentStrategy.getSupportedExposureTimeRange() : null;
+    }
+
+    public int getManualIso() {
+        return currentStrategy != null ? currentStrategy.getManualIso() : 100;
+    }
+
+    public long getManualExposureTimeNs() {
+        return currentStrategy != null ? currentStrategy.getManualExposureTimeNs() : 10_000_000L;
+    }
+
+    public boolean isManualExposureEnabled() {
+        return currentStrategy != null && currentStrategy.isManualExposureEnabled();
+    }
+
+    public void setManualExposure(int iso, long exposureTimeNs) {
+        if (currentStrategy != null) {
+            currentStrategy.setManualExposure(iso, exposureTimeNs);
+        }
+    }
+
+    public void resetAutoExposure() {
+        if (currentStrategy != null) {
+            currentStrategy.resetAutoExposure();
         }
     }
 

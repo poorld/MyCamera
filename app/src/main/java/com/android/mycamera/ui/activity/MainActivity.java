@@ -9,13 +9,19 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.util.Range;
 import android.view.MotionEvent;
+import android.view.KeyEvent;
 import android.view.TextureView;
 import android.view.View;
+import android.view.ViewConfiguration;
+import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -30,9 +36,12 @@ import com.android.mycamera.R;
 import com.android.mycamera.camera.helper.BackgroundRecordingHelper;
 import com.android.mycamera.camera.manager.CameraManager;
 import com.android.mycamera.camera.observer.CameraStateObserver;
+import com.android.mycamera.camera.config.CameraConfig;
 import com.android.mycamera.focus.GeminiFocusView;
 import com.android.mycamera.model.CameraApiType;
 import com.android.mycamera.model.CameraState;
+import com.android.mycamera.model.Quality;
+import com.android.mycamera.model.Resolution;
 import com.android.mycamera.ui.view.ZoomDialView;
 import com.android.mycamera.utils.CameraUtils;
 
@@ -42,6 +51,8 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     
     private static final String[] REQUIRED_PERMISSIONS = CameraUtils.getRequiredPermissions();
     private static final int REQUEST_CODE_PERMISSIONS = 10;
+    private static final int Y1_RECORD_KEY = KeyEvent.KEYCODE_F10;
+    private static final int EXPOSURE_SLIDER_STEPS = 1000;
 
     public static final String TAG = "MainActivity";
     
@@ -51,6 +62,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     private ImageButton captureButton;
     private ImageButton settingsButton;
     private ImageButton switchCameraButton;
+    private ImageButton exposureButton;
     private ImageButton flashButton;
     private ImageButton galleryButton;
     private ImageButton photoModeButton;
@@ -72,12 +84,41 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     private TextView zoomCurrentText;
     private TextView zoomThirdText;
     private TextView zoomMaxText;
+    private View exposureControlsPanel;
+    private Button exposureAutoButton;
+    private Button sceneSnapshotButton;
+    private Button sceneHandheldNightButton;
+    private Button sceneTripodLongExposureButton;
+    private Button sceneSunnyOutdoorButton;
+    private SeekBar isoSeekBar;
+    private SeekBar shutterSeekBar;
+    private TextView isoValueText;
+    private TextView shutterValueText;
 
     private boolean isVideoMode = false;
     private boolean isRecording = false;
     private boolean isSyncingApiSelection = false;
+    private boolean isSyncingExposureControls = false;
     private Handler recordingTimerHandler;
+    private final Handler hardwareKeyHandler = new Handler(Looper.getMainLooper());
     private long recordingStartTime = 0;
+    private boolean recordKeyLongPressHandled;
+    private boolean powerKeyLongPressHandled;
+    private Range<Integer> supportedIsoRange;
+    private Range<Long> supportedExposureTimeRange;
+    private final Runnable recordKeyLongPressRunnable = () -> {
+        recordKeyLongPressHandled = true;
+        toggleRecordingFromHardwareKey();
+    };
+    private final Runnable powerKeyLongPressRunnable = () -> {
+        powerKeyLongPressHandled = true;
+        switchCamera();
+    };
+    private final Runnable hideExposureControlsRunnable = () -> {
+        if (exposureControlsPanel != null) {
+            exposureControlsPanel.setVisibility(View.GONE);
+        }
+    };
     private final Runnable hideZoomDialRunnable = () -> {
         if (zoomDial != null) zoomDial.setVisibility(View.GONE);
     };
@@ -111,6 +152,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         captureButton = findViewById(R.id.captureButton);
         settingsButton = findViewById(R.id.settingsButton);
         switchCameraButton = findViewById(R.id.switchCameraButton);
+        exposureButton = findViewById(R.id.exposureButton);
         flashButton = findViewById(R.id.flashButton);
         galleryButton = findViewById(R.id.galleryButton);
         photoModeButton = findViewById(R.id.photoModeButton);
@@ -132,6 +174,16 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         zoomCurrentText = findViewById(R.id.zoomCurrentText);
         zoomThirdText = findViewById(R.id.zoomThirdText);
         zoomMaxText = findViewById(R.id.zoomMaxText);
+        exposureControlsPanel = findViewById(R.id.exposureControlsPanel);
+        exposureAutoButton = findViewById(R.id.exposureAutoButton);
+        sceneSnapshotButton = findViewById(R.id.sceneSnapshotButton);
+        sceneHandheldNightButton = findViewById(R.id.sceneHandheldNightButton);
+        sceneTripodLongExposureButton = findViewById(R.id.sceneTripodLongExposureButton);
+        sceneSunnyOutdoorButton = findViewById(R.id.sceneSunnyOutdoorButton);
+        isoSeekBar = findViewById(R.id.isoSeekBar);
+        shutterSeekBar = findViewById(R.id.shutterSeekBar);
+        isoValueText = findViewById(R.id.isoValueText);
+        shutterValueText = findViewById(R.id.shutterValueText);
 
         updateModeButtons();
     }
@@ -139,8 +191,27 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     private void initializeCameraManager() {
         Log.d(TAG, "initializeCameraManager: ");
         mCameraManager = CameraManager.getInstance(this);
+        applyY1DefaultPreviewConfiguration();
         mCameraManager.addStateObserver(this);
         mCameraManager.preInitializeCamera();
+    }
+
+    /**
+     * Y1 always starts the app with a Full HD preview, even when an earlier
+     * settings session saved another resolution or CameraX quality.
+     */
+    private void applyY1DefaultPreviewConfiguration() {
+        CameraConfig currentConfig = mCameraManager.getCurrentConfig();
+        if (currentConfig == null
+                || (Resolution.FULL_HD_1080P.equals(currentConfig.getResolution())
+                && Quality.FULL_HD == currentConfig.getQuality())) {
+            return;
+        }
+
+        mCameraManager.updateConfiguration(new CameraConfig.Builder(currentConfig)
+                .setResolution(Resolution.FULL_HD_1080P)
+                .setQuality(Quality.FULL_HD)
+                .build());
     }
     
     private void setupClickListeners() {
@@ -155,9 +226,31 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             if (apiSwitcherPanel.getVisibility() == View.VISIBLE) {
                 apiSwitcherPanel.setVisibility(View.GONE);
             } else {
+                exposureControlsPanel.setVisibility(View.GONE);
                 apiSwitcherPanel.setVisibility(View.VISIBLE);
             }
         });
+        exposureButton.setOnClickListener(v -> {
+            if (exposureControlsPanel.getVisibility() == View.VISIBLE) {
+                hardwareKeyHandler.removeCallbacks(hideExposureControlsRunnable);
+                exposureControlsPanel.setVisibility(View.GONE);
+            } else {
+                apiSwitcherPanel.setVisibility(View.GONE);
+                exposureControlsPanel.setVisibility(View.VISIBLE);
+                scheduleExposureControlsHide();
+            }
+        });
+        exposureAutoButton.setOnClickListener(v -> {
+            if (mCameraManager != null) {
+                mCameraManager.resetAutoExposure();
+                updateManualExposureUi();
+                scheduleExposureControlsHide();
+            }
+        });
+        sceneSnapshotButton.setOnClickListener(v -> applyExposureScene(200, 4_000_000L));
+        sceneHandheldNightButton.setOnClickListener(v -> applyExposureScene(800, 33_333_333L));
+        sceneTripodLongExposureButton.setOnClickListener(v -> applyExposureScene(800, 1_000_000_000L));
+        sceneSunnyOutdoorButton.setOnClickListener(v -> applyExposureScene(100, 2_000_000L));
         
         cameraPreview.setOnTouchListener((v, event) -> {
             if (event.getAction() == MotionEvent.ACTION_DOWN) {
@@ -190,8 +283,56 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         });
 
         zoomQuickBar.setOnTouchListener((view, event) -> handleZoomTouch(event));
+        setupManualExposureControls();
 
 
+    }
+
+    private void setupManualExposureControls() {
+        isoSeekBar.setMax(EXPOSURE_SLIDER_STEPS);
+        shutterSeekBar.setMax(EXPOSURE_SLIDER_STEPS);
+
+        isoSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (!fromUser || isSyncingExposureControls) return;
+                applyManualExposureFromControls();
+                scheduleExposureControlsHide();
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+                hardwareKeyHandler.removeCallbacks(hideExposureControlsRunnable);
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                scheduleExposureControlsHide();
+            }
+        });
+        shutterSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (!fromUser || isSyncingExposureControls) return;
+                applyManualExposureFromControls();
+                scheduleExposureControlsHide();
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+                hardwareKeyHandler.removeCallbacks(hideExposureControlsRunnable);
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                scheduleExposureControlsHide();
+            }
+        });
+    }
+
+    private void scheduleExposureControlsHide() {
+        hardwareKeyHandler.removeCallbacks(hideExposureControlsRunnable);
+        hardwareKeyHandler.postDelayed(hideExposureControlsRunnable, 3_000);
     }
     
     @Override
@@ -227,6 +368,9 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     
     @Override
     protected void onPause() {
+        hardwareKeyHandler.removeCallbacks(recordKeyLongPressRunnable);
+        hardwareKeyHandler.removeCallbacks(powerKeyLongPressRunnable);
+        hardwareKeyHandler.removeCallbacks(hideExposureControlsRunnable);
         super.onPause();
         Log.d(TAG, "onPause: ");
 
@@ -289,6 +433,17 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             capturePhoto();
         }
     }
+
+    private void toggleRecordingFromHardwareKey() {
+        if (mCameraManager == null) {
+            return;
+        }
+        if (isRecording) {
+            stopRecording();
+        } else {
+            startRecording();
+        }
+    }
     
     private void startRecording() {
         Log.d(TAG, "startRecording: ");
@@ -320,6 +475,9 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     }
     
     private void switchCamera() {
+        if (mCameraManager == null || mCameraManager.getCurrentConfig() == null) {
+            return;
+        }
         String currentId = mCameraManager.getCurrentConfig().getCameraId();
         android.hardware.camera2.CameraManager cameraManager = (android.hardware.camera2.CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
@@ -399,6 +557,45 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         photoModeButton.setAlpha(isVideoMode ? 0.5f : 1.0f);
         videoModeButton.setAlpha(isVideoMode ? 1.0f : 0.5f);
     }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == Y1_RECORD_KEY && event.getRepeatCount() == 0) {
+            recordKeyLongPressHandled = false;
+            hardwareKeyHandler.postDelayed(recordKeyLongPressRunnable,
+                    ViewConfiguration.getLongPressTimeout());
+            return true;
+        }
+        if (keyCode == Y1_RECORD_KEY) {
+            return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_POWER && event.getRepeatCount() == 0) {
+            powerKeyLongPressHandled = false;
+            hardwareKeyHandler.postDelayed(powerKeyLongPressRunnable,
+                    ViewConfiguration.getLongPressTimeout());
+            return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_POWER) {
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if (keyCode == Y1_RECORD_KEY) {
+            hardwareKeyHandler.removeCallbacks(recordKeyLongPressRunnable);
+            if (!recordKeyLongPressHandled && !event.isCanceled()) {
+                capturePhoto();
+            }
+            return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_POWER) {
+            hardwareKeyHandler.removeCallbacks(powerKeyLongPressRunnable);
+            return true;
+        }
+        return super.onKeyUp(keyCode, event);
+    }
     
     private void updateCaptureButton() {
         if (isVideoMode) {
@@ -453,6 +650,104 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         updateZoomLabel(zoomThirdText, zoomStops[Math.min(2, zoomStops.length - 1)], zoom);
         updateZoomLabel(zoomMaxText, zoomStops[zoomStops.length - 1], zoom);
         zoomDial.setZoom(minZoom, maxZoom, zoom);
+    }
+
+    private void updateManualExposureUi() {
+        boolean supported = mCameraManager != null && mCameraManager.isManualExposureSupported();
+        exposureButton.setVisibility(supported ? View.VISIBLE : View.GONE);
+        if (!supported) {
+            exposureControlsPanel.setVisibility(View.GONE);
+            supportedIsoRange = null;
+            supportedExposureTimeRange = null;
+            return;
+        }
+
+        supportedIsoRange = mCameraManager.getSupportedIsoRange();
+        supportedExposureTimeRange = mCameraManager.getSupportedExposureTimeRange();
+        if (supportedIsoRange == null || supportedExposureTimeRange == null) {
+            exposureButton.setVisibility(View.GONE);
+            exposureControlsPanel.setVisibility(View.GONE);
+            return;
+        }
+
+        int iso = mCameraManager.getManualIso();
+        long shutterTimeNs = mCameraManager.getManualExposureTimeNs();
+        boolean isManualExposure = mCameraManager.isManualExposureEnabled();
+        isSyncingExposureControls = true;
+        isoSeekBar.setProgress(isManualExposure ? isoToProgress(iso) : 0);
+        shutterSeekBar.setProgress(isManualExposure ? shutterToProgress(shutterTimeNs) : 0);
+        isSyncingExposureControls = false;
+        isoValueText.setText(isManualExposure ? "ISO " + iso : "AUTO");
+        shutterValueText.setText(isManualExposure ? formatShutterTime(shutterTimeNs) : "AUTO");
+        isoSeekBar.setEnabled(isManualExposure);
+        shutterSeekBar.setEnabled(isManualExposure);
+        isoSeekBar.setAlpha(isManualExposure ? 1f : 0.45f);
+        shutterSeekBar.setAlpha(isManualExposure ? 1f : 0.45f);
+        exposureAutoButton.setEnabled(isManualExposure);
+        exposureAutoButton.setAlpha(isManualExposure ? 1f : 0.55f);
+    }
+
+    private void applyManualExposureFromControls() {
+        if (mCameraManager == null || supportedIsoRange == null || supportedExposureTimeRange == null) {
+            return;
+        }
+        int iso = isoFromProgress(isoSeekBar.getProgress());
+        long shutterTimeNs = shutterFromProgress(shutterSeekBar.getProgress());
+        mCameraManager.setManualExposure(iso, shutterTimeNs);
+        isoValueText.setText("ISO " + iso);
+        shutterValueText.setText(formatShutterTime(shutterTimeNs));
+        exposureAutoButton.setEnabled(true);
+        exposureAutoButton.setAlpha(1f);
+    }
+
+    private void applyExposureScene(int targetIso, long targetShutterTimeNs) {
+        if (mCameraManager == null || supportedIsoRange == null || supportedExposureTimeRange == null) {
+            return;
+        }
+        mCameraManager.setManualExposure(
+                supportedIsoRange.clamp(targetIso),
+                supportedExposureTimeRange.clamp(targetShutterTimeNs));
+        updateManualExposureUi();
+        scheduleExposureControlsHide();
+    }
+
+
+    private int isoToProgress(int iso) {
+        long min = supportedIsoRange.getLower();
+        long max = supportedIsoRange.getUpper();
+        if (max <= min) return 0;
+        return (int) Math.round((iso - min) * EXPOSURE_SLIDER_STEPS / (double) (max - min));
+    }
+
+    private int isoFromProgress(int progress) {
+        long min = supportedIsoRange.getLower();
+        long max = supportedIsoRange.getUpper();
+        return (int) Math.round(min + (max - min) * progress / (double) EXPOSURE_SLIDER_STEPS);
+    }
+
+    private int shutterToProgress(long shutterTimeNs) {
+        double min = Math.max(1d, supportedExposureTimeRange.getLower());
+        double max = Math.max(min, supportedExposureTimeRange.getUpper());
+        if (max == min) return 0;
+        double value = Math.max(min, Math.min(max, shutterTimeNs));
+        return (int) Math.round((Math.log(value) - Math.log(min))
+                / (Math.log(max) - Math.log(min)) * EXPOSURE_SLIDER_STEPS);
+    }
+
+    private long shutterFromProgress(int progress) {
+        double min = Math.max(1d, supportedExposureTimeRange.getLower());
+        double max = Math.max(min, supportedExposureTimeRange.getUpper());
+        if (max == min) return (long) min;
+        return Math.round(Math.exp(Math.log(min) + (Math.log(max) - Math.log(min))
+                * progress / EXPOSURE_SLIDER_STEPS));
+    }
+
+    private String formatShutterTime(long shutterTimeNs) {
+        if (shutterTimeNs >= 1_000_000_000L) {
+            return String.format(Locale.US, "%.1f s", shutterTimeNs / 1_000_000_000d);
+        }
+        long denominator = Math.max(1, Math.round(1_000_000_000d / shutterTimeNs));
+        return "1/" + denominator + " s";
     }
 
     private float[] createZoomStops(float minZoom, float maxZoom) {
@@ -536,6 +831,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
                     mCameraManager.startPreview(cameraPreview, this);
                     updateFlashButton();
                     updateZoomUi();
+                    updateManualExposureUi();
                     updateSettingsDisplay();
                     updateSwitchCameraButtonIcon();
                     break;
@@ -597,6 +893,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             statusText.setText("Ready");
             updateFlashButton();
             updateZoomUi();
+            updateManualExposureUi();
         });
     }
 

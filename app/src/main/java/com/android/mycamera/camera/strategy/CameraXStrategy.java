@@ -8,15 +8,19 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.BitmapFactory;
 import android.graphics.SurfaceTexture;
+import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.CaptureResult;
+import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.CamcorderProfile;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaRecorder;
 import android.os.Environment;
+import android.os.SystemClock;
 import android.util.Log;
 import android.util.Range;
 import android.util.Size;
@@ -98,6 +102,24 @@ public class CameraXStrategy extends BaseCameraStrategy {
     private File outputFile;
     private float requestedZoomRatio = 1f;
     private boolean requestedFlashEnabled = false;
+    private Range<Integer> supportedIsoRange;
+    private Range<Long> supportedExposureTimeRange;
+    private boolean manualExposureSupported;
+    private boolean manualExposureEnabled;
+    private int manualIso = 100;
+    private long manualExposureTimeNs = 10_000_000L;
+    private Range<Integer> autoBrightnessCompensationRange;
+    private int autoBrightnessCompensationIndex;
+    private long lastAutoBrightnessAdjustmentMs;
+    private final CameraCaptureSession.CaptureCallback autoBrightnessCaptureCallback =
+            new CameraCaptureSession.CaptureCallback() {
+                @Override
+                public void onCaptureCompleted(@NonNull CameraCaptureSession session,
+                                               @NonNull CaptureRequest request,
+                                               @NonNull TotalCaptureResult result) {
+                    adjustAutoBrightness(result);
+                }
+            };
 
     public CameraXStrategy(Context context) {
         super(context);
@@ -113,6 +135,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
     public void openCamera(CameraConfig config) {
         Log.d(TAG, "openCamera: ");
         this.currentConfig = config;
+        loadManualExposureCapabilities(config.getCameraId());
         startOrientationUpdates();
         this.videoCapture = null;
         this.previewUseCase = null;
@@ -161,6 +184,8 @@ public class CameraXStrategy extends BaseCameraStrategy {
                 int targetRotation = getCameraXTargetRotation();
                 Preview.Builder previewBuilder = new Preview.Builder()
                         .setTargetRotation(targetRotation);
+                Camera2Interop.Extender previewExtender = new Camera2Interop.Extender(previewBuilder);
+                previewExtender.setSessionCaptureCallback(autoBrightnessCaptureCallback);
                 if (finalQuality == Quality.UHD) {
                     // Keep UHD recording, but lower preview stream to improve stability on constrained devices.
                     previewBuilder.setTargetResolution(UHD_PREVIEW_SIZE);
@@ -793,16 +818,157 @@ public class CameraXStrategy extends BaseCameraStrategy {
     }
 
     private void applyFpsRangeToCamera(Camera activeCamera) {
-        if (activeCamera == null || appliedFpsRange == null) return;
+        if (activeCamera == null) return;
         try {
-            CaptureRequestOptions options = new CaptureRequestOptions.Builder()
-                    .setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, appliedFpsRange)
-                    .build();
+            CaptureRequestOptions.Builder optionsBuilder = new CaptureRequestOptions.Builder();
+            if (appliedFpsRange != null) {
+                optionsBuilder.setCaptureRequestOption(
+                        CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, appliedFpsRange);
+            }
+            if (manualExposureSupported && manualExposureEnabled) {
+                optionsBuilder.setCaptureRequestOption(
+                        CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF);
+                optionsBuilder.setCaptureRequestOption(
+                        CaptureRequest.SENSOR_SENSITIVITY, manualIso);
+                optionsBuilder.setCaptureRequestOption(
+                        CaptureRequest.SENSOR_EXPOSURE_TIME, manualExposureTimeNs);
+            } else {
+                optionsBuilder.setCaptureRequestOption(
+                        CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
+            }
+            CaptureRequestOptions options = optionsBuilder.build();
             Camera2CameraControl.from(activeCamera.getCameraControl()).setCaptureRequestOptions(options);
-            logDebug("Applied AE FPS range: " + appliedFpsRange);
+            logDebug("Applied CameraX exposure controls; fps=" + appliedFpsRange
+                    + ", manualExposure=" + manualExposureEnabled);
         } catch (Exception e) {
-            logError("Failed to apply AE FPS range: " + appliedFpsRange, e);
+            logError("Failed to apply CameraX exposure controls", e);
         }
+    }
+
+    private void loadManualExposureCapabilities(String cameraId) {
+        manualExposureSupported = false;
+        supportedIsoRange = null;
+        supportedExposureTimeRange = null;
+        autoBrightnessCompensationRange = null;
+        autoBrightnessCompensationIndex = 0;
+        try {
+            CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            if (manager == null) return;
+            CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
+            autoBrightnessCompensationRange = characteristics.get(
+                    CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE);
+            int[] capabilities = characteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES);
+            if (!hasManualSensorCapability(capabilities)) return;
+
+            supportedIsoRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
+            supportedExposureTimeRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE);
+            manualExposureSupported = supportedIsoRange != null && supportedExposureTimeRange != null;
+            if (manualExposureSupported) {
+                manualIso = supportedIsoRange.clamp(manualIso);
+                manualExposureTimeNs = supportedExposureTimeRange.clamp(manualExposureTimeNs);
+            }
+        } catch (Exception e) {
+            logError("Failed to query CameraX manual exposure capabilities", e);
+        }
+    }
+
+    private boolean hasManualSensorCapability(int[] capabilities) {
+        if (capabilities == null) return false;
+        for (int capability : capabilities) {
+            if (capability == CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void adjustAutoBrightness(TotalCaptureResult result) {
+        if (manualExposureEnabled || camera == null || autoBrightnessCompensationRange == null) {
+            return;
+        }
+        Integer iso = result.get(CaptureResult.SENSOR_SENSITIVITY);
+        Long exposureTimeNs = result.get(CaptureResult.SENSOR_EXPOSURE_TIME);
+        if (iso == null || exposureTimeNs == null) return;
+
+        int brighterIndex = autoBrightnessCompensationRange.clamp(1);
+        int targetIndex = autoBrightnessCompensationIndex;
+        if (autoBrightnessCompensationIndex == 0
+                && (iso >= 800 || exposureTimeNs >= 25_000_000L)) {
+            targetIndex = brighterIndex;
+        } else if (autoBrightnessCompensationIndex != 0
+                && iso <= 250 && exposureTimeNs <= 5_000_000L) {
+            targetIndex = 0;
+        }
+        if (targetIndex == autoBrightnessCompensationIndex
+                || SystemClock.elapsedRealtime() - lastAutoBrightnessAdjustmentMs < 800) {
+            return;
+        }
+
+        autoBrightnessCompensationIndex = targetIndex;
+        lastAutoBrightnessAdjustmentMs = SystemClock.elapsedRealtime();
+        camera.getCameraControl().setExposureCompensationIndex(targetIndex);
+        logDebug("Auto dark-scene compensation=" + targetIndex + ", ISO=" + iso
+                + ", exposureNs=" + exposureTimeNs);
+    }
+
+    @Override
+    public boolean isManualExposureSupported() {
+        return manualExposureSupported;
+    }
+
+    @Override
+    public Range<Integer> getSupportedIsoRange() {
+        return supportedIsoRange;
+    }
+
+    @Override
+    public Range<Long> getSupportedExposureTimeRange() {
+        return supportedExposureTimeRange;
+    }
+
+    @Override
+    public int getManualIso() {
+        return manualIso;
+    }
+
+    @Override
+    public long getManualExposureTimeNs() {
+        return manualExposureTimeNs;
+    }
+
+    @Override
+    public boolean isManualExposureEnabled() {
+        return manualExposureEnabled;
+    }
+
+    @Override
+    public void setManualExposure(int iso, long exposureTimeNs) {
+        if (!manualExposureSupported) return;
+        manualIso = supportedIsoRange.clamp(iso);
+        manualExposureTimeNs = supportedExposureTimeRange.clamp(exposureTimeNs);
+        manualExposureEnabled = true;
+        if (camera != null) {
+            camera.getCameraControl().setExposureCompensationIndex(0);
+        }
+        applyFpsRangeToCamera(camera);
+    }
+
+    @Override
+    public void resetAutoExposure() {
+        if (!manualExposureSupported) return;
+        manualIso = supportedIsoRange.clamp(100);
+        manualExposureTimeNs = supportedExposureTimeRange.clamp(10_000_000L);
+        manualExposureEnabled = false;
+        autoBrightnessCompensationIndex = 0;
+        if (camera != null) {
+            camera.getCameraControl().setExposureCompensationIndex(0);
+            try {
+                Camera2CameraControl.from(camera.getCameraControl()).clearCaptureRequestOptions();
+            } catch (Exception e) {
+                logError("Failed to clear CameraX manual exposure controls", e);
+            }
+        }
+        applyFpsRangeToCamera(camera);
     }
 
     private List<Range<Integer>> getSupportedFpsRanges() {

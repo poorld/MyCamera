@@ -2,6 +2,7 @@ package com.android.mycamera.camera.strategy;
 
 import android.view.Surface;
 import android.view.TextureView;
+import android.util.Range;
 
 import com.android.mycamera.camera.config.CameraConfig;
 import com.android.mycamera.model.CameraState;
@@ -98,6 +99,23 @@ public interface CameraStrategy {
     default float getZoom() { return 1f; }
 
     default void setZoom(float zoomRatio) { }
+
+    /** Returns whether the active camera supports manual ISO and exposure time. */
+    default boolean isManualExposureSupported() { return false; }
+
+    default Range<Integer> getSupportedIsoRange() { return null; }
+
+    default Range<Long> getSupportedExposureTimeRange() { return null; }
+
+    default int getManualIso() { return 100; }
+
+    default long getManualExposureTimeNs() { return 10_000_000L; }
+
+    default boolean isManualExposureEnabled() { return false; }
+
+    default void setManualExposure(int iso, long exposureTimeNs) { }
+
+    default void resetAutoExposure() { }
 
     void setFocusPoint(float x, float y);
 
