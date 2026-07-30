@@ -97,9 +97,9 @@ public class CameraSetupHelper {
         List<String> resolutions = new ArrayList<>();
         
         for (Quality quality : camXQualities) {
-            String name = ((Quality.ConstantQuality) quality).getName();
-            qualityMap.put(name, quality);
-            resolutions.add(name);
+            String displayName = getQualityDisplayName(quality);
+            qualityMap.put(displayName, quality);
+            resolutions.add(displayName);
         }
         
         return createSpinnerAdapter(resolutions);
@@ -165,14 +165,31 @@ public class CameraSetupHelper {
         List<String> resolutions = new ArrayList<>();
         
         for (Quality quality : camXQualities) {
-            String name = ((Quality.ConstantQuality) quality).getName();
-            qualityMap.put(name, quality);
-            resolutions.add(name);
+            String displayName = getQualityDisplayName(quality);
+            qualityMap.put(displayName, quality);
+            resolutions.add(displayName);
         }
         
         qualityAdapter = createSpinnerAdapter(resolutions);
         resolutionSpinner.setAdapter(qualityAdapter);
         setMiddleSelection(resolutionSpinner);
+    }
+    
+    private String getQualityDisplayName(Quality quality) {
+        String name = ((Quality.ConstantQuality) quality).getName();
+        switch (name) {
+            case "SD":
+                return "SD (720x480)";
+            case "HD":
+                return "HD (1280x720)";
+            case "FHD":
+            case "FULL_HD":
+                return "FULL_HD (1920x1080)";
+            case "UHD":
+                return "UHD (3840x2160)";
+            default:
+                return name;
+        }
     }
     
     public void clearAdapters() {

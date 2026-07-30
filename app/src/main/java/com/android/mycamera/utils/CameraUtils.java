@@ -48,17 +48,45 @@ public class CameraUtils {
     }
     
     /**
-     * Create camera directory if it doesn't exist
+     * Public save directory shown in settings: /sdcard/DCIM/Camera
      */
     public static File createCameraDirectory(Context context) {
-        File cameraDir = context.getExternalFilesDir("Media");
-        if (cameraDir == null) {
-            cameraDir = new File(context.getFilesDir(), "Media");
-        }
-        if (!cameraDir.exists()) {
-            cameraDir.mkdirs();
+        File cameraDir = new File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
+                "Camera");
+        if (!cameraDir.exists() && !cameraDir.mkdirs()) {
+            Log.w("CameraUtils", "Failed to create DCIM/Camera, fallback to app Media dir");
+            File fallback = context.getExternalFilesDir("Media");
+            if (fallback == null) {
+                fallback = new File(context.getFilesDir(), "Media");
+            }
+            if (!fallback.exists()) {
+                fallback.mkdirs();
+            }
+            return fallback;
         }
         return cameraDir;
+    }
+
+    /** Prefer /sdcard/... display form for UI. */
+    public static String getDisplaySavePath(File dir) {
+        if (dir == null) {
+            return "/sdcard/DCIM/Camera";
+        }
+        String path = dir.getAbsolutePath().replace('\\', '/');
+        if (path.startsWith("/storage/emulated/0")) {
+            return "/sdcard" + path.substring("/storage/emulated/0".length());
+        }
+        return path;
+    }
+
+    public static boolean isLegacyAppMediaPath(String path) {
+        if (path == null) {
+            return false;
+        }
+        String normalized = path.replace('\\', '/');
+        return normalized.contains("/Android/data/com.android.mycamera")
+                || normalized.contains("/android/data/com.android.mycamera");
     }
     
     /**

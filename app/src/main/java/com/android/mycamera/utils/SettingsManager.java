@@ -6,6 +6,7 @@ import android.preference.PreferenceManager;
 
 import com.android.mycamera.camera.config.CameraConfig;
 import com.android.mycamera.model.CameraApiType;
+import com.android.mycamera.model.PhotoResolution;
 import com.android.mycamera.model.Quality;
 import com.android.mycamera.model.Resolution;
 
@@ -20,6 +21,9 @@ public class SettingsManager {
     private static final String PREF_RESOLUTION = "resolution";
     private static final String PREF_FRAME_RATE = "frame_rate";
     private static final String PREF_QUALITY = "quality";
+    private static final String PREF_PHOTO_RESOLUTION = "photo_resolution";
+    /** One-time: enforce product default still size 12M. */
+    private static final String PREF_PHOTO_DEFAULT_12M_APPLIED = "photo_default_12m_applied_v1";
     private static final String PREF_AUDIO_ENABLED = "audio_enabled";
     private static final String PREF_SAVE_LOCATION = "save_location";
     private static final String PREF_CAMERA_ID = "camera_id";
@@ -28,6 +32,7 @@ public class SettingsManager {
     private static final String PREF_KEEP_SCREEN_ON = "keep_screen_on";
     private static final String PREF_APP_LANGUAGE = "app_language";
     private static final String PREF_CAMERA2_CUSTOM_RESOLUTION = "camera2_custom_resolution";
+    private static final String PREF_SHOW_API_SWITCHER = "show_api_switcher";
 
     public static final String LANGUAGE_SYSTEM = "system";
     public static final String LANGUAGE_CHINESE = "zh";
@@ -51,6 +56,12 @@ public class SettingsManager {
         editor.putString(PREF_RESOLUTION, config.getResolution().toString());
         editor.putInt(PREF_FRAME_RATE, config.getFrameRate());
         editor.putString(PREF_QUALITY, config.getQuality().name());
+        editor.putString(PREF_PHOTO_RESOLUTION, config.getPhotoResolution().name());
+        // Remember still size per camera (cam0 high-res vs cam1 4M/3M/...).
+        if (config.getCameraId() != null) {
+            editor.putString(PREF_PHOTO_RESOLUTION + "_cam_" + config.getCameraId(),
+                    config.getPhotoResolution().name());
+        }
         editor.putBoolean(PREF_AUDIO_ENABLED, config.isAudioEnabled());
         editor.putString(PREF_SAVE_LOCATION, config.getSaveLocation().getAbsolutePath());
         editor.putString(PREF_CAMERA_ID, config.getCameraId());
@@ -65,7 +76,7 @@ public class SettingsManager {
      */
     public CameraConfig loadCameraConfig() {
         CameraApiType apiType = CameraApiType.valueOf(
-                preferences.getString(PREF_CAMERA_API, CameraApiType.CAMERAX.name())
+                preferences.getString(PREF_CAMERA_API, CameraApiType.CAMERA2.name())
         );
         
         Resolution resolution = Resolution.fromString(
@@ -77,17 +88,45 @@ public class SettingsManager {
         
         int frameRate = preferences.getInt(PREF_FRAME_RATE, 30);
         
-        Quality quality = Quality.valueOf(
-                preferences.getString(PREF_QUALITY, Quality.FULL_HD.name())
-        );
-        
+        Quality quality = Quality.normalizeSelectable(Quality.valueOf(preferences.getString(PREF_QUALITY, Quality.DEFAULT.name())));
+
         boolean audioEnabled = preferences.getBoolean(PREF_AUDIO_ENABLED, true);
         
         File defaultSaveLocation = CameraUtils.createCameraDirectory(context);
         String saveLocationPath = preferences.getString(PREF_SAVE_LOCATION, defaultSaveLocation.getAbsolutePath());
+        // Migrate old app-private Android/data path to public DCIM/Camera.
+        if (CameraUtils.isLegacyAppMediaPath(saveLocationPath)) {
+            saveLocationPath = defaultSaveLocation.getAbsolutePath();
+            preferences.edit().putString(PREF_SAVE_LOCATION, saveLocationPath).apply();
+        }
         File saveLocation = new File(saveLocationPath);
+        if (!saveLocation.exists()) {
+            // Ensure directory exists; fall back to DCIM/Camera if missing parent perms.
+            if (!saveLocation.mkdirs()) {
+                saveLocation = defaultSaveLocation;
+            }
+        }
         
         String cameraId = preferences.getString(PREF_CAMERA_ID, "0");
+
+        // cam0 default 12M; cam1 default 4M(16:9). Prefer per-camera saved value.
+        if (!preferences.getBoolean(PREF_PHOTO_DEFAULT_12M_APPLIED, false)) {
+            preferences.edit()
+                    .putString(PREF_PHOTO_RESOLUTION, PhotoResolution.MP_12.name())
+                    .putString(PREF_PHOTO_RESOLUTION + "_cam_0", PhotoResolution.MP_12.name())
+                    .putString(PREF_PHOTO_RESOLUTION + "_cam_1", PhotoResolution.DEFAULT_CAM1.name())
+                    .putBoolean(PREF_PHOTO_DEFAULT_12M_APPLIED, true)
+                    .apply();
+        }
+        String perCamKey = PREF_PHOTO_RESOLUTION + "_cam_" + cameraId;
+        String photoName = preferences.getString(perCamKey, null);
+        if (photoName == null || photoName.trim().isEmpty()) {
+            photoName = preferences.getString(
+                    PREF_PHOTO_RESOLUTION,
+                    PhotoResolution.defaultForCamera(cameraId).name());
+        }
+        PhotoResolution photoResolution = PhotoResolution.normalize(
+                PhotoResolution.fromName(photoName), cameraId);
         
         boolean backgroundReviewEnabled = preferences.getBoolean(PREF_BACKGROUND_REVIEW, false);
         boolean backgroundRecordingEnabled = preferences.getBoolean(PREF_BACKGROUND_RECORDING, false);
@@ -97,6 +136,7 @@ public class SettingsManager {
                 .setResolution(resolution)
                 .setFrameRate(frameRate)
                 .setQuality(quality)
+                .setPhotoResolution(photoResolution)
                 .setAudioEnabled(audioEnabled)
                 .setSaveLocation(saveLocation)
                 .setCameraId(cameraId)
@@ -110,7 +150,7 @@ public class SettingsManager {
      */
     public CameraApiType getCameraApiType() {
         return CameraApiType.valueOf(
-                preferences.getString(PREF_CAMERA_API, CameraApiType.CAMERAX.name())
+                preferences.getString(PREF_CAMERA_API, CameraApiType.CAMERA2.name())
         );
     }
     
@@ -164,6 +204,24 @@ public class SettingsManager {
     public void setCameraId(String cameraId) {
         preferences.edit().putString(PREF_CAMERA_ID, cameraId).apply();
     }
+
+    public PhotoResolution getPhotoResolutionForCamera(String cameraId) {
+        String key = PREF_PHOTO_RESOLUTION + "_cam_" + (cameraId == null ? "0" : cameraId);
+        String name = preferences.getString(key, null);
+        if (name == null || name.trim().isEmpty()) {
+            name = PhotoResolution.defaultForCamera(cameraId).name();
+        }
+        return PhotoResolution.normalize(PhotoResolution.fromName(name), cameraId);
+    }
+
+    public void setPhotoResolutionForCamera(String cameraId, PhotoResolution photoResolution) {
+        PhotoResolution normalized = PhotoResolution.normalize(photoResolution, cameraId);
+        String key = PREF_PHOTO_RESOLUTION + "_cam_" + (cameraId == null ? "0" : cameraId);
+        preferences.edit()
+                .putString(key, normalized.name())
+                .putString(PREF_PHOTO_RESOLUTION, normalized.name())
+                .apply();
+    }
     
     /**
      * Check if background recording is enabled
@@ -197,6 +255,14 @@ public class SettingsManager {
 
     public void setCamera2CustomResolutionEnabled(boolean enabled) {
         preferences.edit().putBoolean(PREF_CAMERA2_CUSTOM_RESOLUTION, enabled).apply();
+    }
+
+    public boolean isShowApiSwitcherEnabled() {
+        return preferences.getBoolean(PREF_SHOW_API_SWITCHER, false);
+    }
+
+    public void setShowApiSwitcherEnabled(boolean enabled) {
+        preferences.edit().putBoolean(PREF_SHOW_API_SWITCHER, enabled).apply();
     }
 
     public String getAppLanguage() {

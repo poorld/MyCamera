@@ -1,0 +1,110 @@
+--------- beginning of main
+07-25 21:29:41.716  2824  2824 W ScreenFlashWrapper: completePendingScreenFlashClear: none pending!
+07-25 21:29:41.720  2824  2824 W ScreenFlashWrapper: completePendingScreenFlashClear: none pending!
+07-25 21:29:41.758  2824  2824 W VideoConfigUtil: Unsupported mime type video/avc or profile level -1. Data space is unspecified.
+07-25 21:29:41.758  2824  2824 W VideoEncoderInfoWrapper: Detected that the device does not support a size 1920x1080 that should be valid in widths/heights = [128, 2560]/[128, 1440]
+07-25 21:29:41.767  2824  3050 W VideoConfigUtil: Unsupported mime type video/avc or profile level -1. Data space is unspecified.
+07-25 21:29:41.774  2824  3587 I CCodec  : setting up 'default' as default (vendor) store
+07-25 21:29:41.782  2824  3587 I CCodec  : Created component [c2.mtk.avc.encoder]
+07-25 21:29:41.793  2824  3587 I CCodecConfig: query failed after returning 22 values (BAD_INDEX)
+07-25 21:29:41.794  2824  3587 W ColorUtils: expected specified color aspects (0:0:0:0)
+07-25 21:29:41.800  2824  3587 I hw-BpHwBinder: onLastStrongRef automatically unlinking death recipients
+07-25 21:29:41.804  2824  3587 I CCodec  : setting up 'default' as default (vendor) store
+07-25 21:29:41.812  2824  3587 I CCodec  : Created component [c2.mtk.avc.encoder]
+07-25 21:29:41.826  2824  3587 I CCodecConfig: query failed after returning 22 values (BAD_INDEX)
+07-25 21:29:41.826  2824  3587 W ColorUtils: expected specified color aspects (0:0:0:0)
+07-25 21:29:41.828  2824  3586 I MediaCodec: MediaCodec will operate in async mode
+07-25 21:29:41.832  2824  3587 W ColorUtils: expected specified color aspects (0:0:0:0)
+07-25 21:29:41.832  2824  3587 W Codec2Client: query -- param skipped: index = 3254781982.
+07-25 21:29:41.833  2824  3587 I CCodecConfig: query failed after returning 23 values (BAD_INDEX)
+07-25 21:29:41.833  2824  3587 W ColorUtils: expected specified color aspects (0:0:0:0)
+07-25 21:29:41.834  2824  3050 I BufferQueueConsumer: [GraphicBufferSource](id:b0800000013,api:0,p:-1,c:2824) connect: controlledByApp=false
+07-25 21:29:41.861  2824  3608 I CCodec  : setting up 'default' as default (vendor) store
+07-25 21:29:41.864  2824  3608 I CCodec  : Created component [c2.android.aac.encoder]
+07-25 21:29:41.869  2824  3608 I CCodecConfig: query failed after returning 9 values (BAD_INDEX)
+07-25 21:29:41.873  2824  3610 I hw-BpHwBinder: onLastStrongRef automatically unlinking death recipients
+07-25 21:29:41.876  2824  3608 I CCodec  : setting up 'default' as default (vendor) store
+07-25 21:29:41.880  2824  3608 I CCodec  : Created component [c2.android.aac.encoder]
+07-25 21:29:41.883  2824  2851 I BufferQueueProducer: [SurfaceTexture-0-2824-0](id:b0800000001,api:4,p:687,c:2824) disconnect: api 4
+07-25 21:29:41.884  2824  2851 I BufferQueueProducer: [ImageReader-1920x1080f100m4-2824-7](id:b0800000011,api:4,p:687,c:2824) disconnect: api 4
+07-25 21:29:41.886  2824  3608 I CCodecConfig: query failed after returning 9 values (BAD_INDEX)
+07-25 21:29:41.887  2824  3608 I MediaCodec: MediaCodec will operate in async mode
+07-25 21:29:41.889  2824  3608 W Codec2Client: query -- param skipped: index = 1107298332.
+07-25 21:29:41.889  2824  3608 I CCodecConfig: query failed after returning 9 values (BAD_INDEX)
+07-25 21:29:41.891  2824  3587 W Codec2Client: query -- param skipped: index = 1342179345.
+07-25 21:29:41.891  2824  3587 W Codec2Client: query -- param skipped: index = 2415921170.
+07-25 21:29:41.892  2824  3608 W Codec2Client: query -- param skipped: index = 1342179345.
+07-25 21:29:41.892  2824  3608 W Codec2Client: query -- param skipped: index = 2415921170.
+07-25 21:29:41.892  2824  3608 W Codec2Client: query -- param skipped: index = 3254792206.
+07-25 21:29:41.892  2824  3608 W Codec2Client: query -- param skipped: index = 3254792194.
+07-25 21:29:41.894  2824  3587 I CCodecBufferChannel: [c2.mtk.avc.encoder#726] Created output block pool with allocatorID 16 => poolID 21 - OK
+07-25 21:29:41.894  2824  3608 I CCodecBufferChannel: [c2.android.aac.encoder#828] Created output block pool with allocatorID 16 => poolID 33 - OK
+07-25 21:29:41.901  2824  2824 I AudioTrack: createTrack_l(1853190702): AUDIO_OUTPUT_FLAG_FAST successful; frameCount 960 -> 960
+07-25 21:29:41.934  2824  2824 I BufferQueueConsumer: [ImageReader-1920x1080f100m4-2824-7](id:b0800000011,api:0,p:-1,c:2824) disconnect
+07-25 21:29:42.003  2824  2851 I BufferQueueProducer: [SurfaceTexture-0-2824-0](id:b0800000001,api:4,p:687,c:2824) connect: api=4 producerControlledByApp=true
+07-25 21:29:42.004  2824  2851 I BufferQueueProducer: [GraphicBufferSource](id:b0800000013,api:4,p:687,c:2824) connect: api=4 producerControlledByApp=false
+07-25 21:29:42.022  2824  3050 W Recorder: Audio source silenced transitions to the same state false
+07-25 21:29:42.270  2824  2844 I mali_config: @get_buffer_dataspace_setting: update dataspace (0x10020000 -> 0x08020000)
+07-25 21:29:42.294  2824  3009 I MPEG4Writer: limits: 4503599627370495/0 bytes/us, bit rate: -1 bps and the estimated moov size 3192 bytes
+07-25 21:29:42.296  2824  3675 I MPEG4Writer: setStartTimestampUs: 320867787
+07-25 21:29:42.296  2824  3675 I MPEG4Writer: Earliest track starting time: 320867787
+07-25 21:29:42.297  2824  3676 I MPEG4Writer: setStartTimestampUs: 320869697
+07-25 21:29:42.321  2824  2844 I mali_config: @get_buffer_dataspace_setting: update dataspace (0x10020000 -> 0x08020000)
+07-25 21:29:42.337  2824  2844 I mali_config: @get_buffer_dataspace_setting: update dataspace (0x10020000 -> 0x08020000)
+07-25 21:29:42.388  2824  2844 I mali_config: @get_buffer_dataspace_setting: update dataspace (0x10020000 -> 0x08020000)
+07-25 21:29:42.405  2824  2844 I mali_config: @get_buffer_dataspace_setting: update dataspace (0x10020000 -> 0x08020000)
+07-25 21:29:42.455  2824  2844 I mali_config: @get_buffer_dataspace_setting: update dataspace (0x10020000 -> 0x08020000)
+07-25 21:29:42.472  2824  2844 I mali_config: @get_buffer_dataspace_setting: update dataspace (0x10020000 -> 0x08020000)
+07-25 21:29:44.999  2824  3110 W GraphicBufferSource: onFrameAvailable: EOS is sent, ignoring frame
+07-25 21:29:45.000  2824  3608 I hw-BpHwBinder: onLastStrongRef automatically unlinking death recipients
+07-25 21:29:45.009  2824  3675 I MPEG4Writer: Received total/0-length (80/0) buffers and encoded 80 frames. - Video
+07-25 21:29:45.010  2824  3608 I CCodec  : setting up 'default' as default (vendor) store
+07-25 21:29:45.018  2824  3608 I CCodec  : Created component [c2.android.aac.encoder]
+07-25 21:29:45.022  2824  3676 I MPEG4Writer: Received total/0-length (127/0) buffers and encoded 127 frames. - Audio
+07-25 21:29:45.023  2824  3676 I MPEG4Writer: Audio track drift time: 0 us
+07-25 21:29:45.023  2824  3009 I MPEG4Writer: Adjust the moov start time from 320867787 us -> 320867787 us
+07-25 21:29:45.024  2824  3009 I MPEG4Writer: MOOV atom was written to the file
+07-25 21:29:45.032  2824  3110 W GraphicBufferSource: onFrameAvailable: EOS is sent, ignoring frame
+07-25 21:29:45.034  2824  3608 I CCodecConfig: query failed after returning 9 values (BAD_INDEX)
+07-25 21:29:45.036  2824  3608 I MediaCodec: MediaCodec will operate in async mode
+07-25 21:29:45.040  2824  3608 W Codec2Client: query -- param skipped: index = 1107298332.
+07-25 21:29:45.042  2824  3608 I CCodecConfig: query failed after returning 9 values (BAD_INDEX)
+07-25 21:29:45.065  2824  2865 W GraphicBufferSource: onFrameAvailable: EOS is sent, ignoring frame
+07-25 21:29:45.089  2824  3009 E MPEG4Writer: Stop() called but track is not started or stopped
+07-25 21:29:45.090  2824  3009 E MPEG4Writer: Stop() called but track is not started or stopped
+07-25 21:29:45.099  2824  2865 W GraphicBufferSource: onFrameAvailable: EOS is sent, ignoring frame
+07-25 21:29:45.131  2824  2865 W GraphicBufferSource: onFrameAvailable: EOS is sent, ignoring frame
+07-25 21:29:45.163  2824  2865 W GraphicBufferSource: onFrameAvailable: EOS is sent, ignoring frame
+07-25 21:29:45.194  2824  2824 I BufferQueueConsumer: [](id:b0800000014,api:0,p:-1,c:2824) connect: controlledByApp=true
+07-25 21:29:45.195  2824  3110 W GraphicBufferSource: onFrameAvailable: EOS is sent, ignoring frame
+07-25 21:29:45.214  2824  2824 I AudioTrack: createTrack_l(1953397075): AUDIO_OUTPUT_FLAG_FAST successful; frameCount 960 -> 960
+07-25 21:29:45.234  2824  2824 W ScreenFlashWrapper: completePendingScreenFlashClear: none pending!
+07-25 21:29:45.235  2824  2824 W ScreenFlashWrapper: completePendingScreenFlashClear: none pending!
+07-25 21:29:45.249  2824  2824 I BufferQueueConsumer: [](id:b0800000015,api:0,p:-1,c:2824) connect: controlledByApp=true
+07-25 21:29:45.265  2824  2824 I BufferQueueConsumer: [ImageReader-1920x1080f100m4-2824-8](id:b0800000014,api:0,p:-1,c:2824) disconnect
+07-25 21:29:45.332  2824  2849 I BufferQueueProducer: [SurfaceTexture-0-2824-0](id:b0800000001,api:4,p:687,c:2824) disconnect: api 4
+07-25 21:29:45.333  2824  2849 I BufferQueueProducer: [GraphicBufferSource](id:b0800000013,api:4,p:687,c:2824) disconnect: api 4
+07-25 21:29:45.334  2824  2849 W GraphicBufferSource: released unpopulated slots: [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63]
+07-25 21:29:45.337  2824  2865 W ndroid.mycamer: Long monitor contention with owner CameraX-core_camera_0 (2849) at void android.hardware.camera2.impl.CameraDeviceImpl.close()(CameraDeviceImpl.java:1372) waiters=0 in void android.hardware.camera2.impl.CameraDeviceImpl$CameraDeviceCallbacks.onCaptureStarted(android.hardware.camera2.impl.CaptureResultExtras, long) for 155ms
+07-25 21:29:45.403  2824  2849 I BufferQueueConsumer: [](id:b0800000016,api:0,p:-1,c:2824) connect: controlledByApp=true
+07-25 21:29:45.420  2824  2849 I BufferQueueConsumer: [SurfaceTexture-0-2824-7](id:b0800000016,api:0,p:-1,c:2824) disconnect
+07-25 21:29:45.431  2824  3608 I hw-BpHwBinder: onLastStrongRef automatically unlinking death recipients
+07-25 21:29:45.437  2824  3689 I hw-BpHwBinder: onLastStrongRef automatically unlinking death recipients
+07-25 21:29:45.446  2824  3587 I CCodec  : setting up 'default' as default (vendor) store
+07-25 21:29:45.456  2824  3587 I CCodec  : Created component [c2.mtk.avc.encoder]
+07-25 21:29:45.467  2824  3587 I CCodecConfig: query failed after returning 22 values (BAD_INDEX)
+07-25 21:29:45.468  2824  3587 W ColorUtils: expected specified color aspects (0:0:0:0)
+07-25 21:29:45.469  2824  3586 I MediaCodec: MediaCodec will operate in async mode
+07-25 21:29:45.471  2824  3587 W ColorUtils: expected specified color aspects (0:0:0:0)
+07-25 21:29:45.472  2824  3587 W Codec2Client: query -- param skipped: index = 3254781982.
+07-25 21:29:45.472  2824  3587 I CCodecConfig: query failed after returning 23 values (BAD_INDEX)
+07-25 21:29:45.473  2824  3587 W ColorUtils: expected specified color aspects (0:0:0:0)
+07-25 21:29:45.476  2824  3587 I hw-BpHwBinder: onLastStrongRef automatically unlinking death recipients
+07-25 21:29:45.477  2824  3586 I BpBinder: onLastStrongRef automatically unlinking death recipients: android.media.IResourceManagerService
+07-25 21:29:45.503  2824  2849 I BufferQueueProducer: [SurfaceTexture-0-2824-0](id:b0800000001,api:4,p:687,c:2824) connect: api=4 producerControlledByApp=true
+07-25 21:29:45.504  2824  2849 I BufferQueueProducer: [ImageReader-1920x1080f100m4-2824-9](id:b0800000015,api:4,p:687,c:2824) connect: api=4 producerControlledByApp=false
+07-25 21:29:45.792  2824  2844 I mali_config: @get_buffer_dataspace_setting: update dataspace (0x10020000 -> 0x08020000)
+07-25 21:29:45.808  2824  2844 I mali_config: @get_buffer_dataspace_setting: update dataspace (0x10020000 -> 0x08020000)
+07-25 21:29:45.859  2824  2844 I mali_config: @get_buffer_dataspace_setting: update dataspace (0x10020000 -> 0x08020000)
+07-25 21:29:45.910  2824  2844 I mali_config: @get_buffer_dataspace_setting: update dataspace (0x10020000 -> 0x08020000)
+07-25 21:29:45.962  2824  2844 I mali_config: @get_buffer_dataspace_setting: update dataspace (0x10020000 -> 0x08020000)

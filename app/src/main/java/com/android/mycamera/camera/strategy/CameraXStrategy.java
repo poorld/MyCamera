@@ -61,6 +61,7 @@ import androidx.lifecycle.LifecycleOwner;
 
 import com.android.mycamera.camera.config.CameraConfig;
 import com.android.mycamera.model.CameraState;
+import com.android.mycamera.model.PhotoResolution;
 import com.android.mycamera.model.Resolution;
 import com.android.mycamera.utils.CameraUtils;
 
@@ -89,6 +90,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
     private CameraSelector currentCameraSelector;
     private Quality appliedVideoQuality = Quality.FHD;
     private Range<Integer> appliedFpsRange;
+    private boolean stableVideoPipelineBound = false;
     // private Executor executor;
 
     private static final long MAX_FILE_SIZE = 1024 * 1024 * 500; // 500M
@@ -172,7 +174,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
                 appliedFpsRange = chooseBestFpsRange(currentConfig.getFrameRate(), getSupportedFpsRanges());
                 logDebug("CameraX supported qualities: " + supportedQualities);
                 logDebug("CameraX supported fps ranges: " + getSupportedFpsRanges());
-                logDebug("CameraX config quality=" + currentConfig.getQuality() + ", config resolution="
+                logDebug("CameraX config quality=" + currentConfig.getQuality() + ", photo=" + currentConfig.getPhotoResolution() + ", config resolution="
                         + currentConfig.getResolution().getWidth() + "x" + currentConfig.getResolution().getHeight()
                         + ", targetFps=" + currentConfig.getFrameRate());
                 logDebug("CameraX use quality=" + finalQuality + ", targetResolution="
@@ -199,9 +201,9 @@ public class CameraXStrategy extends BaseCameraStrategy {
                 videoCapture.setTargetRotation(targetRotation);
                 appliedVideoQuality = finalQuality;
                 ImageCapture.Builder imageCaptureBuilder = new ImageCapture.Builder()
-                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                         .setTargetRotation(targetRotation)
-                        .setTargetResolution(new Size(resolution.getWidth(), resolution.getHeight()));
+                        .setTargetResolution(getPhotoTargetSize(targetRotation));
                 Camera2Interop.Extender imageCaptureExtender = new Camera2Interop.Extender(imageCaptureBuilder);
                 imageCaptureExtender.setCaptureRequestOption(
                         CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
@@ -209,13 +211,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
                 );
                 imageCapture = imageCaptureBuilder.build();
 
-                cameraProvider.unbindAll();
-
-                camera = cameraProvider.bindToLifecycle(this.lifecycleOwner, cameraSelector, previewUseCase, videoCapture);
-                applyFpsRangeToCamera(camera);
-                applyStoredZoom();
-                applyRequestedFlash();
-                attachPreviewSurfaceProvider();
+                bindPhotoUseCases(cameraProvider);
                 logDebug("CameraX target rotation=" + targetRotation);
                 notifyStateChanged(CameraState.PREVIEW_STARTED);
                 notifyPreviewStarted();
@@ -289,11 +285,16 @@ public class CameraXStrategy extends BaseCameraStrategy {
     @SuppressLint("MissingPermission")
     @Override
     public void startRecording() {
-        Log.d(TAG, "startRecording: videoCapture=" + videoCapture);
+        Log.d(TAG, "startRecording: videoCapture=" + videoCapture
+                + ", stableVideoPipelineBound=" + stableVideoPipelineBound);
         if (videoCapture == null || previewUseCase == null || currentCameraSelector == null || lifecycleOwner == null) return;
         if (recording != null) return;
         cameraProviderFuture.addListener(() -> {
             try {
+                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
+                if (!stableVideoPipelineBound) {
+                    bindVideoUseCases(cameraProvider);
+                }
                 videoCapture.setTargetRotation(getCameraXTargetRotation());
                 isUserStopping = false;
                 firstStart = true;
@@ -310,6 +311,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
                 recording = pendingRecording.start(ContextCompat.getMainExecutor(context), this::checkEvent);
             } catch (Exception e) {
                 logError("Failed to start CameraX recording", e);
+                restorePhotoUseCases();
             }
         }, ContextCompat.getMainExecutor(context));
     }
@@ -350,6 +352,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
                 Log.d(TAG, "Recording failed: " + finalizeEvent.getError() + ", " + finalizeEvent.getCause());
                 recording = null;
                 firstStart = true;
+                restorePhotoUseCases();
                 notifyError("Recording failed: " + finalizeEvent.getError());
             } else {
                 recording = null;
@@ -359,6 +362,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
                     Log.d(TAG, "Segment finalized, starting next segment...");
                     startNextSegment();
                 } else {
+                    restorePhotoUseCases();
                     notifyRecordingStopped();
                     notifyPhotoCaptured(outputFile.getAbsolutePath());
                 }
@@ -396,74 +400,95 @@ public class CameraXStrategy extends BaseCameraStrategy {
         }
     }
 
-    private void restorePhotoUseCases() {
-        if (cameraProviderFuture == null || !cameraProviderFuture.isDone()
-                || lifecycleOwner == null || currentCameraSelector == null
-                || previewUseCase == null || videoCapture == null) {
-            return;
-        }
-        try {
-            ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
-            cameraProvider.unbindAll();
-            camera = cameraProvider.bindToLifecycle(lifecycleOwner, currentCameraSelector, previewUseCase, videoCapture);
-            applyFpsRangeToCamera(camera);
-            applyStoredZoom();
-            applyRequestedFlash();
-            attachPreviewSurfaceProvider();
-        } catch (Exception e) {
-            logError("Failed to restore CameraX photo use cases", e);
-        }
-    }
-
     @Override
     public void capturePhoto() {
-        if (recording != null || cameraProviderFuture == null || lifecycleOwner == null || currentCameraSelector == null) return;
-        cameraProviderFuture.addListener(() -> {
-            try {
-                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
-                Resolution resolution = currentConfig.getResolution();
+        if (recording != null || imageCapture == null) return;
 
-                ImageCapture.Builder dedicatedBuilder = new ImageCapture.Builder()
-                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-                        .setTargetRotation(getCameraXTargetRotation())
-                        .setTargetResolution(new Size(resolution.getWidth(), resolution.getHeight()));
-                Camera2Interop.Extender dedicatedExtender = new Camera2Interop.Extender(dedicatedBuilder);
-                dedicatedExtender.setCaptureRequestOption(
-                        CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
-                        new Range<>(currentConfig.getFrameRate(), currentConfig.getFrameRate())
-                );
-                ImageCapture dedicatedCapture = dedicatedBuilder.build();
-
-                // Temporarily bind only ImageCapture to avoid stream-combination downgrades.
-                cameraProvider.unbindAll();
-                camera = cameraProvider.bindToLifecycle(lifecycleOwner, currentCameraSelector, dedicatedCapture);
-                applyRequestedFlash();
-
-                File outputFile = CameraUtils.generateUniqueMediaFile(context, "jpg");
-                ImageCapture.OutputFileOptions outputOptions = new ImageCapture.OutputFileOptions.Builder(outputFile).build();
-                applyStoredZoom().addListener(() -> dedicatedCapture.takePicture(outputOptions, ContextCompat.getMainExecutor(context), new ImageCapture.OnImageSavedCallback() {
+        imageCapture.setTargetRotation(getCameraXTargetRotation());
+        File outputFile = CameraUtils.generateUniqueMediaFile(context, "jpg");
+        ImageCapture.OutputFileOptions outputOptions = new ImageCapture.OutputFileOptions.Builder(outputFile).build();
+        imageCapture.takePicture(outputOptions, ContextCompat.getMainExecutor(context),
+                new ImageCapture.OnImageSavedCallback() {
                     @Override
                     public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputResults) {
-                        BitmapFactory.Options options = new BitmapFactory.Options();
-                        options.inJustDecodeBounds = true;
-                        BitmapFactory.decodeFile(outputFile.getAbsolutePath(), options);
-                        logDebug("CameraX actual photo size: " + options.outWidth + "x" + options.outHeight);
-                        restorePhotoUseCases();
                         notifyPhotoCaptured(outputFile.getAbsolutePath());
                     }
 
                     @Override
                     public void onError(@NonNull ImageCaptureException exc) {
-                        restorePhotoUseCases();
                         notifyError("Photo capture failed: " + exc.getMessage());
                     }
-                }), ContextCompat.getMainExecutor(context));
-            } catch (Exception e) {
-                logError("Failed to capture CameraX photo", e);
-                restorePhotoUseCases();
-                notifyError("Photo capture failed: " + e.getMessage());
+                });
+    }
+
+    private Size getPhotoTargetSize(int targetRotation) {
+        PhotoResolution photoResolution = currentConfig != null
+                ? PhotoResolution.normalize(currentConfig.getPhotoResolution(), currentConfig.getCameraId())
+                : PhotoResolution.DEFAULT;
+        boolean portrait = targetRotation == Surface.ROTATION_0
+                || targetRotation == Surface.ROTATION_180;
+        // ImageCapture targetResolution is width x height in sensor-oriented space.
+        return portrait
+                ? new Size(photoResolution.getHeight(), photoResolution.getWidth())
+                : new Size(photoResolution.getWidth(), photoResolution.getHeight());
+    }
+
+    private void bindPhotoUseCases(ProcessCameraProvider cameraProvider) {
+        cameraProvider.unbindAll();
+        stableVideoPipelineBound = false;
+        if (videoCapture != null) {
+            try {
+                camera = cameraProvider.bindToLifecycle(lifecycleOwner, currentCameraSelector,
+                        previewUseCase, imageCapture, videoCapture);
+                stableVideoPipelineBound = true;
+                logDebug("Bound stable pipeline: preview + imageCapture + videoCapture");
+                applyFpsRangeToCamera(camera);
+                applyStoredZoom();
+                applyRequestedFlash();
+                attachPreviewSurfaceProvider();
+                return;
+            } catch (IllegalArgumentException ex) {
+                logDebug("Stable triple bind unsupported, fallback to preview+imageCapture: " + ex.getMessage());
             }
-        }, ContextCompat.getMainExecutor(context));
+        }
+        camera = cameraProvider.bindToLifecycle(lifecycleOwner, currentCameraSelector,
+                previewUseCase, imageCapture);
+        applyFpsRangeToCamera(camera);
+        applyStoredZoom();
+        applyRequestedFlash();
+        attachPreviewSurfaceProvider();
+    }
+
+    private void bindVideoUseCases(ProcessCameraProvider cameraProvider) {
+        if (stableVideoPipelineBound && camera != null) {
+            logDebug("Skip video rebind, stable pipeline already active");
+            return;
+        }
+        cameraProvider.unbindAll();
+        stableVideoPipelineBound = false;
+        camera = cameraProvider.bindToLifecycle(lifecycleOwner, currentCameraSelector,
+                previewUseCase, videoCapture);
+        applyFpsRangeToCamera(camera);
+        applyStoredZoom();
+        applyRequestedFlash();
+        attachPreviewSurfaceProvider();
+    }
+
+    private void restorePhotoUseCases() {
+        if (stableVideoPipelineBound) {
+            logDebug("Skip restore rebind, stable pipeline already active");
+            return;
+        }
+        if (cameraProviderFuture == null || !cameraProviderFuture.isDone()
+                || lifecycleOwner == null || currentCameraSelector == null
+                || previewUseCase == null || imageCapture == null) {
+            return;
+        }
+        try {
+            bindPhotoUseCases(cameraProviderFuture.get());
+        } catch (Exception e) {
+            logError("Failed to restore CameraX photo use cases", e);
+        }
     }
 
     @Override
@@ -475,6 +500,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
             camera.getCameraControl().enableTorch(false);
         }
         requestedFlashEnabled = false;
+        stableVideoPipelineBound = false;
 
         if (cameraProviderFuture != null && cameraProviderFuture.isDone()) {
             try {
@@ -636,6 +662,12 @@ public class CameraXStrategy extends BaseCameraStrategy {
         switch (quality) {
             case HD: return Quality.HD;
             case FULL_HD: return Quality.FHD;
+            case QHD:
+                // CameraX has no 1440p/2K preset (only SD/HD/FHD/UHD). Mapping to UHD causes
+                // devices without 4K to fall back to FHD (1920x1080). 2K is handled by
+                // CameraManager forcing Camera2 + 2560x1440 instead of this path.
+                Log.w(TAG, "CameraX cannot express 2K/QHD; expected Camera2 path for 2560x1440");
+                return Quality.FHD;
             case UHD: return Quality.UHD;
             case SD: return Quality.SD;
             case LOWEST: return Quality.LOWEST;
@@ -646,7 +678,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
 
     private Quality convertResolutionToCameraXQuality(Resolution resolution) {
         if (resolution == null) return null;
-        if (resolution.equals(Resolution.UHD_4K)) {
+        if (resolution.equals(Resolution.UHD_4K) || resolution.equals(Resolution.QHD_2K)) {
             return Quality.UHD;
         }
         if (resolution.equals(Resolution.FULL_HD_1080P)) {

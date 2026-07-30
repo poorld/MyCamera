@@ -15,7 +15,10 @@ import com.android.mycamera.camera.observer.CameraStateManager;
 import com.android.mycamera.camera.strategy.BackgroundRecordingService;
 import com.android.mycamera.camera.strategy.CameraStrategy;
 import com.android.mycamera.model.CameraApiType;
+import com.android.mycamera.model.CaptureMode;
 import com.android.mycamera.model.CameraState;
+import com.android.mycamera.model.PhotoResolution;
+import com.android.mycamera.model.Quality;
 import com.android.mycamera.model.Resolution;
 import com.android.mycamera.utils.MemoryManager;
 import com.android.mycamera.utils.PerformanceUtils;
@@ -41,6 +44,8 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
     
     private CameraStrategy currentStrategy;
     private CameraConfig currentConfig;
+    /** True when settings staged a config that is not yet applied to the live pipeline. */
+    private boolean configurationDirty = false;
     private final Map<String, CameraStrategy> cameraCache = new HashMap<>();
     private boolean isPerformanceOptimized = false;
     
@@ -82,6 +87,9 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
     public void initializeCamera(CameraStateObserver observer) {
         Log.d(TAG, "initializeCamera: ");
         stateManager.addObserver(observer);
+        currentConfig = applyVideoCapabilityConstraints(currentConfig);
+        settingsManager.saveCameraConfig(currentConfig);
+        configurationDirty = false;
         currentStrategy = getCameraStrategy(currentConfig.getApiType());
         currentStrategy.addStateListener(this);
 
@@ -130,15 +138,44 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
 
 
         try {
-            currentStrategy = getCameraStrategy(newApiType);
-            Log.d(TAG, "switchCameraApi newStrategy: " + currentStrategy);
-            currentStrategy.addStateListener(this);
             CameraConfig.Builder configBuilder = new CameraConfig.Builder(currentConfig)
                     .setApiType(newApiType);
-            if (newApiType != CameraApiType.CAMERA2 && !currentConfig.getResolution().isFixed()) {
-                configBuilder.setResolution(Resolution.FULL_HD_1080P);
+            if (newApiType == CameraApiType.CAMERAX) {
+                // CameraX only supports HD/FHD among our selectable set (no 2K preset).
+                // If current video is 2K, demote to FHD so user can actually switch back to CameraX.
+                Quality quality = Quality.normalizeSelectable(currentConfig.getQuality());
+                if (quality == Quality.QHD) {
+                    Log.w(TAG, "Switching to CameraX: 2K is unsupported by CameraX, fallback video quality to FHD");
+                    quality = Quality.FULL_HD;
+                }
+                configBuilder.setQuality(quality)
+                        .setResolution(Resolution.of(quality.getWidth(), quality.getHeight()));
+            } else if (newApiType == CameraApiType.CAMERA2) {
+                // Prefer resolution matched to selected video quality (HD/FHD/2K).
+                Quality quality = Quality.normalizeSelectable(currentConfig.getQuality());
+                Resolution resolution = Resolution.of(quality.getWidth(), quality.getHeight());
+                if (resolution == null) {
+                    resolution = Resolution.FULL_HD_1080P;
+                }
+                configBuilder.setQuality(quality).setResolution(resolution);
+            } else {
+                // Camera1 only supports fixed resolutions; fallback to 1920x1080.
+                Quality quality = Quality.normalizeSelectable(currentConfig.getQuality());
+                Resolution resolution = Resolution.of(quality.getWidth(), quality.getHeight());
+                if (resolution == null || !resolution.isFixed()) {
+                    resolution = Resolution.FULL_HD_1080P;
+                }
+                configBuilder.setQuality(quality).setResolution(resolution);
             }
-            currentConfig = configBuilder.build();
+            currentConfig = applyVideoCapabilityConstraints(configBuilder.build());
+            // Strategy must follow constrained API (e.g. CameraX+2K -> Camera2).
+            currentStrategy = getCameraStrategy(currentConfig.getApiType());
+            Log.d(TAG, "switchCameraApi requested=" + newApiType
+                    + ", effective=" + currentConfig.getApiType()
+                    + ", quality=" + currentConfig.getQuality()
+                    + ", resolution=" + currentConfig.getResolution()
+                    + ", strategy=" + currentStrategy);
+            currentStrategy.addStateListener(this);
             
             // Save new configuration
             settingsManager.saveCameraConfig(currentConfig);
@@ -165,20 +202,22 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
      * Switch camera ID
      */
     public boolean switchCamera(String cameraId) {
-        if (currentStrategy == null) {
+        if (currentStrategy == null || currentConfig == null) {
             return false;
         }
-        
-        boolean success = currentStrategy.switchCamera(cameraId);
-        if (success) {
-            currentConfig = new CameraConfig.Builder(currentConfig)
-                    .setCameraId(cameraId)
-                    .build();
-            
-            settingsManager.setCameraId(cameraId);
-        }
-        
-        return success;
+        // Build target config BEFORE reopen so cam1 does not briefly use cam0 12M/36M still size.
+        PhotoResolution photoForCam = settingsManager.getPhotoResolutionForCamera(cameraId);
+        currentConfig = new CameraConfig.Builder(currentConfig)
+                .setCameraId(cameraId)
+                .setPhotoResolution(photoForCam)
+                .build();
+        settingsManager.setCameraId(cameraId);
+        settingsManager.saveCameraConfig(currentConfig);
+        Log.d(TAG, "switchCamera id=" + cameraId + ", photo=" + photoForCam);
+
+        currentStrategy.closeCamera();
+        currentStrategy.openCamera(currentConfig);
+        return true;
     }
     
     /**
@@ -212,10 +251,39 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
      */
     public void startRecording() {
         Log.d(TAG, "startRecording: ");
+        // Long-press record can start from photo UI; pin CaptureMode.VIDEO so
+        // post-record preview stays on the video pipeline (not JPEG photo mode).
+        ensureCaptureMode(CaptureMode.VIDEO, false);
         if (isBackgroundRecordingEnabled() && isBackgroundRecordingServiceReady()) {
             backgroundRecordingHelper.startRecording();
         } else if (currentStrategy != null) {
             currentStrategy.startRecording();
+        }
+    }
+
+    /**
+     * Update capture mode on the shared config (and live strategy).
+     * @param reapplyPipeline when true, rebuild session now; when false, only bind config
+     */
+    public void ensureCaptureMode(CaptureMode mode, boolean reapplyPipeline) {
+        if (currentConfig == null) {
+            return;
+        }
+        CaptureMode normalized = CaptureMode.normalize(mode);
+        CaptureMode existing = CaptureMode.normalize(currentConfig.getCaptureMode());
+        if (existing != normalized) {
+            currentConfig = new CameraConfig.Builder(currentConfig)
+                    .setCaptureMode(normalized)
+                    .build();
+            settingsManager.saveCameraConfig(currentConfig);
+            Log.d(TAG, "ensureCaptureMode " + existing + " -> " + normalized
+                    + ", reapply=" + reapplyPipeline);
+        }
+        if (currentStrategy != null) {
+            currentStrategy.bindConfiguration(currentConfig);
+            if (reapplyPipeline) {
+                currentStrategy.openCamera(currentConfig);
+            }
         }
     }
     
@@ -373,28 +441,158 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
     }
 
     public CameraApiType getCameraApiType() {
+        if (currentConfig != null && currentConfig.getApiType() != null) {
+            return currentConfig.getApiType();
+        }
         return settingsManager.getCameraApiType();
     }
     
     /**
      * Update configuration
      */
+
+    /**
+     * Normalize video config per API:
+     * - CameraX is quality-driven (and has no 2K preset).
+     * - Camera1/Camera2 are resolution-driven; never overwrite user resolution with quality size.
+     */
+    private CameraConfig applyVideoCapabilityConstraints(CameraConfig config) {
+        if (config == null) {
+            return null;
+        }
+        CameraApiType apiType = config.getApiType();
+        Quality quality = Quality.normalizeSelectable(config.getQuality());
+        Resolution videoResolution = config.getResolution() != null
+                ? config.getResolution()
+                : Resolution.FULL_HD_1080P;
+
+        if (apiType == CameraApiType.CAMERAX) {
+            if (quality == Quality.QHD) {
+                Log.w(TAG, "2K (2560x1440) is not a CameraX quality preset; using Camera2 so target size can apply");
+                apiType = CameraApiType.CAMERA2;
+                videoResolution = Resolution.of(quality.getWidth(), quality.getHeight());
+            } else {
+                // CameraX: keep resolution metadata aligned with quality.
+                videoResolution = Resolution.of(quality.getWidth(), quality.getHeight());
+            }
+        } else {
+            // Camera1/2: honor selected resolution, sync quality label to nearest match.
+            if (videoResolution == null) {
+                videoResolution = Resolution.FULL_HD_1080P;
+            }
+            quality = qualityFromResolution(videoResolution);
+        }
+
+        if (apiType == config.getApiType()
+                && quality == config.getQuality()
+                && videoResolution.equals(config.getResolution())) {
+            return config;
+        }
+
+        Log.d(TAG, "applyVideoCapabilityConstraints api=" + apiType
+                + ", quality=" + quality
+                + ", resolution=" + videoResolution);
+        return new CameraConfig.Builder(config)
+                .setApiType(apiType)
+                .setQuality(quality)
+                .setResolution(videoResolution)
+                .build();
+    }
+
+    private Quality qualityFromResolution(Resolution resolution) {
+        if (resolution == null) {
+            return Quality.DEFAULT;
+        }
+        int width = resolution.getWidth();
+        int height = resolution.getHeight();
+        if (width == 2560 && height == 1440) {
+            return Quality.QHD;
+        }
+        if (width == 1920 && height == 1080) {
+            return Quality.FULL_HD;
+        }
+        if (width == 1280 && height == 720) {
+            return Quality.HD;
+        }
+        long area = (long) width * height;
+        long bestDelta = Long.MAX_VALUE;
+        Quality best = Quality.DEFAULT;
+        for (Quality candidate : Quality.selectableValues()) {
+            long candidateArea = (long) candidate.getWidth() * candidate.getHeight();
+            long delta = Math.abs(candidateArea - area);
+            if (delta < bestDelta) {
+                bestDelta = delta;
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Persist config only. Do not reopen/rebuild camera pipeline.
+     * Used by Settings so spinner changes feel instant; MainActivity applies on resume.
+     */
+    public void stageConfiguration(CameraConfig newConfig) {
+        Log.d(TAG, "stageConfiguration: ");
+        this.currentConfig = applyVideoCapabilityConstraints(newConfig);
+        settingsManager.saveCameraConfig(this.currentConfig);
+        configurationDirty = true;
+        Log.d(TAG, "stageConfiguration staged api=" + currentConfig.getApiType()
+                + ", mode=" + currentConfig.getCaptureMode()
+                + ", videoRes=" + currentConfig.getResolution()
+                + ", photoRes=" + currentConfig.getPhotoResolution());
+    }
+
+    /**
+     * Apply staged settings to the live camera if it is currently open.
+     * @return true if a live reconfigure was performed
+     */
+    public boolean applyStagedConfigurationIfNeeded() {
+        if (!configurationDirty || currentConfig == null) {
+            return false;
+        }
+        configurationDirty = false;
+        if (currentStrategy != null && isCameraAvailable()) {
+            Log.d(TAG, "applyStagedConfigurationIfNeeded: applying live");
+            updateConfiguration(currentConfig);
+            return true;
+        }
+        Log.d(TAG, "applyStagedConfigurationIfNeeded: deferred until next open");
+        return false;
+    }
+
+    public boolean isConfigurationDirty() {
+        return configurationDirty;
+    }
+
     public void updateConfiguration(CameraConfig newConfig) {
         Log.d(TAG, "updateConfiguration: ");
-        this.currentConfig = newConfig;
-        settingsManager.saveCameraConfig(newConfig);
+        CameraApiType previousApi = currentConfig != null ? currentConfig.getApiType() : null;
+        this.currentConfig = applyVideoCapabilityConstraints(newConfig);
+        settingsManager.saveCameraConfig(this.currentConfig);
+        configurationDirty = false;
+        Log.d(TAG, "updateConfiguration effective api=" + currentConfig.getApiType()
+                + ", mode=" + currentConfig.getCaptureMode()
+                + ", videoRes=" + currentConfig.getResolution()
+                + ", photoRes=" + currentConfig.getPhotoResolution());
 
         if (isBackgroundRecordingServiceReady()) {
-            updateBackgroundRecordingConfig(newConfig);
+            updateBackgroundRecordingConfig(this.currentConfig);
             return;
         }
 
-        
-        if (currentStrategy != null) {
-            // Reopen camera with new configuration
+        // Only fully close when API strategy must change. Same-API pipeline switches
+        // (photo/video, resolution) rebuild the capture session without device reopen.
+        boolean apiChanged = previousApi != currentConfig.getApiType();
+        if (apiChanged && currentStrategy != null) {
             currentStrategy.closeCamera();
-            currentStrategy.openCamera(newConfig);
+            currentStrategy = null;
         }
+        if (currentStrategy == null || apiChanged) {
+            currentStrategy = getCameraStrategy(currentConfig.getApiType());
+            currentStrategy.addStateListener(this);
+        }
+        currentStrategy.openCamera(currentConfig);
     }
     
     /**
@@ -495,13 +693,10 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         cameraFactory = new CameraHelperFactory(context);
 
         try {
-            // Cache camera instances for faster switching
-            for (CameraApiType apiType : getSupportedApis()) {
-                String cacheKey = "preinit_" + apiType.name();
-                if (!cameraCache.containsKey(cacheKey)) {
-                    CameraStrategy strategy = cameraFactory.createCameraStrategy(apiType);
-                    cameraCache.put(cacheKey, strategy);
-                }
+            CameraApiType initialApi = currentConfig.getApiType();
+            String cacheKey = "preinit_" + initialApi.name();
+            if (!cameraCache.containsKey(cacheKey)) {
+                cameraCache.put(cacheKey, cameraFactory.createCameraStrategy(initialApi));
             }
             
             Log.d(TAG, "Camera pre-initialization completed");
@@ -514,7 +709,16 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
 
     public CameraStrategy getCameraStrategy(CameraApiType apiType) {
         String cacheKey = "preinit_" + apiType.name();
-        return cameraCache.get(cacheKey);
+        CameraStrategy strategy = cameraCache.get(cacheKey);
+        if (strategy != null) {
+            return strategy;
+        }
+        if (cameraFactory == null) {
+            cameraFactory = new CameraHelperFactory(context);
+        }
+        strategy = cameraFactory.createCameraStrategy(apiType);
+        cameraCache.put(cacheKey, strategy);
+        return strategy;
     }
 
     

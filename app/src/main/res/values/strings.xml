@@ -5,6 +5,10 @@
     <string name="camera_settings">Camera Settings</string>
     <string name="app_settings">App Settings</string>
     <string name="keep_screen_on">Keep Screen On</string>
+    <string name="show_api_switcher">Show Camera API Switcher</string>
+    <string name="af_ois_enabled">AF/OIS On</string>
+    <string name="af_ois_disabled">AF/OIS Off</string>
+    <string name="af_ois_failed">Failed to switch AF/OIS</string>
     <string name="language">Language</string>
     <string name="language_follow_system">Follow System</string>
     <string name="language_chinese">Chinese</string>
@@ -13,6 +17,8 @@
     <string name="custom_camera2_resolution">Custom Camera2 Resolution</string>
     <string name="frame_rate">Frame Rate</string>
     <string name="video_quality">Video Quality</string>
+    <string name="video_resolution">Video Resolution</string>
+    <string name="photo_resolution">Photo Resolution</string>
     <string name="recording">Recording</string>
     <string name="enable_audio">Enable Audio</string>
     <string name="background_review">Background Review</string>
@@ -23,4 +29,20 @@
     <string name="memory_optimization">Memory Optimization</string>
     <string name="camera_size">Camera Size</string>
     <string name="old_camera">Old Camera</string>
+    <string name="yuv_dump_test">YUV Dump Test</string>
+    <string name="yuv_dump_enable">Enable P2 dump</string>
+    <string name="yuv_dump_rrzo">Dump RRZO input (RAW)</string>
+    <string name="yuv_dump_display">Dump display output (YUV)</string>
+    <string name="yuv_dump_record">Dump recording output (YUV)</string>
+    <string name="yuv_dump_capture">Capture one frame</string>
+    <string name="yuv_dump_overlay_start">Start floating capture button</string>
+    <string name="yuv_dump_overlay_stop">Stop floating capture button</string>
+    <string name="yuv_dump_overlay_capture">Dump YUV</string>
+    <string name="yuv_dump_overlay_title">YUV dump capture</string>
+    <string name="yuv_dump_overlay_notification">Tap the floating button to dump one P2 frame. Long-press it to close.</string>
+    <string name="yuv_dump_overlay_permission">Allow display-over-other-apps permission, then tap the button again.</string>
+    <string name="yuv_dump_hint">The dump configuration is global: it applies to any camera app after the app rebuilds its pipeline. Start the floating button before switching to another app; tap it during recording to capture one frame. Files are saved to /data/vendor/p2_dump.</string>
+    <string name="yuv_dump_disabled">Enable P2 dump first.</string>
+    <string name="yuv_dump_triggered">One-frame dump requested.</string>
+    <string name="yuv_dump_status">Input mask: %1$d, output mask: %2$d</string>
 </resources>

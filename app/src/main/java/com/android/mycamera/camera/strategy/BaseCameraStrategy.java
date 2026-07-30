@@ -60,12 +60,24 @@ public abstract class BaseCameraStrategy implements CameraStrategy {
     
     protected void notifyStateChanged(CameraState newState) {
         Log.d(TAG, "notifyStateChanged: " + this);
-        Log.d(TAG, "notifyStateChanged: currentState=" + currentState + " ,newState=" + newState, new RuntimeException());
+        Log.d(TAG, "notifyStateChanged: currentState=" + currentState + " ,newState=" + newState);
         if (currentState != newState) {
             currentState = newState;
             for (CameraStateListener listener : stateListeners) {
                 listener.onStateChanged(newState);
             }
+        }
+    }
+
+    /**
+     * Always deliver state to listeners, even when unchanged.
+     * Needed after config switches so UI can leave "Initializing...".
+     */
+    protected void forceNotifyState(CameraState newState) {
+        Log.d(TAG, "forceNotifyState: currentState=" + currentState + " ,newState=" + newState);
+        currentState = newState;
+        for (CameraStateListener listener : new ArrayList<>(stateListeners)) {
+            listener.onStateChanged(newState);
         }
     }
     
@@ -95,7 +107,8 @@ public abstract class BaseCameraStrategy implements CameraStrategy {
     }
     
     protected void notifyRecordingStopped() {
-        notifyStateChanged(CameraState.OPENED);
+        // Stay on preview pipeline; do not go back to OPENED or MainActivity will restart preview.
+        notifyStateChanged(CameraState.PREVIEW_STARTED);
         for (CameraStateListener listener : stateListeners) {
             listener.onRecordingStopped();
         }

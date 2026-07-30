@@ -135,6 +135,12 @@ public interface CameraStrategy {
      * Update camera configuration
      */
     void updateConfiguration(CameraConfig config);
+
+    /**
+     * Push latest config into the live strategy without forcing an open/close.
+     * Used when capture mode flips for recording so stop-preview rebuilds the right pipeline.
+     */
+    default void bindConfiguration(CameraConfig config) {}
     
     /**
      * Interface for camera state listeners

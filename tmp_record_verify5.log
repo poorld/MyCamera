@@ -1,0 +1,472 @@
+--------- beginning of main
+07-25 21:43:58.613   723  6038 D MdpMgr  : [selectDpIspStream] [selectDpIspStream] cqIdx(0/0/0/32_0/1),sceID(0)
+07-25 21:43:58.613   723  6038 D MdpMgr  : [_dequeueBuf] +,cqIndx(0/0/0/32),sceID(0),deqIndex(2),isWaitBuf(1),
+07-25 21:43:58.613   723  6038 D MdpMgr  :         deqIndex(2), dequeTime(25 us)
+07-25 21:43:58.613   723  6038 D MdpMgr  : [selectDpIspStream] [selectDpIspStream] cqIdx(0/0/0/32_0/1),sceID(0)
+07-25 21:43:58.613   723  6038 D MdpMgr  : [_dequeueBuf] +,cqIndx(0/0/0/32),sceID(0),deqIndex(0),isWaitBuf(1),
+07-25 21:43:58.613   723  6038 D MdpMgr  :         deqIndex(0), dequeTime(16 us)
+07-25 21:43:58.613   723  6038 D MdpMgr  : [selectDpIspStream] [selectDpIspStream] cqIdx(0/0/0/32_0/1),sceID(0)
+07-25 21:43:58.613   723  6038 D MtkCam/StreamingPipe/P2ANode: [onDIPStreamBaseCB] P2S cam 0 MWFrame:#793 MWReq:#793, frame 794-793 :sensor(0) Frame 793 enque done in 10 ms, result = 1
+07-25 21:43:58.613   723  6038 D Iop/p2HPDQNode: [doDeque] +,tag(2),idx(0),p2CQ(0/0/0/32),
+07-25 21:43:58.613   723  6038 D Iop/p2HPDQNode:                          +,tag(1),idx(0),p2CQ(0/0),
+07-25 21:43:58.613   723  6038 D Iop/p2HPDQNode:                          -,cb(166 us)
+07-25 21:43:58.614  5796  6077 W Codec2Client: query -- param skipped: index = 1107298332.
+07-25 21:43:58.614  5796  6077 D CCodec  : setup formats input: AMessage(what = 0x00000000) = {
+07-25 21:43:58.614  5796  6077 D CCodec  :   int32_t sample-rate = 48000
+07-25 21:43:58.614  5796  6077 D CCodec  :   int32_t channel-count = 1
+07-25 21:43:58.614  5796  6077 D CCodec  :   int32_t max-input-size = 2048
+07-25 21:43:58.614  5796  6077 D CCodec  :   string mime = "audio/raw"
+07-25 21:43:58.614  5796  6077 D CCodec  : }
+07-25 21:43:58.614  5796  6077 D CCodec  : setup formats output: AMessage(what = 0x00000000) = {
+07-25 21:43:58.614  5796  6077 D CCodec  :   int32_t sample-rate = 48000
+07-25 21:43:58.614  5796  6077 D CCodec  :   int32_t bitrate = 128000
+07-25 21:43:58.614  5796  6077 D CCodec  :   int32_t channel-count = 1
+07-25 21:43:58.614  5796  6077 D CCodec  :   int32_t level = 0
+07-25 21:43:58.614  5796  6077 D CCodec  :   int32_t max-bitrate = 128000
+07-25 21:43:58.614  5796  6077 D CCodec  :   string mime = "audio/mp4a-latm"
+07-25 21:43:58.614  5796  6077 D CCodec  :   int32_t profile = 1
+07-25 21:43:58.614  5796  6077 D CCodec  : }
+07-25 21:43:58.614   723  6042 D MtkCam/P2/MWFrame: [doRelease] P2S cam 0 MWFrame:#793 MWReq:#793, frame 794 : all streams(9), using(0), status: s0:d0:App:YCrCb_420_SP:0|HW_TEXTURE(1),s2:d0:App:YV12:0|HW_VIDEO_ENCODER(1),Meta:App:Control(1),Hal:Image:P1:Resizeraw_main1(1),Hal:Image:STT_main1(1),Hal:Meta:P1:Dynamic_main1(1),Hal:Meta:P2:Dynamic(1),App:Meta:DynamicP1_main1(1),App:Meta:DynamicP2(1),
+07-25 21:43:58.615   723  6008 D mtkcam-AppStreamMgr: [0-FrameHandler::updateResult] requestNo 793, real time:0, last partial:1
+07-25 21:43:58.615   723  6008 D ULog    : R AppRequest:793 M[CameraDevice:187001] -  :mtkcam-AppStreamMgr #51397
+07-25 21:43:58.615   723  6042 D mtkcam-pipeline: [onLastStrongRef] [ requestNo:793 frameNo:793 ] frame end
+07-25 21:43:58.616   723  6042 D MtkCam/StreamingPipe/Timer: [print]Frame timer [#  793/ 461][t  13][io   0][tof  0/  0][d  0/  0][mss  0/  0/  0/  0][a 12/  2/ 10][tun  0/  0][msf  0/  0][vnr  0/  0/  0][am  0][b  0/  0][tpi(  0/  0)/(  0/  0)/(  0/  0)][vmdp_A  0/  0 vmdp_B  0/  0][h  1/  0/  0][e  0][r  0/  0][w_A  0/  0/  0/  0 w_B  0/  0/  0/  0][x  0][disp  0/  0][async  0/  0][p2sm  0/  0/  0][fps29.50/29.50/ 30/ 30]
+07-25 21:43:58.616  5796  6077 I CCodecConfig: query failed after returning 9 values (BAD_INDEX)
+07-25 21:43:58.617  5796  5953 D AudioEncoder: Transitioning encoder internal state: STOPPING --> CONFIGURED
+07-25 21:43:58.617  5796  5845 W GraphicBufferSource: onFrameAvailable: EOS is sent, ignoring frame
+07-25 21:43:58.620   723  6011 D HwIRQ3A : [wait] VSIrq
+07-25 21:43:58.620   723  6034 D NormalPipe: [enqueRequest] +N:0 CurSof:30 enqCnt:795 cqCnt(p/v):795/795 FrameStatus(2)
+07-25 21:43:58.620   723  6034 D NormalPipe: [configEnquePath] N:0 configFrame event:1 multiSenNum:2 occupy:0 status:1(2) fsm:0 depth:0
+07-25 21:43:58.620   723  6034 D NormalPipe: [dmaCfg] N:0 dma:x8 cmd:0x101a, crop:(0,0,2016,1136), outsize:(1920,1088)
+07-25 21:43:58.620   723  6011 I MtkCam/P1NodeImp: [setRequest] [Cam::0 R798 S798 E797 D795 O795 #0] [P1::SET][Num Q:798 M:798 F:796 R:796 @0][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:1 Flush:x0] Num[798] Ctrl[1]=[ 798 ]
+07-25 21:43:58.620   723  6034 D NormalPipe: [dmaCfg] N:0 dma:x6 cmd:0x101c, crop:(0,0,2016,1), outsize:(2016,1)
+07-25 21:43:58.620   723  4812 E camiopipe: [vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/imageio/pipe/CamIOPipe/CamIOPipe.cpp, sendCommand, line3805] ERROR: [0x0]:NOT support command! (sendCommand){#3805:vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/imageio/pipe/CamIOPipe/CamIOPipe.cpp}
+07-25 21:43:58.620   723  6011 D aao_buf_mgr: [updateInfo] mMagicNumber(795), i4SubsampleCount(1)
+07-25 21:43:58.620   723  4812 E camiopipe: [vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/imageio/pipe/CamIOPipe/CamIOPipe.cpp, sendCommand, line3812] ERROR: [0x0]:sendCommand(0x1500) error! (sendCommand){#3812:vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/imageio/pipe/CamIOPipe/CamIOPipe.cpp}
+07-25 21:43:58.620   723  4812 E NormalPipe: [vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/iopipe/CamIO/NormalPipe.cpp, sendCommand, line3773] ERROR: error: sendCommand fail: (cmd,arg1,arg2,arg3)=(0x00001500,0x7C9EA4FF40,0x7C9EA4FF44,0xB400007ECE828ADC) (sendCommand){#3773:vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/iopipe/CamIO/NormalPipe.cpp}
+07-25 21:43:58.621   723  4812 D Hal3Av3 : [parseMeta] Return to AP AE_REGIONS L(0) T(0) R(0) B(0) W(0)
+07-25 21:43:58.621   723  6034 D ifunc_cam_tuning: [update] [0x0]:CAM_TUNING_CTRL - EN:0x100e02e0 DMA:0x808001e8
+07-25 21:43:58.621   723  4812 D Hal3Av3 : [parseMeta] Return to AP AF_REGIONS L(0) T(0) R(0) B(0) W(0)
+07-25 21:43:58.621   723  6034 D LMVDrv  : [GetLMVStatusAndUpdate]Suspicous clear, driver may drop frame and now in new pipeline: magicNum(797)=bypass(0)
+07-25 21:43:58.621   723  4812 D Hal3Av3 : [parseMeta] Return to AP AWB_REGIONS L(0) T(0) R(0) B(0) W(0)
+07-25 21:43:58.621   723  6034 W LMVDrv  : [GetLMVStatusAndUpdate]Cannot find magicNum(0) in queue(0)
+07-25 21:43:58.621   723  4812 D Hal3Av3 : [parseMeta] MTK_SENSOR_TEST_PATTERN_DATA(0, 0, 0, 0)
+07-25 21:43:58.621   723  4812 I MtkCam/P1NodeImp: [runQueue] [Cam::0 R798 S798 E797 D795 O795 #1] [P1::REQ][Num Q:799 M:0 F:797 R:797 @0][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:1 Flush:x0] [META ze:0 ci:3 rt:-1 tn:-1 qc:-1 fi:-1 fr:-1] [New-Request][0] [0] [IMGO:1 (-1,-1)] [Gp:255/0] IOmap-Img[1]=<0_I[0]{}_O[2]{0x100000003,0x100000004}>-Meta[1]=<0_I[2]{0x80000000,0x100000018}_O[2]{0x10000001b,0x100000024}> CfgStream-Img[OutIMG:0x100000001(0),OutRRZ:0x100000003(1),OutLCS:0x100000004(1)]-Meta[InAPP:0x80000000(1),InHAL:0x100000018(1),OutAPP:0x100000024(1),OutHAL:0x10000001b(1)]  | [PreSet][Key:799] Num(0) Dummy(0) MetaCnt[APP:66,HAL:18] | [Rev:0] depth(1) burst(1) Que[1]
+07-25 21:43:58.621   723  6034 D camiopipe: [sendCommand] [0x0]:[2]P1_UPDATE_CHECK CTL_EN(0x11bebee3) +[0_0]:0x11bebee3 [1_0]:0x11bebee3 [2_0]:0x11bebee3 -[0_0]:0x11bebee3 [1_0]:0x11bebee3 [2_0]:0x11bebee3 
+07-25 21:43:58.621   723  6034 D NormalPipe: [frameToEnque] - sof(30)
+07-25 21:43:58.621   723  6034 D NormalPipe: [enqueRequest] -
+07-25 21:43:58.621   723  4812 D MtkCam/ppl_context: [sendFrameToRootNodes] r797 frameNo:797 (X) -> 0x1 success; erase record
+07-25 21:43:58.621   723  6011 D AeFlowDefault: [monitorAndReschedule:Perframe AE] Calc:1 Apply:1 Magic:795 AEMonitorStable:1 VdCnt:0 u4CwvYcur:0 u4CwvYpre:0 
+07-25 21:43:58.622   723  6011 D ae_mgr  : [updateAEInfo2ISP] State:0 VDNum:0 Shutter:30003 Gain:9040 1024 750 Flare offset:0 512 FrameDuration:33350000 DisableOBC:0 ExpRatio:100 eAEMode:1 eAEstate:2 CurrentidxF:113
+07-25 21:43:58.623   723  6011 D awb_mgr : [setIspAwbInfo()] m_eSensorDev: 1, awb_gain: 990/512/816, PreGain1: 512/512/512, RPG: 990/512/816, PGN: 990/512/816, bAWBLock: 0 (m_bAWBLock:0, m_u4AWBMode:1)
+07-25 21:43:58.623   723  6011 D Task3APv: [run] getSensorParams: m_u4PreRealISO(750), u4RealISO(750), m_preAwbGain(988, 512, 819), rAwbInfo.gain(990, 512, 816)
+07-25 21:43:58.623   723  6062 D MtkCam/HalSensorList: [querySecureState] Secure State is 0
+07-25 21:43:58.623   723  6011 D isp_tuning_custom: [evaluate_Shading_Ratio] sensorid(1379), preSensorId(1379), eSensorMode(2), preSensorMode(2), isSensorOrModeSwitch(0), isInit(0)
+07-25 21:43:58.623   723  6011 D isp_tuning_custom: [iso_smooth][ISO smooth enabled][ISO idx(9885)]avgISO = 750.
+07-25 21:43:58.623   723  6011 D isp_tuning_custom: [RA_smooth][RA smooth][frm idx(9885)] rto for iso(21), prev_rto(21),RA_incremental_step(2), smoothed ratio(21)
+07-25 21:43:58.623   723  6011 D paramctrl_per_frame: put ratio with m_eSensorDev(1), i4Rto(21)
+07-25 21:43:58.623   723  6011 D paramctrl_per_frame: [updateLscInfo] (flash, iso, rto)=(0, 750, 21), auto(1), lock(0,0,0), dyn(1), op(0), PreCapFlashIsLockRto(0), fgForceUnlock(0)
+07-25 21:43:58.623   723  6011 D Task3APv: [run] Cam 1 : Req(#798)/Stt(#795)/i4Opt(0)/FlashOnOff(0) Lv(8)/ISO(750)/RGB(990,512,816) AFisLockAE(0) isLVChangeTooMuch(0) m_i4FrameCount(796) m_i4TsfFrameCount(797)
+07-25 21:43:58.624   723  6016 D MtkCam/BaseHeap: [IonHeap::helpFlushCacheIon] ctrl(0), num[0]: mID(0x26),size(24576),VA(0x7f77703000),PA(0x5400000)
+07-25 21:43:58.624   723  6011 W TuningMgr: TuningMgr[updateEngine] WARNING: [temp log] AF enable(1_0x100e02e0_0x808001e8)
+07-25 21:43:58.624   723  6011 D TuningMgr: TuningMgr[enqueBuffer] magicNum(0x31e)
+07-25 21:43:58.624   723  4812 D ULog    : R AppRequest:798 M[CameraDevice:187001] +  :mtkcam-dev3 #51398
+07-25 21:43:58.625   723  6062 D MtkCam/HalSensorList: [querySecureState] Secure State is 0
+07-25 21:43:58.625   723  4812 D mtkcam-dev3-utils: [0-AppRequestUtil::createOneRequest] requestNumber[798]:StreamBuffer:0xb400007dee808850 streamId:0 bufferId:3 buffer:0xb400007e2e8179d0 status:OK acquireFenceOp.hdl:0x0 releaseFenceOp.hdl:0x0 acquireFenceOp.fd:-1 releaseFenceOp.fd:-1 appBufferHandleHolder:0xb400007d8e846728 freeByOthers:0 / StreamBuffer:0xb400007dee8088a8 streamId:2 bufferId:12 buffer:0xb400007e2e83c250 status:OK acquireFenceOp.hdl:0x0 releaseFenceOp.hdl:0x0 acquireFenceOp.fd:-1 releaseFenceOp.fd:-1 appBufferHandleHolder:0xb400007d8e84f228 freeByOthers:0 / 
+07-25 21:43:58.626   723  6011 I MtkCam/P1NodeImp: [setupAction] [Cam::0 R798 S798 E798 D795 O795 #1] [P1::ENQ][Num Q:798 M:798 F:796 R:796 @30][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:1 Flush:x0] [Exp:30003000ns] [MetaCtrl][SCALER_CROP(1) (0,0_2016x1512) ][SENSOR_CROP(0)][RESIZER_SET(0)]
+07-25 21:43:58.626   723  6061 E AfAlgo  : Err:  6195: [AdpComp]Adaptive input error!! 
+07-25 21:43:58.626   723  6011 D NormalPipe: [acceptEnqRequest] MyEnq:0: dma:0x8 pa(0x6500000)io(0_0_2016_1136_1920_1088) mag(0x31e)|dma:0x6 pa(0x50009E0)io(0_0_2016_1_2016_1) mag(0x31e)|dma:0xf pa(0x8A01F00)io(0_0_256_1_256_1) mag(0x31e)|dma:0xb pa(0x9700000)io(0_0_384_384_384_384) mag(0x31e)|
+07-25 21:43:58.626   723  6061 E AfAlgo  : Err:  6279: [AdpComp]Adaptive input error
+07-25 21:43:58.626   723  4812 D mtkcam-HDRPolicyHelper: [getSeamlessSmoothResult][Cam::0]frameType[3] requestAETargetMode=0 requestExpNum=0
+07-25 21:43:58.626   723  6061 D TaskAFNormal: [run] Cam 1 : Req(#798)/Stt(#796)/i4Opt(0)/FlashOnOff(0)
+07-25 21:43:58.627   723  4812 D MtkCam/ppl_context: [sendFrameToRootNodes] r798 frameNo:798 (X) -> 0x1 BUSY
+07-25 21:43:58.628   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:rrzo
+07-25 21:43:58.628   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] (0x0)DMA port (0x1) is not supported
+07-25 21:43:58.628   723  6035 D ifunc_cam_buf: [waitBufReady] [0x0]:, [0x5d00000] waitbufready pass
+07-25 21:43:58.628   723  6035 D ifunc_cam_buf: [dequeueHwBuf] [0x0]:BUF_CTRL_RRZO:(0xd_0x0),PA(0x5D00000_0xB600D00),FH_VA(0x7F775CED00),size(0x3bc400),cur sof(0),
+07-25 21:43:58.628   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:imgo
+07-25 21:43:58.628   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] (0x0)DMA port (0x0) is not supported
+07-25 21:43:58.628   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:
+07-25 21:43:58.628   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:lcso
+07-25 21:43:58.628   723  6035 D NormalPipe: [ispDequeThread] N:0_deq@SOF_30
+07-25 21:43:58.628   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:rrzo
+07-25 21:43:58.629   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] (0x0)DMA port (0x1) is not supported
+07-25 21:43:58.629   723  6029 D NormalPipe: [deque] MyDeq:0: dma:0x6 pa(0x50013C0) io(0_0_1_0_0_0_2016_1_2016_1) mag(0x31c)|dma:0x8 pa(0x5D00000) io(0_0_2016_1136_0_0_1920_1088_1920_1088) mag(0x31c)|dma:0xb pa(0xDB00000) io(0_0_0_0_0_0_0_0_0_0) mag(0x31c)|dma:0xf pa(0x8A01D00) io(0_0_0_0_0_0_0_0_0_0) mag(0x31c)|
+07-25 21:43:58.629   723  6029 W fsc_hal : [processResult]image_scale_output.image_scale == 0
+07-25 21:43:58.629   723  6029 D fsc_hal : [processResult]P magic(796) dac(258) ET(30003) EIS(0), CB magic(796), factor(1.000000), sensor(2016,1136), RRZO: c(0,0,2016,1136) s(1920,1088) f(0.000000,0.000000,1920.000000,1088.000000),RSSO: s(0,0), f(0.000000,0.000000,0.000000,0.000000)
+07-25 21:43:58.629   723  6029 D MtkCam/HalSensorList: [querySecureState] Secure State is 0
+07-25 21:43:58.629   723  6029 D MtkCam/HalSensor: [destroyInstance] HalSensor destroyInstance count = 6, caller =MtkCam/P1NodeUtility
+07-25 21:43:58.630   723  6029 D MtkCam/BaseHeap: [IonHeap::unlockBufLocked] Hal:Image:P1:Fullraw_main1:Size2016x1:Stride2520.0.0:Sn3@ still locked (2)
+07-25 21:43:58.630   723  6029 I MtkCam/P1NodeImp: [releaseAction] [Cam::0 R798 S798 E798 D796 O795 #1] [P1::DEQ][Num Q:796 M:796 F:794 R:794 @28][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:3 Flush:x0] job(0/1) IMG(pure) RRZ0(0-0-2016x1136)(0-0-1920x1088)(1920x1088) T-ns(EXP: 30003000)(Src:0)(SOF: m_1177298112000 b_1177298101000)(SS: 1177268109000) ExpExtend(0, 
+07-25 21:43:58.631   723  6032 I MtkCam/P1NodeImp: [releaseFrame] [Cam::0 R798 S798 E798 D796 O796 #1] [P1::OUT][Num Q:796 M:796 F:794 R:794 @28][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:3 Flush:x0] [Release-0] [DispatchFrame]
+07-25 21:43:58.631   723  6032 D MtkCam/ppl_context: [onDispatchFrame] r794 frameNo:794 0x1 -> 0x15 READY(1/1)
+07-25 21:43:58.631   723  6032 D MtkCam/P2/MWFrameRequest: [printIOMap] P2S cam 0 MWFrame:#794 MWReq:#794, frame 795 : iomap: [0]=>img[2/2], meta[3/2], fps[29.56]
+07-25 21:43:58.634   531  2449 E [GrallocExtra-ERROR]: gralloc_extra_query:105 gralloc_extra_query with NULL handle: 0x0
+07-25 21:43:58.634  2345  2403 D C2OMXNode: dhy...mOsdPos:,,mOsdText:
+07-25 21:43:58.636   723  6043 D MtkCam/P2/StreamingProcessor: [makePayLoad] P2S cam 0 MWFrame:#794 MWReq:#794, frame 795-0 : masterID(0) #Requests(1) merged into #RequestsPacks(1), PendingPayload(2), p1Ts=0001177270609000
+07-25 21:43:58.636   723  6043 D MtkCam/StreamingPipe/Data: [calNonLargeSrcCrop]sID(0), imgoIn(0), srcCrop(0,0,1920x1088), isSrcCrop(0), mP2Pack Valid(1), imgo(0x0),rrz(1920x1088)
+07-25 21:43:58.636   723  6043 D MtkCam/StreamingPipe/Pipe: [prepareIORequest]P2S cam 0 MWFrame:#794 MWReq:#794, frame 795-794  master/slave/fd(0/-1/0) ReqNo(794), feature=0x8008(3DNR+FSC), cycle(33), fps(n/a)=(30/30), ZoomROI((1920.000000x1088.000000)@(0.000000,0.000000)) SFPIOMgr:[sID(0)--IMG(0x0/0),RRZ(0xb400007e0e829530/1),LCS(0xb400007e0e824670/1),LCSH(0x0/0),pRSS(0x0/0),cRSS(0x0/0),RSSR2(0x0/0),FYuv(0x0/0),RYuv1(0x0/0),RYuv2(0x0/0),mAIYuv(0x0/0),HalI(0xb400007dbe8234f0),AppI(0xb400007e2e80d2b8),AppDI(0xb400007dbe81f900),AppOver(0x0)]{path(GEN),halO(0xb400007e2e80dd70),appO(0xb400007e2e80d130),Outs--[buf(0xb400007e0e815c70/1)(320x240),tran(0),type(1), tar(disp), prof(0), crop(238.730179,0.000000,1442.539673x1088.000000), flag(0x0)][buf(0xb400007e0e81f210/1)(1920x1080),tran(0),type(2), tar(rec), prof(3), crop(0.000000,0.957747,1920.000000x1086.084473), flag(0x0)]Tuning--id(0)--[flag(5)]}
+07-25 21:43:58.638   723  6041 D isp_mgr_sl2: DIP_X_SL2H_RZ is (SL2_VRZ_COM, SL2_HRZ_COM) = (2138, 2150), (i4RzWidth, i4Width) = (1920, 2016), (i4RzHeight, i4Height) = (1088, 1136)
+07-25 21:43:58.639   723  6041 D isp_mgr_sl2: profile is 1, DIP_X_SL2H_RZ is (0x085a0866)
+07-25 21:43:58.639   723  6041 D isp_mgr_nr3d: NR3D_EN(1), SL2E_EN(1), x,y,w,h(0,0,1920,1088), full x,y,w,h(0,0,1920,1088),vipi offst(0) w,h(1920,1088), R2C en(1) cnt(0,0,0,0)
+07-25 21:43:58.639   723  6041 D MtkCam/StreamingPipe/P2ANode: [enqueFeatureStream] P2S cam 0 MWFrame:#794 MWReq:#794, frame 795-794 :sensor(0) Frame 794 enque start
+07-25 21:43:58.640   723  6036 D Iop/p2HPEQNode: [doEnque] sDrvScen:0, CQIdx:0, dupCQIdx:1, burstQIdx:0, RingBufIndex:33,  mTuningData ptr:780771492
+07-25 21:43:58.640   723  6036 D PostProcPipe: [PrintPipePortInfo] vInPorts:FN(794),RN(794),TS(0x1acbe468),UK(0xcc67095),Sec(0),[0]:(0x2205),w(1920),h(1088),stride(3600,0,0),type(0),idx(19),dir(0),Size(0x003bc400,0x00000000,0x00000000),VA(0x7c8f122000,0x0,0x0),PA(0x5d00000,0x0,0x0),secPort(0),
+07-25 21:43:58.640   723  6036 D PostProcPipe:                       vInPorts:FN(794),RN(794),TS(0x1acbe468),UK(0xcc67095),Sec(0),[1]:(0x32315659),w(1920),h(1088),stride(1920,960,960),type(0),idx(22),dir(0),Size(0x001fe000,0x0007f800,0x0007f800),VA(0x7c866c5000,0x7c868c3000,0x7c86942800),PA(0x9400000,0x95fe000,0x967d800),secPort(0),
+07-25 21:43:58.640   723  6036 D PostProcPipe:                       vInPorts:FN(794),RN(794),TS(0x1acbe468),UK(0xcc67095),Sec(0),[2]:(0x2401),w(200),h(112),stride(768,0,0),type(0),idx(26),dir(0),Size(0x00048000,0x00000000,0x00000000),VA(0x7cd7423000,0x0,0x0),PA(0xdb00000,0x0,0x0),secPort(0)
+07-25 21:43:58.640   723  6036 D PostProcPipe: [PrintPipePortInfo] vOutPorts:FN(794),RN(794),TS(0x1acbe468),UK(0xcc67095),Sec(0),[0]:(0x32315659),w(1920),h(1088),stride(1920,960,960),type(0),idx(32),dir(1),Size(0x001fe000,0x0007f800,0x0007f800),VA(0x7c863c7000,0x7c865c5000,0x7c86644800),PA(0x9900000,0x9afe000,0x9b7d800),secPort(0),
+07-25 21:43:58.640   723  6036 D PostProcPipe:                       vOutPorts:FN(794),RN(794),TS(0x1acbe468),UK(0xcc67095),Sec(0),[1]:(0x11),w(320),h(240),stride(320,320,0),type(0),idx(38),dir(1),Size(0x00012c00,0x00009600,0x00000000),VA(0x7f773d4000,0x7f773e6c00,0x0),PA(0xd100000,0xd112c00,0x0),secPort(0),
+07-25 21:43:58.640   723  6036 D PostProcPipe:                       vOutPorts:FN(794),RN(794),TS(0x1acbe468),UK(0xcc67095),Sec(0),[2]:(0x32315659),w(1920),h(1080),stride(1920,960,960),type(0),idx(37),dir(1),Size(0x001fa400,0x0007e900,0x0007e900),VA(0x7c63bfd000,0x7c63df7400,0x7c63e75d00),PA(0xe100000,0xe2fa400,0xe378d00),secPort(0)
+07-25 21:43:58.640   723  6036 D PostProcPipe: [configPipe] [Imgi][crop_1](x,f_x,y,f_y)=(0,0,0,0),(w,f_w,h,f_h)=(0,0,0,0),(tarW,tarH)=(0,0)-
+07-25 21:43:58.640   723  6036 D PostProcPipe:                     [crop_2](x,f_x,y,f_y)=(238,765648,0,0),(w,f_w,h,f_h)=(1442,565888,1088,0),(tarW,tarH)=(320,240)-
+07-25 21:43:58.640   723  6036 D PostProcPipe:                     [crop_3](x,f_x,y,f_y)=(0,0,0,1004270),(w,f_w,h,f_h)=(1920,0,1086,88576),(tarW,tarH)=(1920,1080),dupCqIdx(1),[vipi]ofst(0),rW/H(1920/1088)
+07-25 21:43:58.640   723  6036 D PostProcPipe: ,                    isDipOnly(0), hwmodule(9/0), dipCQ/dup/burst(0/1/0), drvSc(0), isWtf(1),tdr_tpipe(0),en_yuv/yuv2/rgb/dma/fmt_sel/ctl_sel/misc (0x11e07df8/0xf0/0x1400f9/0x30e0f1/0x30480409/0x16040/0x10), tcm(0xa/0x9fd8e1e3/0xe807b3c), last(1), CRZ_EN(0), img3o ofset(0,0),userName(),PIX_ID(3),ImgBuf_PIX_ID(3),tv_sec(1784987038),tv_usec(672664)
+07-25 21:43:58.640   723  6036 D iio/ifunc_dip: [ConfigDipPipe] moduleIdx(0), pDipWBuf(0xce8165b8), m_pIspDescript_phy(0x8bc6000), m_pIspDescript_vir(0x8a71b000), m_pIspVirRegAddr_pa(0x8bc7000), m_pIspVirRegAddr_va(0x8a71c000)
+07-25 21:43:58.641   723  6037 D iio/ifunc_dip: [enable] thiscq(0), frameflag(0x1), ring_index(33), ref_ringbufidx(32)
+07-25 21:43:58.641   723  6037 D MdpMgr  : [updateDpStreamMap] refObjectCqIdx:0, refObjectRingBufIdx:1,cqIdx:0,ringIdx:33,refringbufidx:32
+07-25 21:43:58.641   723  6037 D MdpMgr  : [selectDpIspStream] [selectDpIspStream] cqIdx(0/1/0/33_0/1),sceID(0)
+07-25 21:43:58.641   723  6037 D MdpMgr  : [_startMdp] dstFmt(657,4982892)
+07-25 21:43:58.641   723  6037 D MdpMgr  : [_startMdp] dstFmt(657,7080040)
+07-25 21:43:58.642   723  6037 D MdpMgr  : [_startMdp] +sceID(0),cqPa(0x8bc6000)-Va(0x7c8a71b000),tpipVa(0x7c8a164000)-Pa(0x8d10000),isWaitB(1),cqIndx(0/1/0/33),venc(0),(va: 0x7c8a164000),        srcFt(0x2205),W(1920),H(1088),stride(3600,0),size(0x3bc400-0x0-0x0),VA(0x    ffff),PA(0x 5d00000),plane(1),Stmtype(1)
+07-25 21:43:58.642   723  6037 D MdpMgr  :         wdma_en(1),idx(0),cap(3),ft(17),rt(0),fp(0),(w,h,s)=(320,240,320),C(w,h,s)=(320,120,320),V(w,h,s)=(0,0,0),mdpidx(0),
+07-25 21:43:58.642   723  6037 D MdpMgr  :         wrot_en(1),idx(1),cap(2),ft(842094169),rt(0),fp(0),(w,h,s)=(1920,1080,1920),C(w,h,s)=(960,540,960),V(w,h,s)=(960,540,960),mdpidx(0),
+07-25 21:43:58.642   723  6037 D MdpMgr  :         jpg_en(0),idx(2),cap(0),ft(0),rt(0),fp(0),(w,h,s)=(0,0,0),C(w,h,s)=(0,0,0),V(w,h,s)=(0,0,0),mdpidx(1),
+07-25 21:43:58.642   723  6037 D MdpMgr  :         pipe_en(0),idx(3),cap(0),ft(0),rt(0),fp(0),(w,h,s)=(0,0,0),C(w,h,s)=(0,0,0),V(w,h,s)=(0,0,0),mdpidx(2),
+07-25 21:43:58.642   723  6037 D MdpMgr  :         (va:0x7c8a164000,dstpa:0x8d10000)
+07-25 21:43:58.642   723  6037 D MdpMgr  : flag(0_0x1->0x1),startStm(821 us),WDPQ(0x       0),WRPQ(0x       0),tv_sec(1784987038),tv_usec(672664)
+07-25 21:43:58.642   723  6037 D Iop/p2HPEQNode: [doMdpStart] frameUnit.idxofwaitDQFrmPackList (0x5e814408_0_0_1, 0_0_1_0)
+07-25 21:43:58.642   723  6038 D MdpMgr  : [selectDpIspStream] [selectDpIspStream] cqIdx(0/1/0/33_0/1),sceID(0)
+07-25 21:43:58.649   723  6038 D MdpMgr  : [_dequeueBuf] +,cqIndx(0/1/0/33),sceID(0),deqIndex(1),isWaitBuf(1),
+07-25 21:43:58.649   723  6038 D MdpMgr  :         deqIndex(1), dequeTime(6467 us)
+07-25 21:43:58.649   723  6038 D MdpMgr  : [selectDpIspStream] [selectDpIspStream] cqIdx(0/1/0/33_0/1),sceID(0)
+07-25 21:43:58.649   723  6038 D MdpMgr  : [_dequeueBuf] +,cqIndx(0/1/0/33),sceID(0),deqIndex(2),isWaitBuf(1),
+07-25 21:43:58.649   723  6038 D MdpMgr  :         deqIndex(2), dequeTime(39 us)
+07-25 21:43:58.649   723  6038 D MdpMgr  : [selectDpIspStream] [selectDpIspStream] cqIdx(0/1/0/33_0/1),sceID(0)
+07-25 21:43:58.649   723  6038 D MdpMgr  : [_dequeueBuf] +,cqIndx(0/1/0/33),sceID(0),deqIndex(0),isWaitBuf(1),
+07-25 21:43:58.649   723  6038 D MdpMgr  :         deqIndex(0), dequeTime(26 us)
+07-25 21:43:58.649   723  6038 D MdpMgr  : [selectDpIspStream] [selectDpIspStream] cqIdx(0/1/0/33_0/1),sceID(0)
+07-25 21:43:58.649   723  6038 D MtkCam/StreamingPipe/P2ANode: [onDIPStreamBaseCB] P2S cam 0 MWFrame:#794 MWReq:#794, frame 795-794 :sensor(0) Frame 794 enque done in 10 ms, result = 1
+07-25 21:43:58.650   723  6038 D Iop/p2HPDQNode: [doDeque] +,tag(2),idx(0),p2CQ(0/1/0/33),
+07-25 21:43:58.650   723  6038 D Iop/p2HPDQNode:                          +,tag(1),idx(0),p2CQ(0/1),
+07-25 21:43:58.650   723  6038 D Iop/p2HPDQNode:                          -,cb(315 us)
+07-25 21:43:58.651   723  6042 D MtkCam/P2/MWFrame: [doRelease] P2S cam 0 MWFrame:#794 MWReq:#794, frame 795 : all streams(9), using(0), status: s0:d0:App:YCrCb_420_SP:0|HW_TEXTURE(1),s2:d0:App:YV12:0|HW_VIDEO_ENCODER(1),Meta:App:Control(1),Hal:Image:P1:Resizeraw_main1(1),Hal:Image:STT_main1(1),Hal:Meta:P1:Dynamic_main1(1),Hal:Meta:P2:Dynamic(1),App:Meta:DynamicP1_main1(1),App:Meta:DynamicP2(1),
+07-25 21:43:58.651   723  6008 D mtkcam-AppStreamMgr: [0-FrameHandler::updateResult] requestNo 794, real time:0, last partial:1
+07-25 21:43:58.651   723  6008 D ULog    : R AppRequest:794 M[CameraDevice:187001] -  :mtkcam-AppStreamMgr #51399
+07-25 21:43:58.652   723  6042 D mtkcam-pipeline: [onLastStrongRef] [ requestNo:794 frameNo:794 ] frame end
+07-25 21:43:58.652   723  6042 D MtkCam/StreamingPipe/Timer: [print]Frame timer [#  794/ 462][t  13][io   0][tof  0/  0][d  0/  0][mss  0/  0/  0/  0][a 12/  2/ 10][tun  0/  0][msf  0/  0][vnr  0/  0/  0][am  0][b  0/  0][tpi(  0/  0)/(  0/  0)/(  0/  0)][vmdp_A  0/  0 vmdp_B  0/  0][h  2/  0/  0][e  0][r  0/  0][w_A  0/  0/  0/  0 w_B  0/  0/  0/  0][x  0][disp  0/  0][async  0/  0][p2sm  0/  0/  0][fps29.44/29.44/ 30/ 30]
+07-25 21:43:58.653   723  6034 D NormalPipe: [enqueRequest] +N:0 CurSof:31 enqCnt:796 cqCnt(p/v):796/796 FrameStatus(2)
+07-25 21:43:58.653   723  6011 D HwIRQ3A : [wait] VSIrq
+07-25 21:43:58.654   723  6034 D NormalPipe: [configEnquePath] N:0 configFrame event:1 multiSenNum:2 occupy:0 status:1(2) fsm:0 depth:0
+07-25 21:43:58.654  5796  5845 W GraphicBufferSource: onFrameAvailable: EOS is sent, ignoring frame
+07-25 21:43:58.654   723  6034 D NormalPipe: [dmaCfg] N:0 dma:x8 cmd:0x101a, crop:(0,0,2016,1136), outsize:(1920,1088)
+07-25 21:43:58.654   723  6011 I MtkCam/P1NodeImp: [setRequest] [Cam::0 R799 S799 E798 D796 O796 #0] [P1::SET][Num Q:799 M:799 F:797 R:797 @0][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:1 Flush:x0] Num[799] Ctrl[1]=[ 799 ]
+07-25 21:43:58.654   723  6034 D NormalPipe: [dmaCfg] N:0 dma:x6 cmd:0x101c, crop:(0,0,2016,1), outsize:(2016,1)
+07-25 21:43:58.654   723  6011 D aao_buf_mgr: [updateInfo] mMagicNumber(796), i4SubsampleCount(1)
+07-25 21:43:58.654   723  4812 E camiopipe: [vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/imageio/pipe/CamIOPipe/CamIOPipe.cpp, sendCommand, line3805] ERROR: [0x0]:NOT support command! (sendCommand){#3805:vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/imageio/pipe/CamIOPipe/CamIOPipe.cpp}
+07-25 21:43:58.654   723  4812 E camiopipe: [vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/imageio/pipe/CamIOPipe/CamIOPipe.cpp, sendCommand, line3812] ERROR: [0x0]:sendCommand(0x1500) error! (sendCommand){#3812:vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/imageio/pipe/CamIOPipe/CamIOPipe.cpp}
+07-25 21:43:58.654   723  4812 E NormalPipe: [vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/iopipe/CamIO/NormalPipe.cpp, sendCommand, line3773] ERROR: error: sendCommand fail: (cmd,arg1,arg2,arg3)=(0x00001500,0x7C9EA4FF40,0x7C9EA4FF44,0xB400007ECE826F0C) (sendCommand){#3773:vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/iopipe/CamIO/NormalPipe.cpp}
+07-25 21:43:58.654   723  4812 D Hal3Av3 : [parseMeta] Return to AP AE_REGIONS L(0) T(0) R(0) B(0) W(0)
+07-25 21:43:58.654   723  4812 D Hal3Av3 : [parseMeta] Return to AP AF_REGIONS L(0) T(0) R(0) B(0) W(0)
+07-25 21:43:58.654   723  4812 D Hal3Av3 : [parseMeta] Return to AP AWB_REGIONS L(0) T(0) R(0) B(0) W(0)
+07-25 21:43:58.655   723  6034 D ifunc_cam_tuning: [update] [0x0]:CAM_TUNING_CTRL - EN:0x100e02e0 DMA:0x808001e8
+07-25 21:43:58.655   723  4812 D Hal3Av3 : [parseMeta] MTK_SENSOR_TEST_PATTERN_DATA(0, 0, 0, 0)
+07-25 21:43:58.655   723  6034 D LMVDrv  : [GetLMVStatusAndUpdate]Suspicous clear, driver may drop frame and now in new pipeline: magicNum(798)=bypass(0)
+07-25 21:43:58.655   723  4812 I MtkCam/P1NodeImp: [runQueue] [Cam::0 R799 S799 E798 D796 O796 #1] [P1::REQ][Num Q:800 M:0 F:798 R:798 @0][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:1 Flush:x0] [META ze:0 ci:3 rt:-1 tn:-1 qc:-1 fi:-1 fr:-1] [New-Request][0] [0] [IMGO:1 (-1,-1)] [Gp:255/0] IOmap-Img[1]=<0_I[0]{}_O[2]{0x100000003,0x100000004}>-Meta[1]=<0_I[2]{0x80000000,0x100000018}_O[2]{0x10000001b,0x100000024}> CfgStream-Img[OutIMG:0x100000001(0),OutRRZ:0x100000003(1),OutLCS:0x100000004(1)]-Meta[InAPP:0x80000000(1),InHAL:0x100000018(1),OutAPP:0x100000024(1),OutHAL:0x10000001b(1)]  | [PreSet][Key:800] Num(0) Dummy(0) MetaCnt[APP:66,HAL:18] | [Rev:0] depth(1) burst(1) Que[1]
+07-25 21:43:58.655   723  6034 W LMVDrv  : [GetLMVStatusAndUpdate]Cannot find magicNum(0) in queue(0)
+07-25 21:43:58.655   723  4812 D MtkCam/ppl_context: [sendFrameToRootNodes] r798 frameNo:798 (X) -> 0x1 success; erase record
+07-25 21:43:58.655   723  6034 D camiopipe: [sendCommand] [0x0]:[0]P1_UPDATE_CHECK CTL_EN(0x11bebee3) +[0_0]:0x11bebee3 [1_0]:0x11bebee3 [2_0]:0x11bebee3 -[0_0]:0x11bebee3 [1_0]:0x11bebee3 [2_0]:0x11bebee3 
+07-25 21:43:58.655   723  6034 D NormalPipe: [frameToEnque] - sof(31)
+07-25 21:43:58.655   723  6034 D NormalPipe: [enqueRequest] -
+07-25 21:43:58.655   723  6011 D AeFlowDefault: [monitorAndReschedule:Perframe AE] Calc:1 Apply:1 Magic:796 AEMonitorStable:1 VdCnt:0 u4CwvYcur:0 u4CwvYpre:0 
+07-25 21:43:58.656   723  6011 D ae_mgr  : [updateAEInfo2ISP] State:0 VDNum:0 Shutter:30003 Gain:9040 1024 750 Flare offset:0 512 FrameDuration:33350000 DisableOBC:0 ExpRatio:100 eAEMode:1 eAEstate:2 CurrentidxF:113
+07-25 21:43:58.656   723  6062 D MtkCam/HalSensorList: [querySecureState] Secure State is 0
+07-25 21:43:58.657   723  6011 D awb_mgr : [setIspAwbInfo()] m_eSensorDev: 1, awb_gain: 990/512/816, PreGain1: 512/512/512, RPG: 990/512/816, PGN: 990/512/816, bAWBLock: 0 (m_bAWBLock:0, m_u4AWBMode:1)
+07-25 21:43:58.657   723  6011 D Task3APv: [run] getSensorParams: m_u4PreRealISO(750), u4RealISO(750), m_preAwbGain(990, 512, 816), rAwbInfo.gain(990, 512, 816)
+07-25 21:43:58.657   723  6011 D isp_tuning_custom: [evaluate_Shading_Ratio] sensorid(1379), preSensorId(1379), eSensorMode(2), preSensorMode(2), isSensorOrModeSwitch(0), isInit(0)
+07-25 21:43:58.657   723  6011 D isp_tuning_custom: [iso_smooth][ISO smooth enabled][ISO idx(9886)]avgISO = 750.
+07-25 21:43:58.657   723  6011 D isp_tuning_custom: [RA_smooth][RA smooth][frm idx(9886)] rto for iso(21), prev_rto(21),RA_incremental_step(2), smoothed ratio(21)
+07-25 21:43:58.657   723  6011 D paramctrl_per_frame: put ratio with m_eSensorDev(1), i4Rto(21)
+07-25 21:43:58.657   723  6011 D paramctrl_per_frame: [updateLscInfo] (flash, iso, rto)=(0, 750, 21), auto(1), lock(0,0,0), dyn(1), op(0), PreCapFlashIsLockRto(0), fgForceUnlock(0)
+07-25 21:43:58.657   723  6011 D Task3APv: [run] Cam 1 : Req(#799)/Stt(#796)/i4Opt(0)/FlashOnOff(0) Lv(8)/ISO(750)/RGB(990,512,816) AFisLockAE(0) isLVChangeTooMuch(0) m_i4FrameCount(797) m_i4TsfFrameCount(798)
+07-25 21:43:58.657   723  1127 D ULog    : R AppRequest:799 M[CameraDevice:187001] +  :mtkcam-dev3 #51400
+07-25 21:43:58.658   723  6011 W TuningMgr: TuningMgr[updateEngine] WARNING: [temp log] AF enable(1_0x100e02e0_0x808001e8)
+07-25 21:43:58.658   723  6062 D MtkCam/HalSensorList: [querySecureState] Secure State is 0
+07-25 21:43:58.658   723  6011 D TuningMgr: TuningMgr[enqueBuffer] magicNum(0x31f)
+07-25 21:43:58.658   723  1127 D mtkcam-dev3-utils: [0-AppRequestUtil::createOneRequest] requestNumber[799]:StreamBuffer:0xb400007dee807b90 streamId:0 bufferId:6 buffer:0xb400007e2e839310 status:OK acquireFenceOp.hdl:0x7cde608368 releaseFenceOp.hdl:0x0 acquireFenceOp.fd:-1 releaseFenceOp.fd:-1 appBufferHandleHolder:0xb400007d8e842128 freeByOthers:0 / StreamBuffer:0xb400007dee807be8 streamId:2 bufferId:13 buffer:0xb400007e2e813750 status:OK acquireFenceOp.hdl:0x0 releaseFenceOp.hdl:0x0 acquireFenceOp.fd:-1 releaseFenceOp.fd:-1 appBufferHandleHolder:0xb400007d8e83a768 freeByOthers:0 / 
+07-25 21:43:58.659   723  1127 D mtkcam-HDRPolicyHelper: [getSeamlessSmoothResult][Cam::0]frameType[3] requestAETargetMode=0 requestExpNum=0
+07-25 21:43:58.659   723  6011 I MtkCam/P1NodeImp: [setupAction] [Cam::0 R799 S799 E799 D796 O796 #1] [P1::ENQ][Num Q:799 M:799 F:797 R:797 @31][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:1 Flush:x0] [Exp:30003000ns] [MetaCtrl][SCALER_CROP(1) (0,0_2016x1512) ][SENSOR_CROP(0)][RESIZER_SET(0)]
+07-25 21:43:58.659   723  6011 D NormalPipe: [acceptEnqRequest] MyEnq:0: dma:0x8 pa(0x6D00000)io(0_0_2016_1136_1920_1088) mag(0x31f)|dma:0x6 pa(0x50013C0)io(0_0_2016_1_2016_1) mag(0x31f)|dma:0xf pa(0x8A02000)io(0_0_256_1_256_1) mag(0x31f)|dma:0xb pa(0xCF00000)io(0_0_384_384_384_384) mag(0x31f)|
+07-25 21:43:58.659   723  6061 E AfAlgo  : Err:  6195: [AdpComp]Adaptive input error!! 
+07-25 21:43:58.659   723  6061 E AfAlgo  : Err:  6279: [AdpComp]Adaptive input error
+07-25 21:43:58.660   723  6061 D TaskAFNormal: [run] Cam 1 : Req(#799)/Stt(#797)/i4Opt(0)/FlashOnOff(0)
+07-25 21:43:58.660   723  1127 D MtkCam/ppl_context: [sendFrameToRootNodes] r799 frameNo:799 (X) -> 0x1 BUSY
+07-25 21:43:58.662   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:rrzo
+07-25 21:43:58.662   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] (0x0)DMA port (0x1) is not supported
+07-25 21:43:58.662   723  6035 D ifunc_cam_buf: [waitBufReady] [0x0]:, [0x6100000] waitbufready pass
+07-25 21:43:58.662   723  6035 D ifunc_cam_buf: [dequeueHwBuf] [0x0]:BUF_CTRL_RRZO:(0xd_0x0),PA(0x6100000_0xB600D80),FH_VA(0x7F775CED80),size(0x3bc400),cur sof(0),
+07-25 21:43:58.662   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:imgo
+07-25 21:43:58.662   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] (0x0)DMA port (0x0) is not supported
+07-25 21:43:58.662   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:
+07-25 21:43:58.662   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:lcso
+07-25 21:43:58.662   723  6035 D NormalPipe: [ispDequeThread] N:0_deq@SOF_31
+07-25 21:43:58.662   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:rrzo
+07-25 21:43:58.662   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] (0x0)DMA port (0x1) is not supported
+07-25 21:43:58.662   723  6029 D NormalPipe: [deque] MyDeq:0: dma:0x6 pa(0x5000000) io(0_0_1_0_0_0_2016_1_2016_1) mag(0x31d)|dma:0x8 pa(0x6100000) io(0_0_2016_1136_0_0_1920_1088_1920_1088) mag(0x31d)|dma:0xb pa(0xDD00000) io(0_0_0_0_0_0_0_0_0_0) mag(0x31d)|dma:0xf pa(0x8A01E00) io(0_0_0_0_0_0_0_0_0_0) mag(0x31d)|
+07-25 21:43:58.663   723  6029 W fsc_hal : [processResult]image_scale_output.image_scale == 0
+07-25 21:43:58.663   723  6029 D fsc_hal : [processResult]P magic(797) dac(258) ET(30003) EIS(0), CB magic(797), factor(1.000000), sensor(2016,1136), RRZO: c(0,0,2016,1136) s(1920,1088) f(0.000000,0.000000,1920.000000,1088.000000),RSSO: s(0,0), f(0.000000,0.000000,0.000000,0.000000)
+07-25 21:43:58.663   723  6029 D MtkCam/HalSensorList: [querySecureState] Secure State is 0
+07-25 21:43:58.663   723  6029 D MtkCam/HalSensor: [destroyInstance] HalSensor destroyInstance count = 6, caller =MtkCam/P1NodeUtility
+07-25 21:43:58.664   723  6029 D MtkCam/BaseHeap: [IonHeap::unlockBufLocked] Hal:Image:P1:Fullraw_main1:Size2016x1:Stride2520.0.0:Sn1@ still locked (2)
+07-25 21:43:58.664   723  6029 I MtkCam/P1NodeImp: [releaseAction] [Cam::0 R799 S799 E799 D797 O796 #1] [P1::DEQ][Num Q:797 M:797 F:795 R:795 @29][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:3 Flush:x0] job(0/1) IMG(pure) RRZ0(0-0-2016x1136)(0-0-1920x1088)(1920x1088) T-ns(EXP: 30003000)(Src:0)(SOF: m_1177331891000 b_1177331880000)(SS: 1177301888000) ExpExtend(0, 
+07-25 21:43:58.665   723  6032 I MtkCam/P1NodeImp: [releaseFrame] [Cam::0 R799 S799 E799 D797 O797 #1] [P1::OUT][Num Q:797 M:797 F:795 R:795 @29][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:3 Flush:x0] [Release-0] [DispatchFrame]
+07-25 21:43:58.665   723  6032 D MtkCam/ppl_context: [onDispatchFrame] r795 frameNo:795 0x1 -> 0x15 READY(1/1)
+07-25 21:43:58.665   723  6032 D MtkCam/P2/MWFrameRequest: [printIOMap] P2S cam 0 MWFrame:#795 MWReq:#795, frame 796 : iomap: [0]=>img[2/2], meta[3/2], fps[29.56]
+07-25 21:43:58.668   723  6043 D MtkCam/P2/StreamingProcessor: [makePayLoad] P2S cam 0 MWFrame:#795 MWReq:#795, frame 796-0 : masterID(0) #Requests(1) merged into #RequestsPacks(1), PendingPayload(2), p1Ts=0001177304388000
+07-25 21:43:58.668   531  2449 E [GrallocExtra-ERROR]: gralloc_extra_query:105 gralloc_extra_query with NULL handle: 0x0
+07-25 21:43:58.669   723  6043 D MtkCam/StreamingPipe/Data: [calNonLargeSrcCrop]sID(0), imgoIn(0), srcCrop(0,0,1920x1088), isSrcCrop(0), mP2Pack Valid(1), imgo(0x0),rrz(1920x1088)
+07-25 21:43:58.669   723  6043 D MtkCam/StreamingPipe/Pipe: [prepareIORequest]P2S cam 0 MWFrame:#795 MWReq:#795, frame 796-795  master/slave/fd(0/-1/0) ReqNo(795), feature=0x8008(3DNR+FSC), cycle(33), fps(n/a)=(30/30), ZoomROI((1920.000000x1088.000000)@(0.000000,0.000000)) SFPIOMgr:[sID(0)--IMG(0x0/0),RRZ(0xb400007e0e812af0/1),LCS(0xb400007e0e8322f0/1),LCSH(0x0/0),pRSS(0x0/0),cRSS(0x0/0),RSSR2(0x0/0),FYuv(0x0/0),RYuv1(0x0/0),RYuv2(0x0/0),mAIYuv(0x0/0),HalI(0xb400007dbe8234f0),AppI(0xb400007e2e82a0b8),AppDI(0xb400007dbe81a8f0),AppOver(0x0)]{path(GEN),halO(0xb400007e2e819df0),appO(0xb400007e2e823ef0),Outs--[buf(0xb400007e0e8249d0/1)(320x240),tran(0),type(1), tar(disp), prof(0), crop(238.730179,0.000000,1442.539673x1088.000000), flag(0x0)][buf(0xb400007e0e830490/1)(1920x1080),tran(0),type(2), tar(rec), prof(3), crop(0.000000,0.957747,1920.000000x1086.084473), flag(0x0)]Tuning--id(0)--[flag(5)]}
+07-25 21:43:58.669  2345  2403 D C2OMXNode: dhy...mOsdPos:,,mOsdText:
+07-25 21:43:58.670   723  6041 D isp_mgr_sl2: DIP_X_SL2H_RZ is (SL2_VRZ_COM, SL2_HRZ_COM) = (2138, 2150), (i4RzWidth, i4Width) = (1920, 2016), (i4RzHeight, i4Height) = (1088, 1136)
+07-25 21:43:58.670   723  6041 D isp_mgr_sl2: profile is 1, DIP_X_SL2H_RZ is (0x085a0866)
+07-25 21:43:58.671   723  6041 D isp_mgr_nr3d: NR3D_EN(1), SL2E_EN(1), x,y,w,h(0,0,1920,1088), full x,y,w,h(0,0,1920,1088),vipi offst(0) w,h(1920,1088), R2C en(1) cnt(1,1,1,1)
+07-25 21:43:58.671   723  6041 D MtkCam/StreamingPipe/P2ANode: [enqueFeatureStream] P2S cam 0 MWFrame:#795 MWReq:#795, frame 796-795 :sensor(0) Frame 795 enque start
+07-25 21:43:58.671   723  6036 D Iop/p2HPEQNode: [doEnque] sDrvScen:0, CQIdx:0, dupCQIdx:0, burstQIdx:0, RingBufIndex:34,  mTuningData ptr:780333220
+07-25 21:43:58.671   723  6036 D PostProcPipe: [PrintPipePortInfo] vInPorts:FN(795),RN(795),TS(0x1ccf51a0),UK(0xcc67095),Sec(0),[0]:(0x2205),w(1920),h(1088),stride(3600,0,0),type(0),idx(19),dir(0),Size(0x003bc400,0x00000000,0x00000000),VA(0x7c8ed65000,0x0,0x0),PA(0x6100000,0x0,0x0),secPort(0),
+07-25 21:43:58.671   723  6036 D PostProcPipe:                       vInPorts:FN(795),RN(795),TS(0x1ccf51a0),UK(0xcc67095),Sec(0),[1]:(0x32315659),w(1920),h(1088),stride(1920,960,960),type(0),idx(22),dir(0),Size(0x001fe000,0x0007f800,0x0007f800),VA(0x7c863c7000,0x7c865c5000,0x7c86644800),PA(0x9900000,0x9afe000,0x9b7d800),secPort(0),
+07-25 21:43:58.671   723  6036 D PostProcPipe:                       vInPorts:FN(795),RN(795),TS(0x1ccf51a0),UK(0xcc67095),Sec(0),[2]:(0x2401),w(200),h(112),stride(768,0,0),type(0),idx(26),dir(0),Size(0x00048000,0x00000000,0x00000000),VA(0x7cd5106000,0x0,0x0),PA(0xdd00000,0x0,0x0),secPort(0)
+07-25 21:43:58.671   723  6036 D PostProcPipe: [PrintPipePortInfo] vOutPorts:FN(795),RN(795),TS(0x1ccf51a0),UK(0xcc67095),Sec(0),[0]:(0x32315659),w(1920),h(1088),stride(1920,960,960),type(0),idx(32),dir(1),Size(0x001fe000,0x0007f800,0x0007f800),VA(0x7c73b2d000,0x7c73d2b000,0x7c73daa800),PA(0x9c00000,0x9dfe000,0x9e7d800),secPort(0),
+07-25 21:43:58.671   723  6036 D PostProcPipe:                       vOutPorts:FN(795),RN(795),TS(0x1ccf51a0),UK(0xcc67095),Sec(0),[1]:(0x11),w(320),h(240),stride(320,320,0),type(0),idx(38),dir(1),Size(0x00012c00,0x00009600,0x00000000),VA(0x7f76e28000,0x7f76e3ac00,0x0),PA(0xdf00000,0xdf12c00,0x0),secPort(0),
+07-25 21:43:58.671   723  6036 D PostProcPipe:                       vOutPorts:FN(795),RN(795),TS(0x1ccf51a0),UK(0xcc67095),Sec(0),[2]:(0x32315659),w(1920),h(1080),stride(1920,960,960),type(0),idx(37),dir(1),Size(0x001fa400,0x0007e900,0x0007e900),VA(0x7c638ff000,0x7c63af9400,0x7c63b77d00),PA(0xe400000,0xe5fa400,0xe678d00),secPort(0)
+07-25 21:43:58.671   723  6036 D PostProcPipe: [configPipe] [Imgi][crop_1](x,f_x,y,f_y)=(0,0,0,0),(w,f_w,h,f_h)=(0,0,0,0),(tarW,tarH)=(0,0)-
+07-25 21:43:58.671   723  6036 D PostProcPipe:                     [crop_2](x,f_x,y,f_y)=(238,765648,0,0),(w,f_w,h,f_h)=(1442,565888,1088,0),(tarW,tarH)=(320,240)-
+07-25 21:43:58.671   723  6036 D PostProcPipe:                     [crop_3](x,f_x,y,f_y)=(0,0,0,1004270),(w,f_w,h,f_h)=(1920,0,1086,88576),(tarW,tarH)=(1920,1080),dupCqIdx(0),[vipi]ofst(0),rW/H(1920/1088)
+07-25 21:43:58.671   723  6036 D PostProcPipe: ,                    isDipOnly(0), hwmodule(9/0), dipCQ/dup/burst(0/0/0), drvSc(0), isWtf(1),tdr_tpipe(0),en_yuv/yuv2/rgb/dma/fmt_sel/ctl_sel/misc (0x11e07df8/0xf0/0x1400f9/0x30e0f1/0x30480409/0x16040/0x10), tcm(0xa/0x9fd8e1e3/0xe807b3c), last(1), CRZ_EN(0), img3o ofset(0,0),userName(),PIX_ID(3),ImgBuf_PIX_ID(3),tv_sec(1784987038),tv_usec(704157)
+07-25 21:43:58.671   723  6036 D iio/ifunc_dip: [ConfigDipPipe] moduleIdx(0), pDipWBuf(0xce816610), m_pIspDescript_phy(0x8bcc000), m_pIspDescript_vir(0x8a721000), m_pIspVirRegAddr_pa(0x8bcd000), m_pIspVirRegAddr_va(0x8a722000)
+07-25 21:43:58.672   723  6037 D iio/ifunc_dip: [enable] thiscq(0), frameflag(0x1), ring_index(34), ref_ringbufidx(33)
+07-25 21:43:58.672   723  6037 D MdpMgr  : [updateDpStreamMap] refObjectCqIdx:0, refObjectRingBufIdx:1,cqIdx:0,ringIdx:34,refringbufidx:33
+07-25 21:43:58.672   723  6037 D MdpMgr  : [selectDpIspStream] [selectDpIspStream] cqIdx(0/0/0/34_0/1),sceID(0)
+07-25 21:43:58.672   723  6037 D MdpMgr  : [_startMdp] dstFmt(657,4982892)
+07-25 21:43:58.672   723  6037 D MdpMgr  : [_startMdp] dstFmt(657,7080040)
+07-25 21:43:58.673   723  6037 D MdpMgr  : [_startMdp] +sceID(0),cqPa(0x8bcc000)-Va(0x7c8a721000),tpipVa(0x7c8a164000)-Pa(0x8d10000),isWaitB(1),cqIndx(0/0/0/34),venc(0),(va: 0x7c8a164000),        srcFt(0x2205),W(1920),H(1088),stride(3600,0),size(0x3bc400-0x0-0x0),VA(0x    ffff),PA(0x 6100000),plane(1),Stmtype(1)
+07-25 21:43:58.673   723  6037 D MdpMgr  :         wdma_en(1),idx(0),cap(3),ft(17),rt(0),fp(0),(w,h,s)=(320,240,320),C(w,h,s)=(320,120,320),V(w,h,s)=(0,0,0),mdpidx(0),
+07-25 21:43:58.673   723  6037 D MdpMgr  :         wrot_en(1),idx(1),cap(2),ft(842094169),rt(0),fp(0),(w,h,s)=(1920,1080,1920),C(w,h,s)=(960,540,960),V(w,h,s)=(960,540,960),mdpidx(0),
+07-25 21:43:58.673   723  6037 D MdpMgr  :         jpg_en(0),idx(2),cap(0),ft(0),rt(0),fp(0),(w,h,s)=(0,0,0),C(w,h,s)=(0,0,0),V(w,h,s)=(0,0,0),mdpidx(1),
+07-25 21:43:58.673   723  6037 D MdpMgr  :         pipe_en(0),idx(3),cap(0),ft(0),rt(0),fp(0),(w,h,s)=(0,0,0),C(w,h,s)=(0,0,0),V(w,h,s)=(0,0,0),mdpidx(2),
+07-25 21:43:58.673   723  6037 D MdpMgr  :         (va:0x7c8a164000,dstpa:0x8d10000)
+07-25 21:43:58.673   723  6037 D MdpMgr  : flag(0_0x1->0x1),startStm(1198 us),WDPQ(0x       0),WRPQ(0x       0),tv_sec(1784987038),tv_usec(704157)
+07-25 21:43:58.674   723  6037 D Iop/p2HPEQNode: [doMdpStart] frameUnit.idxofwaitDQFrmPackList (0x5e814408_0_0_0, 0_0_1_0)
+07-25 21:43:58.674   723  6038 D MdpMgr  : [selectDpIspStream] [selectDpIspStream] cqIdx(0/0/0/34_0/1),sceID(0)
+07-25 21:43:58.680   723  6038 D MdpMgr  : [_dequeueBuf] +,cqIndx(0/0/0/34),sceID(0),deqIndex(1),isWaitBuf(1),
+07-25 21:43:58.680   723  6038 D MdpMgr  :         deqIndex(1), dequeTime(6513 us)
+07-25 21:43:58.681   723  6038 D MdpMgr  : [selectDpIspStream] [selectDpIspStream] cqIdx(0/0/0/34_0/1),sceID(0)
+07-25 21:43:58.681   723  6038 D MdpMgr  : [_dequeueBuf] +,cqIndx(0/0/0/34),sceID(0),deqIndex(2),isWaitBuf(1),
+07-25 21:43:58.681   723  6038 D MdpMgr  :         deqIndex(2), dequeTime(60 us)
+07-25 21:43:58.681   723  6038 D MdpMgr  : [selectDpIspStream] [selectDpIspStream] cqIdx(0/0/0/34_0/1),sceID(0)
+07-25 21:43:58.681   723  6038 D MdpMgr  : [_dequeueBuf] +,cqIndx(0/0/0/34),sceID(0),deqIndex(0),isWaitBuf(1),
+07-25 21:43:58.681   723  6038 D MdpMgr  :         deqIndex(0), dequeTime(30 us)
+07-25 21:43:58.681   723  6038 D MdpMgr  : [selectDpIspStream] [selectDpIspStream] cqIdx(0/0/0/34_0/1),sceID(0)
+07-25 21:43:58.681   723  6038 D MtkCam/StreamingPipe/P2ANode: [onDIPStreamBaseCB] P2S cam 0 MWFrame:#795 MWReq:#795, frame 796-795 :sensor(0) Frame 795 enque done in 10 ms, result = 1
+07-25 21:43:58.681   723  6038 D Iop/p2HPDQNode: [doDeque] +,tag(2),idx(0),p2CQ(0/0/0/34),
+07-25 21:43:58.681   723  6038 D Iop/p2HPDQNode:                          +,tag(1),idx(0),p2CQ(0/0),
+07-25 21:43:58.681   723  6038 D Iop/p2HPDQNode:                          -,cb(257 us)
+07-25 21:43:58.682   723  6042 D MtkCam/P2/MWFrame: [doRelease] P2S cam 0 MWFrame:#795 MWReq:#795, frame 796 : all streams(9), using(0), status: s0:d0:App:YCrCb_420_SP:0|HW_TEXTURE(1),s2:d0:App:YV12:0|HW_VIDEO_ENCODER(1),Meta:App:Control(1),Hal:Image:P1:Resizeraw_main1(1),Hal:Image:STT_main1(1),Hal:Meta:P1:Dynamic_main1(1),Hal:Meta:P2:Dynamic(1),App:Meta:DynamicP1_main1(1),App:Meta:DynamicP2(1),
+07-25 21:43:58.683   723  6008 D mtkcam-AppStreamMgr: [0-FrameHandler::updateResult] requestNo 795, real time:0, last partial:1
+07-25 21:43:58.683   723  6008 D ULog    : R AppRequest:795 M[CameraDevice:187001] -  :mtkcam-AppStreamMgr #51401
+07-25 21:43:58.683   723  6042 D mtkcam-pipeline: [onLastStrongRef] [ requestNo:795 frameNo:795 ] frame end
+07-25 21:43:58.684   723  6042 D MtkCam/StreamingPipe/Timer: [print]Frame timer [#  795/ 463][t  12][io   0][tof  0/  0][d  0/  0][mss  0/  0/  0/  0][a 11/  1/ 10][tun  0/  0][msf  0/  0][vnr  0/  0/  0][am  0][b  0/  0][tpi(  0/  0)/(  0/  0)/(  0/  0)][vmdp_A  0/  0 vmdp_B  0/  0][h  2/  0/  0][e  0][r  0/  0][w_A  0/  0/  0/  0 w_B  0/  0/  0/  0][x  0][disp  0/  0][async  0/  0][p2sm  0/  0/  0][fps29.56/29.56/ 30/ 30]
+07-25 21:43:58.686  5796  5845 W GraphicBufferSource: onFrameAvailable: EOS is sent, ignoring frame
+07-25 21:43:58.687   723  6011 D HwIRQ3A : [wait] VSIrq
+07-25 21:43:58.687   723  6034 D NormalPipe: [enqueRequest] +N:0 CurSof:32 enqCnt:797 cqCnt(p/v):797/797 FrameStatus(2)
+07-25 21:43:58.687   723  6034 D NormalPipe: [configEnquePath] N:0 configFrame event:1 multiSenNum:2 occupy:0 status:1(2) fsm:0 depth:0
+07-25 21:43:58.688   723  6034 D NormalPipe: [dmaCfg] N:0 dma:x8 cmd:0x101a, crop:(0,0,2016,1136), outsize:(1920,1088)
+07-25 21:43:58.688   723  6011 I MtkCam/P1NodeImp: [setRequest] [Cam::0 R800 S800 E799 D797 O797 #0] [P1::SET][Num Q:800 M:800 F:798 R:798 @0][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:1 Flush:x0] Num[800] Ctrl[1]=[ 800 ]
+07-25 21:43:58.688   723  6034 D NormalPipe: [dmaCfg] N:0 dma:x6 cmd:0x101c, crop:(0,0,2016,1), outsize:(2016,1)
+07-25 21:43:58.688   723  1127 E camiopipe: [vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/imageio/pipe/CamIOPipe/CamIOPipe.cpp, sendCommand, line3805] ERROR: [0x0]:NOT support command! (sendCommand){#3805:vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/imageio/pipe/CamIOPipe/CamIOPipe.cpp}
+07-25 21:43:58.688   723  6011 D aao_buf_mgr: [updateInfo] mMagicNumber(797), i4SubsampleCount(1)
+07-25 21:43:58.688   723  1127 E camiopipe: [vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/imageio/pipe/CamIOPipe/CamIOPipe.cpp, sendCommand, line3812] ERROR: [0x0]:sendCommand(0x1500) error! (sendCommand){#3812:vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/imageio/pipe/CamIOPipe/CamIOPipe.cpp}
+07-25 21:43:58.688   723  1127 E NormalPipe: [vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/iopipe/CamIO/NormalPipe.cpp, sendCommand, line3773] ERROR: error: sendCommand fail: (cmd,arg1,arg2,arg3)=(0x00001500,0x7C9723DF40,0x7C9723DF44,0xB400007ECE81057C) (sendCommand){#3773:vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/iopipe/CamIO/NormalPipe.cpp}
+07-25 21:43:58.688   723  1127 D Hal3Av3 : [parseMeta] Return to AP AE_REGIONS L(0) T(0) R(0) B(0) W(0)
+07-25 21:43:58.688   723  6034 D ifunc_cam_tuning: [update] [0x0]:CAM_TUNING_CTRL - EN:0x100e02e0 DMA:0x808001e8
+07-25 21:43:58.689   723  1127 D Hal3Av3 : [parseMeta] Return to AP AF_REGIONS L(0) T(0) R(0) B(0) W(0)
+07-25 21:43:58.689   723  6034 D LMVDrv  : [GetLMVStatusAndUpdate]Suspicous clear, driver may drop frame and now in new pipeline: magicNum(799)=bypass(0)
+07-25 21:43:58.689   723  1127 D Hal3Av3 : [parseMeta] Return to AP AWB_REGIONS L(0) T(0) R(0) B(0) W(0)
+07-25 21:43:58.689   723  6034 W LMVDrv  : [GetLMVStatusAndUpdate]Cannot find magicNum(0) in queue(0)
+07-25 21:43:58.689   723  1127 D Hal3Av3 : [parseMeta] MTK_SENSOR_TEST_PATTERN_DATA(0, 0, 0, 0)
+07-25 21:43:58.689   723  6034 D camiopipe: [sendCommand] [0x0]:[1]P1_UPDATE_CHECK CTL_EN(0x11bebee3) +[0_0]:0x11bebee3 [1_0]:0x11bebee3 [2_0]:0x11bebee3 -[0_0]:0x11bebee3 [1_0]:0x11bebee3 [2_0]:0x11bebee3 
+07-25 21:43:58.689   723  1127 I MtkCam/P1NodeImp: [runQueue] [Cam::0 R800 S800 E799 D797 O797 #1] [P1::REQ][Num Q:801 M:0 F:799 R:799 @0][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:1 Flush:x0] [META ze:0 ci:3 rt:-1 tn:-1 qc:-1 fi:-1 fr:-1] [New-Request][0] [0] [IMGO:1 (-1,-1)] [Gp:255/0] IOmap-Img[1]=<0_I[0]{}_O[2]{0x100000003,0x100000004}>-Meta[1]=<0_I[2]{0x80000000,0x100000018}_O[2]{0x10000001b,0x100000024}> CfgStream-Img[OutIMG:0x100000001(0),OutRRZ:0x100000003(1),OutLCS:0x100000004(1)]-Meta[InAPP:0x80000000(1),InHAL:0x100000018(1),OutAPP:0x100000024(1),OutHAL:0x10000001b(1)]  | [PreSet][Key:801] Num(0) Dummy(0) MetaCnt[APP:66,HAL:18] | [Rev:0] depth(1) burst(1) Que[1]
+07-25 21:43:58.689   723  1127 D MtkCam/ppl_context: [sendFrameToRootNodes] r799 frameNo:799 (X) -> 0x1 success; erase record
+07-25 21:43:58.689   723  6034 D NormalPipe: [frameToEnque] - sof(32)
+07-25 21:43:58.689   723  6034 D NormalPipe: [enqueRequest] -
+07-25 21:43:58.689   723  6011 D AeFlowDefault: [monitorAndReschedule:Perframe AE] Calc:1 Apply:1 Magic:797 AEMonitorStable:1 VdCnt:0 u4CwvYcur:0 u4CwvYpre:0 
+07-25 21:43:58.690   723  6011 D ae_mgr  : [updateAEInfo2ISP] State:0 VDNum:0 Shutter:30003 Gain:9040 1024 750 Flare offset:0 512 FrameDuration:33350000 DisableOBC:0 ExpRatio:100 eAEMode:1 eAEstate:2 CurrentidxF:113
+07-25 21:43:58.690   723  6062 D MtkCam/HalSensorList: [querySecureState] Secure State is 0
+07-25 21:43:58.690   723  6011 D awb_mgr : [setIspAwbInfo()] m_eSensorDev: 1, awb_gain: 990/512/817, PreGain1: 512/512/512, RPG: 990/512/817, PGN: 990/512/817, bAWBLock: 0 (m_bAWBLock:0, m_u4AWBMode:1)
+07-25 21:43:58.690   723  6011 D Task3APv: [run] getSensorParams: m_u4PreRealISO(750), u4RealISO(750), m_preAwbGain(990, 512, 816), rAwbInfo.gain(990, 512, 817)
+07-25 21:43:58.690   723  6011 D isp_tuning_custom: [evaluate_Shading_Ratio] sensorid(1379), preSensorId(1379), eSensorMode(2), preSensorMode(2), isSensorOrModeSwitch(0), isInit(0)
+07-25 21:43:58.690   723  6011 D isp_tuning_custom: [iso_smooth][ISO smooth enabled][ISO idx(9887)]avgISO = 750.
+07-25 21:43:58.690   723  6011 D isp_tuning_custom: [RA_smooth][RA smooth][frm idx(9887)] rto for iso(21), prev_rto(21),RA_incremental_step(2), smoothed ratio(21)
+07-25 21:43:58.690   723  6011 D paramctrl_per_frame: put ratio with m_eSensorDev(1), i4Rto(21)
+07-25 21:43:58.690   723  6011 D paramctrl_per_frame: [updateLscInfo] (flash, iso, rto)=(0, 750, 21), auto(1), lock(0,0,0), dyn(1), op(0), PreCapFlashIsLockRto(0), fgForceUnlock(0)
+07-25 21:43:58.690   723  6011 D Task3APv: [run] Cam 1 : Req(#800)/Stt(#797)/i4Opt(0)/FlashOnOff(0) Lv(8)/ISO(750)/RGB(990,512,817) AFisLockAE(0) isLVChangeTooMuch(0) m_i4FrameCount(798) m_i4TsfFrameCount(799)
+07-25 21:43:58.691   723  6011 W TuningMgr: TuningMgr[updateEngine] WARNING: [temp log] AF enable(1_0x100e02e0_0x808001e8)
+07-25 21:43:58.691   723  6011 D TuningMgr: TuningMgr[enqueBuffer] magicNum(0x320)
+07-25 21:43:58.692   723  6011 I MtkCam/P1NodeImp: [setupAction] [Cam::0 R800 S800 E800 D797 O797 #1] [P1::ENQ][Num Q:800 M:800 F:798 R:798 @32][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:1 Flush:x0] [Exp:30003000ns] [MetaCtrl][SCALER_CROP(1) (0,0_2016x1512) ][SENSOR_CROP(0)][RESIZER_SET(0)]
+07-25 21:43:58.692   723  6011 D NormalPipe: [acceptEnqRequest] MyEnq:0: dma:0x8 pa(0x6900000)io(0_0_2016_1136_1920_1088) mag(0x320)|dma:0x6 pa(0x5000000)io(0_0_2016_1_2016_1) mag(0x320)|dma:0xf pa(0x8A02100)io(0_0_256_1_256_1) mag(0x320)|dma:0xb pa(0xCE00000)io(0_0_384_384_384_384) mag(0x320)|
+07-25 21:43:58.692   723  6062 D MtkCam/HalSensorList: [querySecureState] Secure State is 0
+07-25 21:43:58.693   723  6061 E AfAlgo  : Err:  6195: [AdpComp]Adaptive input error!! 
+07-25 21:43:58.693   723  6061 E AfAlgo  : Err:  6279: [AdpComp]Adaptive input error
+07-25 21:43:58.694   723  6061 D TaskAFNormal: [run] Cam 1 : Req(#800)/Stt(#798)/i4Opt(0)/FlashOnOff(0)
+07-25 21:43:58.694   723  1127 D ULog    : R AppRequest:800 M[CameraDevice:187001] +  :mtkcam-dev3 #51402
+07-25 21:43:58.695   723  1127 D mtkcam-dev3-utils: [0-AppRequestUtil::createOneRequest] requestNumber[800]:StreamBuffer:0xb400007dee807b90 streamId:0 bufferId:5 buffer:0xb400007e2e830550 status:OK acquireFenceOp.hdl:0x7cde608368 releaseFenceOp.hdl:0x0 acquireFenceOp.fd:-1 releaseFenceOp.fd:-1 appBufferHandleHolder:0xb400007d8e8557e8 freeByOthers:0 / StreamBuffer:0xb400007dee807be8 streamId:2 bufferId:14 buffer:0xb400007e2e80f150 status:OK acquireFenceOp.hdl:0x0 releaseFenceOp.hdl:0x0 acquireFenceOp.fd:-1 releaseFenceOp.fd:-1 appBufferHandleHolder:0xb400007d8e844a28 freeByOthers:0 / 
+07-25 21:43:58.695   723  1127 D mtkcam-HDRPolicyHelper: [getSeamlessSmoothResult][Cam::0]frameType[3] requestAETargetMode=0 requestExpNum=0
+07-25 21:43:58.695   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:rrzo
+07-25 21:43:58.695   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] (0x0)DMA port (0x1) is not supported
+07-25 21:43:58.695   723  6035 D ifunc_cam_buf: [waitBufReady] [0x0]:, [0x6500000] waitbufready pass
+07-25 21:43:58.696   723  6035 D ifunc_cam_buf: [dequeueHwBuf] [0x0]:BUF_CTRL_RRZO:(0xd_0x0),PA(0x6500000_0xB600E00),FH_VA(0x7F775CEE00),size(0x3bc400),cur sof(0),
+07-25 21:43:58.696   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:imgo
+07-25 21:43:58.696   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] (0x0)DMA port (0x0) is not supported
+07-25 21:43:58.696   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:
+07-25 21:43:58.696   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:lcso
+07-25 21:43:58.696   723  6035 D NormalPipe: [ispDequeThread] N:0_deq@SOF_32
+07-25 21:43:58.696   723  6029 D NormalPipe: [deque] MyDeq:0: dma:0x6 pa(0x50009E0) io(0_0_1_0_0_0_2016_1_2016_1) mag(0x31e)|dma:0x8 pa(0x6500000) io(0_0_2016_1136_0_0_1920_1088_1920_1088) mag(0x31e)|dma:0xb pa(0x9700000) io(0_0_0_0_0_0_0_0_0_0) mag(0x31e)|dma:0xf pa(0x8A01F00) io(0_0_0_0_0_0_0_0_0_0) mag(0x31e)|
+07-25 21:43:58.696   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:rrzo
+07-25 21:43:58.696   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] (0x0)DMA port (0x1) is not supported
+07-25 21:43:58.697   723  1127 D MtkCam/ppl_context: [sendFrameToRootNodes] r800 frameNo:800 (X) -> 0x1 BUSY
+07-25 21:43:58.697   723  6029 W fsc_hal : [processResult]image_scale_output.image_scale == 0
+07-25 21:43:58.697   723  6029 D fsc_hal : [processResult]P magic(798) dac(258) ET(30003) EIS(0), CB magic(798), factor(1.000000), sensor(2016,1136), RRZO: c(0,0,2016,1136) s(1920,1088) f(0.000000,0.000000,1920.000000,1088.000000),RSSO: s(0,0), f(0.000000,0.000000,0.000000,0.000000)
+07-25 21:43:58.697   723  6029 D MtkCam/HalSensorList: [querySecureState] Secure State is 0
+07-25 21:43:58.697   723  6029 D MtkCam/HalSensor: [destroyInstance] HalSensor destroyInstance count = 6, caller =MtkCam/P1NodeUtility
+07-25 21:43:58.698  2345  2433 D CCodecBufferChannel: elapsed: mInputMetEos 0, hasPendingOutputsInClient 0, n 8
+07-25 21:43:58.698   723  6029 D MtkCam/BaseHeap: [IonHeap::unlockBufLocked] Hal:Image:P1:Fullraw_main1:Size2016x1:Stride2520.0.0:Sn2@ still locked (2)
+07-25 21:43:58.698   723  6029 I MtkCam/P1NodeImp: [releaseAction] [Cam::0 R800 S800 E800 D798 O797 #1] [P1::DEQ][Num Q:798 M:798 F:796 R:796 @30][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:3 Flush:x0] job(0/1) IMG(pure) RRZ0(0-0-2016x1136)(0-0-1920x1088)(1920x1088) T-ns(EXP: 30003000)(Src:0)(SOF: m_1177365669000 b_1177365658000)(SS: 1177335666000) ExpExtend(0, 
+07-25 21:43:58.699   723  6032 I MtkCam/P1NodeImp: [releaseFrame] [Cam::0 R800 S800 E800 D798 O798 #1] [P1::OUT][Num Q:798 M:798 F:796 R:796 @30][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:3 Flush:x0] [Release-0] [DispatchFrame]
+07-25 21:43:58.699   723  6032 D MtkCam/ppl_context: [onDispatchFrame] r796 frameNo:796 0x1 -> 0x15 READY(1/1)
+07-25 21:43:58.700   723  6032 D MtkCam/P2/MWFrameRequest: [printIOMap] P2S cam 0 MWFrame:#796 MWReq:#796, frame 797 : iomap: [0]=>img[2/2], meta[3/2], fps[29.53]
+07-25 21:43:58.702   723  6043 D MtkCam/P2/StreamingProcessor: [makePayLoad] P2S cam 0 MWFrame:#796 MWReq:#796, frame 797-0 : masterID(0) #Requests(1) merged into #RequestsPacks(1), PendingPayload(2), p1Ts=0001177338166000
+07-25 21:43:58.703   723  6043 D MtkCam/StreamingPipe/Data: [calNonLargeSrcCrop]sID(0), imgoIn(0), srcCrop(0,0,1920x1088), isSrcCrop(0), mP2Pack Valid(1), imgo(0x0),rrz(1920x1088)
+07-25 21:43:58.703   723  6043 D MtkCam/StreamingPipe/Pipe: [prepareIORequest]P2S cam 0 MWFrame:#796 MWReq:#796, frame 797-796  master/slave/fd(0/-1/0) ReqNo(796), feature=0x8008(3DNR+FSC), cycle(33), fps(n/a)=(30/30), ZoomROI((1920.000000x1088.000000)@(0.000000,0.000000)) SFPIOMgr:[sID(0)--IMG(0x0/0),RRZ(0xb400007e0e822030/1),LCS(0xb400007e0e825e10/1),LCSH(0x0/0),pRSS(0x0/0),cRSS(0x0/0),RSSR2(0x0/0),FYuv(0x0/0),RYuv1(0x0/0),RYuv2(0x0/0),mAIYuv(0x0/0),HalI(0xb400007dbe818580),AppI(0xb400007e2e829ef8),AppDI(0xb400007dbe817f60),AppOver(0x0)]{path(GEN),halO(0xb400007e2e81a170),appO(0xb400007e2e836f70),Outs--[buf(0xb400007e0e82fcb0/1)(320x240),tran(0),type(1), tar(disp), prof(0), crop(238.730179,0.000000,1442.539673x1088.000000), flag(0x0)][buf(0xb400007e0e8133f0/1)(1920x1080),tran(0),type(2), tar(rec), prof(3), crop(0.000000,0.957747,1920.000000x1086.084473), flag(0x0)]Tuning--id(0)--[flag(5)]}
+07-25 21:43:58.705   723  6041 D isp_mgr_sl2: DIP_X_SL2H_RZ is (SL2_VRZ_COM, SL2_HRZ_COM) = (2138, 2150), (i4RzWidth, i4Width) = (1920, 2016), (i4RzHeight, i4Height) = (1088, 1136)
+07-25 21:43:58.705   723  6041 D isp_mgr_sl2: profile is 1, DIP_X_SL2H_RZ is (0x085a0866)
+07-25 21:43:58.705   723  6041 D isp_mgr_nr3d: NR3D_EN(1), SL2E_EN(1), x,y,w,h(0,0,1920,1088), full x,y,w,h(0,0,1920,1088),vipi offst(0) w,h(1920,1088), R2C en(1) cnt(2,2,2,2)
+07-25 21:43:58.706   723  6041 D MtkCam/StreamingPipe/P2ANode: [enqueFeatureStream] P2S cam 0 MWFrame:#796 MWReq:#796, frame 797-796 :sensor(0) Frame 796 enque start
+07-25 21:43:58.706   723  6036 D Iop/p2HPEQNode: [doEnque] sDrvScen:0, CQIdx:0, dupCQIdx:1, burstQIdx:0, RingBufIndex:35,  mTuningData ptr:780427428
+07-25 21:43:58.706   723  6036 D PostProcPipe: [PrintPipePortInfo] vInPorts:FN(796),RN(796),TS(0x1ed2baf0),UK(0xcc67095),Sec(0),[0]:(0x2205),w(1920),h(1088),stride(3600,0,0),type(0),idx(19),dir(0),Size(0x003bc400,0x00000000,0x00000000),VA(0x7c86ab5000,0x0,0x0),PA(0x6500000,0x0,0x0),secPort(0),
+07-25 21:43:58.706   723  6036 D PostProcPipe:                       vInPorts:FN(796),RN(796),TS(0x1ed2baf0),UK(0xcc67095),Sec(0),[1]:(0x32315659),w(1920),h(1088),stride(1920,960,960),type(0),idx(22),dir(0),Size(0x001fe000,0x0007f800,0x0007f800),VA(0x7c73b2d000,0x7c73d2b000,0x7c73daa800),PA(0x9c00000,0x9dfe000,0x9e7d800),secPort(0),
+07-25 21:43:58.706   723  6036 D PostProcPipe:                       vInPorts:FN(796),RN(796),TS(0x1ed2baf0),UK(0xcc67095),Sec(0),[2]:(0x2401),w(200),h(112),stride(768,0,0),type(0),idx(26),dir(0),Size(0x00048000,0x00000000,0x00000000),VA(0x7cd1266000,0x0,0x0),PA(0x9700000,0x0,0x0),secPort(0)
+07-25 21:43:58.706   723  6036 D PostProcPipe: [PrintPipePortInfo] vOutPorts:FN(796),RN(796),TS(0x1ed2baf0),UK(0xcc67095),Sec(0),[0]:(0x32315659),w(1920),h(1088),stride(1920,960,960),type(0),idx(32),dir(1),Size(0x001fe000,0x0007f800,0x0007f800),VA(0x7c7382f000,0x7c73a2d000,0x7c73aac800),PA(0x9f00000,0xa0fe000,0xa17d800),secPort(0),
+07-25 21:43:58.706   723  6036 D PostProcPipe:                       vOutPorts:FN(796),RN(796),TS(0x1ed2baf0),UK(0xcc67095),Sec(0),[1]:(0x11),w(320),h(240),stride(320,320,0),type(0),idx(38),dir(1),Size(0x00012c00,0x00009600,0x00000000),VA(0x7cdd46b000,0x7cdd47dc00,0x0),PA(0x9300000,0x9312c00,0x0),secPort(0),
+07-25 21:43:58.706   723  6036 D PostProcPipe:                       vOutPorts:FN(796),RN(796),TS(0x1ed2baf0),UK(0xcc67095),Sec(0),[2]:(0x32315659),w(1920),h(1080),stride(1920,960,960),type(0),idx(37),dir(1),Size(0x001fa400,0x0007e900,0x0007e900),VA(0x7c63303000,0x7c634fd400,0x7c6357bd00),PA(0xea00000,0xebfa400,0xec78d00),secPort(0)
+07-25 21:43:58.706   723  6036 D PostProcPipe: [configPipe] [Imgi][crop_1](x,f_x,y,f_y)=(0,0,0,0),(w,f_w,h,f_h)=(0,0,0,0),(tarW,tarH)=(0,0)-
+07-25 21:43:58.706   723  6036 D PostProcPipe:                     [crop_2](x,f_x,y,f_y)=(238,765648,0,0),(w,f_w,h,f_h)=(1442,565888,1088,0),(tarW,tarH)=(320,240)-
+07-25 21:43:58.706   723  6036 D PostProcPipe:                     [crop_3](x,f_x,y,f_y)=(0,0,0,1004270),(w,f_w,h,f_h)=(1920,0,1086,88576),(tarW,tarH)=(1920,1080),dupCqIdx(1),[vipi]ofst(0),rW/H(1920/1088)
+07-25 21:43:58.706   723  6036 D PostProcPipe: ,                    isDipOnly(0), hwmodule(9/0), dipCQ/dup/burst(0/1/0), drvSc(0), isWtf(1),tdr_tpipe(0),en_yuv/yuv2/rgb/dma/fmt_sel/ctl_sel/misc (0x11e07df8/0xf0/0x1400f9/0x30e0f1/0x30480409/0x16040/0x10), tcm(0xa/0x9fd8e1e3/0xe807b3c), last(1), CRZ_EN(0), img3o ofset(0,0),userName(),PIX_ID(3),ImgBuf_PIX_ID(3),tv_sec(1784987038),tv_usec(739044)
+07-25 21:43:58.706   723  6036 D iio/ifunc_dip: [ConfigDipPipe] moduleIdx(0), pDipWBuf(0xce816668), m_pIspDescript_phy(0x8bd2000), m_pIspDescript_vir(0x8a727000), m_pIspVirRegAddr_pa(0x8bd3000), m_pIspVirRegAddr_va(0x8a728000)
+07-25 21:43:58.707   723  6037 D iio/ifunc_dip: [enable] thiscq(0), frameflag(0x1), ring_index(35), ref_ringbufidx(34)
+07-25 21:43:58.707   723  6037 D MdpMgr  : [updateDpStreamMap] refObjectCqIdx:0, refObjectRingBufIdx:1,cqIdx:0,ringIdx:35,refringbufidx:34
+07-25 21:43:58.707   723  6037 D MdpMgr  : [selectDpIspStream] [selectDpIspStream] cqIdx(0/1/0/35_0/1),sceID(0)
+07-25 21:43:58.707   723  6037 D MdpMgr  : [_startMdp] dstFmt(657,4982892)
+07-25 21:43:58.707   723  6037 D MdpMgr  : [_startMdp] dstFmt(657,7080040)
+07-25 21:43:58.708   723  6037 D MdpMgr  : [_startMdp] +sceID(0),cqPa(0x8bd2000)-Va(0x7c8a727000),tpipVa(0x7c8a164000)-Pa(0x8d10000),isWaitB(1),cqIndx(0/1/0/35),venc(0),(va: 0x7c8a164000),        srcFt(0x2205),W(1920),H(1088),stride(3600,0),size(0x3bc400-0x0-0x0),VA(0x    ffff),PA(0x 6500000),plane(1),Stmtype(1)
+07-25 21:43:58.708   723  6037 D MdpMgr  :         wdma_en(1),idx(0),cap(3),ft(17),rt(0),fp(0),(w,h,s)=(320,240,320),C(w,h,s)=(320,120,320),V(w,h,s)=(0,0,0),mdpidx(0),
+07-25 21:43:58.708   723  6037 D MdpMgr  :         wrot_en(1),idx(1),cap(2),ft(842094169),rt(0),fp(0),(w,h,s)=(1920,1080,1920),C(w,h,s)=(960,540,960),V(w,h,s)=(960,540,960),mdpidx(0),
+07-25 21:43:58.708   723  6037 D MdpMgr  :         jpg_en(0),idx(2),cap(0),ft(0),rt(0),fp(0),(w,h,s)=(0,0,0),C(w,h,s)=(0,0,0),V(w,h,s)=(0,0,0),mdpidx(1),
+07-25 21:43:58.708   723  6037 D MdpMgr  :         pipe_en(0),idx(3),cap(0),ft(0),rt(0),fp(0),(w,h,s)=(0,0,0),C(w,h,s)=(0,0,0),V(w,h,s)=(0,0,0),mdpidx(2),
+07-25 21:43:58.708   723  6037 D MdpMgr  :         (va:0x7c8a164000,dstpa:0x8d10000)
+07-25 21:43:58.708   723  6037 D MdpMgr  : flag(0_0x1->0x1),startStm(756 us),WDPQ(0x       0),WRPQ(0x       0),tv_sec(1784987038),tv_usec(739044)
+07-25 21:43:58.708   723  6037 D Iop/p2HPEQNode: [doMdpStart] frameUnit.idxofwaitDQFrmPackList (0x5e814408_0_0_1, 0_0_1_0)
+07-25 21:43:58.708   723  6038 D MdpMgr  : [selectDpIspStream] [selectDpIspStream] cqIdx(0/1/0/35_0/1),sceID(0)
+07-25 21:43:58.715   723  6038 D MdpMgr  : [_dequeueBuf] +,cqIndx(0/1/0/35),sceID(0),deqIndex(1),isWaitBuf(1),
+07-25 21:43:58.715   723  6038 D MdpMgr  :         deqIndex(1), dequeTime(6280 us)
+07-25 21:43:58.715   723  6038 D MdpMgr  : [selectDpIspStream] [selectDpIspStream] cqIdx(0/1/0/35_0/1),sceID(0)
+07-25 21:43:58.715   723  6038 D MdpMgr  : [_dequeueBuf] +,cqIndx(0/1/0/35),sceID(0),deqIndex(2),isWaitBuf(1),
+07-25 21:43:58.715   723  6038 D MdpMgr  :         deqIndex(2), dequeTime(44 us)
+07-25 21:43:58.715   723  6038 D MdpMgr  : [selectDpIspStream] [selectDpIspStream] cqIdx(0/1/0/35_0/1),sceID(0)
+07-25 21:43:58.715   723  6038 D MdpMgr  : [_dequeueBuf] +,cqIndx(0/1/0/35),sceID(0),deqIndex(0),isWaitBuf(1),
+07-25 21:43:58.715   723  6038 D MdpMgr  :         deqIndex(0), dequeTime(32 us)
+07-25 21:43:58.715   723  6038 D MdpMgr  : [selectDpIspStream] [selectDpIspStream] cqIdx(0/1/0/35_0/1),sceID(0)
+07-25 21:43:58.715   723  6038 D MtkCam/StreamingPipe/P2ANode: [onDIPStreamBaseCB] P2S cam 0 MWFrame:#796 MWReq:#796, frame 797-796 :sensor(0) Frame 796 enque done in 9 ms, result = 1
+07-25 21:43:58.716   723  6038 D Iop/p2HPDQNode: [doDeque] +,tag(2),idx(0),p2CQ(0/1/0/35),
+07-25 21:43:58.716   723  6038 D Iop/p2HPDQNode:                          +,tag(1),idx(0),p2CQ(0/1),
+07-25 21:43:58.716   723  6038 D Iop/p2HPDQNode:                          -,cb(296 us)
+07-25 21:43:58.717   560   560 I BufferQueueProducer: [VDS-anlink SCRATCH](this:0xb40000777c0b96b0,id:-1,api:1,p:560,c:560) queueBuffer: fps=26.42 dur=1021.96 max=51.90 min=18.15
+07-25 21:43:58.717   723  6042 D MtkCam/P2/MWFrame: [doRelease] P2S cam 0 MWFrame:#796 MWReq:#796, frame 797 : all streams(9), using(0), status: s0:d0:App:YCrCb_420_SP:0|HW_TEXTURE(1),s2:d0:App:YV12:0|HW_VIDEO_ENCODER(1),Meta:App:Control(1),Hal:Image:P1:Resizeraw_main1(1),Hal:Image:STT_main1(1),Hal:Meta:P1:Dynamic_main1(1),Hal:Meta:P2:Dynamic(1),App:Meta:DynamicP1_main1(1),App:Meta:DynamicP2(1),
+07-25 21:43:58.718   723  6042 D mtkcam-pipeline: [onLastStrongRef] [ requestNo:796 frameNo:796 ] frame end
+07-25 21:43:58.718   723  6008 D mtkcam-AppStreamMgr: [0-FrameHandler::updateResult] requestNo 796, real time:0, last partial:1
+07-25 21:43:58.718   723  6042 D MtkCam/StreamingPipe/Timer: [print]Frame timer [#  796/ 464][t  13][io   0][tof  0/  0][d  0/  0][mss  0/  0/  0/  0][a 11/  2/  9][tun  0/  0][msf  0/  0][vnr  0/  0/  0][am  0][b  0/  0][tpi(  0/  0)/(  0/  0)/(  0/  0)][vmdp_A  0/  0 vmdp_B  0/  0][h  1/  0/  0][e  0][r  0/  0][w_A  0/  0/  0/  0 w_B  0/  0/  0/  0][x  0][disp  0/  0][async  0/  0][p2sm  0/  0/  0][fps29.50/29.50/ 30/ 30]
+07-25 21:43:58.718   723  6008 D ULog    : R AppRequest:796 M[CameraDevice:187001] -  :mtkcam-AppStreamMgr #51403
+07-25 21:43:58.718   531   679 I hwcomposer: [HWCDisplay] [Display_2 (type:2)] fps:26.421045,dur:1021.91,max:51.96,min:18.00  
+07-25 21:43:58.719   531  2449 E [GrallocExtra-ERROR]: gralloc_extra_query:105 gralloc_extra_query with NULL handle: 0x0
+07-25 21:43:58.720  2345  2403 D C2OMXNode: dhy...mOsdPos:,,mOsdText:
+07-25 21:43:58.721   560   560 I BufferQueueProducer: [VDS-anlink SINK](this:0xb40000777c0b9620,id:-1,api:1,p:560,c:560) queueBuffer: fps=26.42 dur=1021.77 max=51.97 min=18.15
+07-25 21:43:58.721   723  6011 D HwIRQ3A : [wait] VSIrq
+07-25 21:43:58.721   723  6034 D NormalPipe: [enqueRequest] +N:0 CurSof:33 enqCnt:798 cqCnt(p/v):798/798 FrameStatus(2)
+07-25 21:43:58.721   723  6034 D NormalPipe: [configEnquePath] N:0 configFrame event:1 multiSenNum:2 occupy:0 status:1(2) fsm:0 depth:0
+07-25 21:43:58.722   723  6034 D NormalPipe: [dmaCfg] N:0 dma:x8 cmd:0x101a, crop:(0,0,2016,1136), outsize:(1920,1088)
+07-25 21:43:58.722   723  1127 E camiopipe: [vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/imageio/pipe/CamIOPipe/CamIOPipe.cpp, sendCommand, line3805] ERROR: [0x0]:NOT support command! (sendCommand){#3805:vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/imageio/pipe/CamIOPipe/CamIOPipe.cpp}
+07-25 21:43:58.722   723  6034 D NormalPipe: [dmaCfg] N:0 dma:x6 cmd:0x101c, crop:(0,0,2016,1), outsize:(2016,1)
+07-25 21:43:58.722   723  1127 E camiopipe: [vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/imageio/pipe/CamIOPipe/CamIOPipe.cpp, sendCommand, line3812] ERROR: [0x0]:sendCommand(0x1500) error! (sendCommand){#3812:vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/imageio/pipe/CamIOPipe/CamIOPipe.cpp}
+07-25 21:43:58.722   723  1127 E NormalPipe: [vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/iopipe/CamIO/NormalPipe.cpp, sendCommand, line3773] ERROR: error: sendCommand fail: (cmd,arg1,arg2,arg3)=(0x00001500,0x7C9723DF40,0x7C9723DF44,0xB400007ECE8158EC) (sendCommand){#3773:vendor/mediatek/proprietary/hardware/mtkcam/drv/src/isp/mt6768/iopipe/CamIO/NormalPipe.cpp}
+07-25 21:43:58.722   723  6034 D ifunc_cam_tuning: [update] [0x0]:CAM_TUNING_CTRL - EN:0x100e02e0 DMA:0x808001e8
+07-25 21:43:58.722   723  6034 D LMVDrv  : [GetLMVStatusAndUpdate]Suspicous clear, driver may drop frame and now in new pipeline: magicNum(800)=bypass(0)
+07-25 21:43:58.722   723  6034 W LMVDrv  : [GetLMVStatusAndUpdate]Cannot find magicNum(0) in queue(0)
+07-25 21:43:58.723   531   679 I hwcomposer: [HWCDisplay] [Display_0 (type:1)] fps:26.423304,dur:1021.83,max:52.02,min:17.96  
+07-25 21:43:58.723   723  6011 I MtkCam/P1NodeImp: [setRequest] [Cam::0 R801 S801 E800 D798 O798 #0] [P1::SET][Num Q:801 M:801 F:799 R:799 @0][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:1 Flush:x0] Num[801] Ctrl[1]=[ 801 ]
+07-25 21:43:58.723   723  6034 D camiopipe: [sendCommand] [0x0]:[2]P1_UPDATE_CHECK CTL_EN(0x11bebee3) +[0_0]:0x11bebee3 [1_0]:0x11bebee3 [2_0]:0x11bebee3 -[0_0]:0x11bebee3 [1_0]:0x11bebee3 [2_0]:0x11bebee3 
+07-25 21:43:58.723   723  6034 D NormalPipe: [frameToEnque] - sof(33)
+07-25 21:43:58.723   723  6011 D aao_buf_mgr: [updateInfo] mMagicNumber(798), i4SubsampleCount(1)
+07-25 21:43:58.723   723  1127 D Hal3Av3 : [parseMeta] Return to AP AE_REGIONS L(0) T(0) R(0) B(0) W(0)
+07-25 21:43:58.723   723  6034 D NormalPipe: [enqueRequest] -
+07-25 21:43:58.723   723  1127 D Hal3Av3 : [parseMeta] Return to AP AF_REGIONS L(0) T(0) R(0) B(0) W(0)
+07-25 21:43:58.723   723  1127 D Hal3Av3 : [parseMeta] Return to AP AWB_REGIONS L(0) T(0) R(0) B(0) W(0)
+07-25 21:43:58.723   723  1127 D Hal3Av3 : [parseMeta] MTK_SENSOR_TEST_PATTERN_DATA(0, 0, 0, 0)
+07-25 21:43:58.723   723  1127 I MtkCam/P1NodeImp: [runQueue] [Cam::0 R801 S801 E800 D798 O798 #1] [P1::REQ][Num Q:802 M:0 F:800 R:800 @0][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:1 Flush:x0] [META ze:0 ci:3 rt:-1 tn:-1 qc:-1 fi:-1 fr:-1] [New-Request][0] [0] [IMGO:1 (-1,-1)] [Gp:255/0] IOmap-Img[1]=<0_I[0]{}_O[2]{0x100000003,0x100000004}>-Meta[1]=<0_I[2]{0x80000000,0x100000018}_O[2]{0x10000001b,0x100000024}> CfgStream-Img[OutIMG:0x100000001(0),OutRRZ:0x100000003(1),OutLCS:0x100000004(1)]-Meta[InAPP:0x80000000(1),InHAL:0x100000018(1),OutAPP:0x100000024(1),OutHAL:0x10000001b(1)]  | [PreSet][Key:802] Num(0) Dummy(0) MetaCnt[APP:66,HAL:18] | [Rev:0] depth(1) burst(1) Que[1]
+07-25 21:43:58.723   723  1127 D MtkCam/ppl_context: [sendFrameToRootNodes] r800 frameNo:800 (X) -> 0x1 success; erase record
+07-25 21:43:58.723  5796  5845 W GraphicBufferSource: onFrameAvailable: EOS is sent, ignoring frame
+07-25 21:43:58.724   723  6011 D AeFlowDefault: [monitorAndReschedule:Perframe AE] Calc:1 Apply:1 Magic:798 AEMonitorStable:1 VdCnt:0 u4CwvYcur:0 u4CwvYpre:0 
+07-25 21:43:58.725   723  6011 D ae_mgr  : [updateAEInfo2ISP] State:0 VDNum:0 Shutter:30003 Gain:9040 1024 750 Flare offset:0 512 FrameDuration:33350000 DisableOBC:0 ExpRatio:100 eAEMode:1 eAEstate:2 CurrentidxF:113
+07-25 21:43:58.725   723  6062 D MtkCam/HalSensorList: [querySecureState] Secure State is 0
+07-25 21:43:58.726   723  6011 D awb_mgr : [setIspAwbInfo()] m_eSensorDev: 1, awb_gain: 990/512/817, PreGain1: 512/512/512, RPG: 990/512/817, PGN: 990/512/817, bAWBLock: 0 (m_bAWBLock:0, m_u4AWBMode:1)
+07-25 21:43:58.726   723  6011 D Task3APv: [run] getSensorParams: m_u4PreRealISO(750), u4RealISO(750), m_preAwbGain(990, 512, 817), rAwbInfo.gain(990, 512, 817)
+07-25 21:43:58.726   723  6011 D isp_tuning_custom: [evaluate_Shading_Ratio] sensorid(1379), preSensorId(1379), eSensorMode(2), preSensorMode(2), isSensorOrModeSwitch(0), isInit(0)
+07-25 21:43:58.726   723  6011 D isp_tuning_custom: [iso_smooth][ISO smooth enabled][ISO idx(9888)]avgISO = 750.
+07-25 21:43:58.726   723  6011 D isp_tuning_custom: [RA_smooth][RA smooth][frm idx(9888)] rto for iso(21), prev_rto(21),RA_incremental_step(2), smoothed ratio(21)
+07-25 21:43:58.726   723  6011 D paramctrl_per_frame: put ratio with m_eSensorDev(1), i4Rto(21)
+07-25 21:43:58.726   723  6011 D paramctrl_per_frame: [updateLscInfo] (flash, iso, rto)=(0, 750, 21), auto(1), lock(0,0,0), dyn(1), op(0), PreCapFlashIsLockRto(0), fgForceUnlock(0)
+07-25 21:43:58.726   723  6011 D Task3APv: [run] Cam 1 : Req(#801)/Stt(#798)/i4Opt(0)/FlashOnOff(0) Lv(8)/ISO(750)/RGB(990,512,817) AFisLockAE(0) isLVChangeTooMuch(0) m_i4FrameCount(799) m_i4TsfFrameCount(800)
+07-25 21:43:58.727   723  6062 D MtkCam/HalSensorList: [querySecureState] Secure State is 0
+07-25 21:43:58.727   723  6061 E AfAlgo  : Err:  6195: [AdpComp]Adaptive input error!! 
+07-25 21:43:58.727   723  6061 E AfAlgo  : Err:  6279: [AdpComp]Adaptive input error
+07-25 21:43:58.727   723  6061 D TaskAFNormal: [run] Cam 1 : Req(#801)/Stt(#799)/i4Opt(0)/FlashOnOff(0)
+07-25 21:43:58.728   723  6011 W TuningMgr: TuningMgr[updateEngine] WARNING: [temp log] AF enable(1_0x100e02e0_0x808001e8)
+07-25 21:43:58.728   723  6011 D TuningMgr: TuningMgr[enqueBuffer] magicNum(0x321)
+07-25 21:43:58.728   723  1127 D ULog    : R AppRequest:801 M[CameraDevice:187001] +  :mtkcam-dev3 #51404
+07-25 21:43:58.729   723  1127 D mtkcam-dev3-utils: [0-AppRequestUtil::createOneRequest] requestNumber[801]:StreamBuffer:0xb400007dee807b90 streamId:0 bufferId:2 buffer:0xb400007e2e826d10 status:OK acquireFenceOp.hdl:0x7cde608368 releaseFenceOp.hdl:0x0 acquireFenceOp.fd:-1 releaseFenceOp.fd:-1 appBufferHandleHolder:0xb400007d8e85d4a8 freeByOthers:0 / StreamBuffer:0xb400007dee807be8 streamId:2 bufferId:8 buffer:0xb400007e2e81e490 status:OK acquireFenceOp.hdl:0x0 releaseFenceOp.hdl:0x0 acquireFenceOp.fd:-1 releaseFenceOp.fd:-1 appBufferHandleHolder:0xb400007d8e85f068 freeByOthers:0 / 
+07-25 21:43:58.730   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:rrzo
+07-25 21:43:58.730   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] (0x0)DMA port (0x1) is not supported
+07-25 21:43:58.730   723  6035 D ifunc_cam_buf: [waitBufReady] [0x0]:, [0x6d00000] waitbufready pass
+07-25 21:43:58.730   723  6035 D ifunc_cam_buf: [dequeueHwBuf] [0x0]:BUF_CTRL_RRZO:(0xd_0x0),PA(0x6D00000_0xB600E80),FH_VA(0x7F775CEE80),size(0x3bc400),cur sof(0),
+07-25 21:43:58.730   723  1127 D mtkcam-HDRPolicyHelper: [getSeamlessSmoothResult][Cam::0]frameType[3] requestAETargetMode=0 requestExpNum=0
+07-25 21:43:58.730   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:imgo
+07-25 21:43:58.730   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] (0x0)DMA port (0x0) is not supported
+07-25 21:43:58.730   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:
+07-25 21:43:58.730   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:lcso
+07-25 21:43:58.730   723  6035 D NormalPipe: [ispDequeThread] N:0_deq@SOF_33
+07-25 21:43:58.730   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] + (0x0x0)module:0x0 dma port:rrzo
+07-25 21:43:58.730   723  6035 D SecMgr  : [SecMgr_GetSecurePortStatus] (0x0)DMA port (0x1) is not supported
+07-25 21:43:58.731   723  1127 D MtkCam/ppl_context: [sendFrameToRootNodes] r801 frameNo:801 (X) -> 0x1 BUSY
+07-25 21:43:58.732   723  6029 D NormalPipe: [deque] MyDeq:0: dma:0x6 pa(0x50013C0) io(0_0_1_0_0_0_2016_1_2016_1) mag(0x31f)|dma:0x8 pa(0x6D00000) io(0_0_2016_1136_0_0_1920_1088_1920_1088) mag(0x31f)|dma:0xb pa(0xCF00000) io(0_0_0_0_0_0_0_0_0_0) mag(0x31f)|dma:0xf pa(0x8A02000) io(0_0_0_0_0_0_0_0_0_0) mag(0x31f)|
+07-25 21:43:58.733   723  6029 W fsc_hal : [processResult]image_scale_output.image_scale == 0
+07-25 21:43:58.733   723  6029 D fsc_hal : [processResult]P magic(799) dac(258) ET(30003) EIS(0), CB magic(799), factor(1.000000), sensor(2016,1136), RRZO: c(0,0,2016,1136) s(1920,1088) f(0.000000,0.000000,1920.000000,1088.000000),RSSO: s(0,0), f(0.000000,0.000000,0.000000,0.000000)
+07-25 21:43:58.733   723  6029 D MtkCam/HalSensorList: [querySecureState] Secure State is 0
+07-25 21:43:58.733   723  6029 D MtkCam/HalSensor: [destroyInstance] HalSensor destroyInstance count = 6, caller =MtkCam/P1NodeUtility
+07-25 21:43:58.734   723  6029 D MtkCam/BaseHeap: [IonHeap::unlockBufLocked] Hal:Image:P1:Fullraw_main1:Size2016x1:Stride2520.0.0:Sn3@ still locked (1)
+07-25 21:43:58.734   723  6029 I MtkCam/P1NodeImp: [releaseAction] [Cam::0 R801 S801 E800 D799 O798 #1] [P1::DEQ][Num Q:799 M:799 F:797 R:797 @31][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:3 Flush:x0] job(0/1) IMG(pure) RRZ0(0-0-2016x1136)(0-0-1920x1088)(1920x1088) T-ns(EXP: 30003000)(Src:0)(SOF: m_1177399447000 b_1177399436000)(SS: 1177369444000) ExpExtend(0, 
+07-25 21:43:58.735   723  6032 I MtkCam/P1NodeImp: [releaseFrame] [Cam::0 R801 S801 E800 D799 O799 #1] [P1::OUT][Num Q:799 M:799 F:797 R:797 @31][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:3 Flush:x0] [Release-0] [DispatchFrame]
+07-25 21:43:58.735   723  6032 D MtkCam/ppl_context: [onDispatchFrame] r797 frameNo:797 0x1 -> 0x15 READY(1/1)
+07-25 21:43:58.735   723  6011 I MtkCam/P1NodeImp: [setupAction] [Cam::0 R801 S801 E801 D799 O799 #1] [P1::ENQ][Num Q:801 M:801 F:799 R:799 @33][Type:1 Out:x85 Rec:x0 Raw:1 Cap:0 Exe:1 Flush:x0] [Exp:30003000ns] [MetaCtrl][SCALER_CROP(1) (0,0_2016x1512) ][SENSOR_CROP(0)][RESIZER_SET(0)]
+07-25 21:43:58.735   723  6032 D MtkCam/P2/MWFrameRequest: [printIOMap] P2S cam 0 MWFrame:#797 MWReq:#797, frame 798 : iomap: [0]=>img[2/2], meta[3/2], fps[29.50]
+07-25 21:43:58.735   723  6011 D NormalPipe: [acceptEnqRequest] MyEnq:0: dma:0x8 pa(0x7100000)io(0_0_2016_1136_1920_1088) mag(0x321)|dma:0x6 pa(0x50013C0)io(0_0_2016_1_2016_1) mag(0x321)|dma:0xf pa(0x8A02200)io(0_0_256_1_256_1) mag(0x321)|dma:0xb pa(0xD200000)io(0_0_384_384_384_384) mag(0x321)|
+07-25 21:43:58.736   548   623 I libPerfCtl: xgfGetFPS pid:5796 fps:26
+07-25 21:43:58.738   723  6043 D MtkCam/P2/StreamingProcessor: [makePayLoad] P2S cam 0 MWFrame:#797 MWReq:#797, frame 798-0 : masterID(0) #Requests(1) merged into #RequestsPacks(1), PendingPayload(2), p1Ts=0001177371944000
+07-25 21:43:58.739   723  6043 D MtkCam/StreamingPipe/Data: [calNonLargeSrcCrop]sID(0), imgoIn(0), srcCrop(0,0,1920x1088), isSrcCrop(0), mP2Pack Valid(1), imgo(0x0),rrz(1920x1088)
+07-25 21:43:58.739   723  6043 D MtkCam/StreamingPipe/Pipe: [prepareIORequest]P2S cam 0 MWFrame:#797 MWReq:#797, frame 798-797  master/slave/fd(0/-1/0) ReqNo(797), feature=0x8008(3DNR+FSC), cycle(33), fps(n/a)=(30/30), ZoomROI((1920.000000x1088.000000)@(0.000000,0.000000)) SFPIOMgr:[sID(0)--IMG(0x0/0),RRZ(0xb400007e0e827250/1),LCS(0xb400007e0e830490/1),LCSH(0x0/0),pRSS(0x0/0),cRSS(0x0/0),RSSR2(0x0/0),FYuv(0x0/0),RYuv1(0x0/0),RYuv2(0x0/0),mAIYuv(0x0/0),HalI(0xb400007dbe81d130),AppI(0xb400007e2e8369f8),AppDI(0xb400007dbe819230),AppOver(0x0)]{path(GEN),halO(0xb400007e2e813170),appO(0xb400007e2e819a70),Outs--[buf(0xb400007e0e831330/1)(320x240),tran(0),type(1), tar(disp), prof(0), crop(238.730179,0.000000,1442.539673x1088.000000), flag(0x0)][buf(0xb400007e0e82bc90/1)(1920x1080),tran(0),type(2), tar(rec), prof(3), crop(0.000000,0.957747,1920.000000x1086.084473), flag(0x0)]Tuning--id(0)--[flag(5)]}

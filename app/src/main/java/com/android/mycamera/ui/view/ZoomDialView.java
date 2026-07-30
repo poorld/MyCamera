@@ -78,7 +78,8 @@ public class ZoomDialView extends View {
         }
         textPaint.setColor(0xFFFFD400);
         textPaint.setTextSize(22f * getResources().getDisplayMetrics().scaledDensity);
-        canvas.drawText(format(zoom), centerX, 35f, textPaint);
+        float zoomTextY = centerY - radius * 0.60f;
+        canvas.drawText(format(zoom), centerX, zoomTextY, textPaint);
     }
 
     private String format(float value) {

@@ -40,6 +40,16 @@
             android:textColor="@color/white"
             android:layout_marginBottom="16dp"/>
 
+        <Switch
+            android:id="@+id/showApiSwitcherSwitch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/show_api_switcher"
+            android:thumb="@drawable/settings_switch_thumb"
+            android:track="@drawable/settings_switch_track"
+            android:textColor="@color/white"
+            android:layout_marginBottom="16dp"/>
+
         <TextView
             android:id="@+id/languageLabel"
             android:layout_width="match_parent"
@@ -61,7 +71,7 @@
             android:id="@+id/resolutionLabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/resolution"
+            android:text="@string/video_resolution"
             android:textSize="18sp"
             android:textStyle="bold"
             android:textColor="@color/white"
@@ -112,6 +122,23 @@
 
         <Spinner
             android:id="@+id/qualitySpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"/>
+
+        <!-- Photo Resolution Settings -->
+        <TextView
+            android:id="@+id/photoResolutionLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/photo_resolution"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/white"
+            android:layout_marginBottom="8dp"/>
+
+        <Spinner
+            android:id="@+id/photoResolutionSpinner"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="24dp"/>
@@ -245,6 +272,26 @@
                 android:layout_height="20dp"
                 android:src="@mipmap/icon_setting_in"
                 android:layout_alignParentEnd="true"/>
+        </RelativeLayout>
+
+        <RelativeLayout
+            android:id="@+id/yuvDumpTest"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="30dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:text="@string/yuv_dump_test"
+                android:textColor="@color/white" />
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_alignParentEnd="true"
+                android:src="@mipmap/icon_setting_in" />
         </RelativeLayout>
 
     </LinearLayout>

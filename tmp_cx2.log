@@ -1,0 +1,21 @@
+--------- beginning of main
+07-25 21:46:09.677  6251  6251 D MainActivity: handleCaptureAction: isVideoMode=true,isRecording=true
+07-25 21:46:09.677  6251  6251 D MainActivity: stopRecording: 
+07-25 21:46:09.677  6251  6251 D CameraManager: stopRecording: 
+07-25 21:46:10.031  6251  6251 D CameraXStrategy: Recorded file: /storage/emulated/0/Android/data/com.android.mycamera/files/Media/CAMX_20260725_214606.mp4
+07-25 21:46:10.031  6251  6251 D CameraXStrategy: Recorded meta: 1920x1080, durationMs=2837, bitrate=19972884
+07-25 21:46:10.032  6251  6251 D CameraXStrategy: Skip restore rebind, stable pipeline already active
+07-25 21:46:10.034  6251  6251 D CameraManager: onStateChanged: OPENED
+07-25 21:46:10.034  6251  6251 D MainActivity: onCameraStateChanged: OPENED
+07-25 21:46:10.036  6251  6251 D CameraXStrategy: startPreview: 
+07-25 21:46:10.048  6251  6251 D MainActivity: onCameraStateChanged: PREVIEW_STARTED
+07-25 21:46:10.048  6251  6251 D MainActivity: onRecordingStopped: 
+07-25 21:46:10.110  6251  6251 D CameraXStrategy: CameraX supported qualities: [ConstantQuality{value=6, name=FHD, typicalSizes=[1920x1080]}, ConstantQuality{value=5, name=HD, typicalSizes=[1280x720]}, ConstantQuality{value=4, name=SD, typicalSizes=[720x480, 640x480]}]
+07-25 21:46:10.124  6251  6251 D CameraXStrategy: CameraX supported fps ranges: [[10, 10], [15, 15], [15, 20], [20, 20], [5, 30], [30, 30]]
+07-25 21:46:10.124  6251  6251 D CameraXStrategy: CameraX config quality=FULL_HD, config resolution=1920x1080, targetFps=30
+07-25 21:46:10.124  6251  6251 D CameraXStrategy: CameraX use quality=ConstantQuality{value=6, name=FHD, typicalSizes=[1920x1080]}, targetResolution=1920x1080, targetFps=30
+07-25 21:46:10.126  6251  6251 D CameraXStrategy: CameraX applied fps range=[30, 30]
+07-25 21:46:10.348  6251  6251 D CameraXStrategy: Bound stable pipeline: preview + imageCapture + videoCapture
+07-25 21:46:10.352  6251  6251 D CameraXStrategy: Applied CameraX exposure controls; fps=[30, 30], manualExposure=false
+07-25 21:46:10.366  6251  6251 D CameraXStrategy: CameraX target rotation=0
+07-25 21:46:10.367  6251  6251 D CameraManager: onStateChanged: PREVIEW_STARTED

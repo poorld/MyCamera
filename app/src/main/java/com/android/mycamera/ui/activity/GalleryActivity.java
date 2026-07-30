@@ -7,6 +7,8 @@ import android.graphics.BitmapFactory;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.MenuItem;
 import android.view.View;
@@ -35,6 +37,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /** Shows only media captured by this app from its app-specific external directory. */
 public class GalleryActivity extends BaseAct {
@@ -45,6 +49,9 @@ public class GalleryActivity extends BaseAct {
     private final Set<File> selectedFiles = new HashSet<>();
     private final Map<File, FrameLayout> mediaItems = new HashMap<>();
     private final ArrayList<File> displayedMediaFiles = new ArrayList<>();
+    private final ExecutorService thumbnailExecutor = Executors.newFixedThreadPool(2);
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private int thumbnailGeneration;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -65,6 +72,7 @@ public class GalleryActivity extends BaseAct {
     }
 
     private void loadMedia() {
+        int generation = ++thumbnailGeneration;
         File mediaDirectory = CameraUtils.createCameraDirectory(this);
         File[] mediaFiles = mediaDirectory.listFiles(new FilenameFilter() {
             @Override
@@ -91,11 +99,11 @@ public class GalleryActivity extends BaseAct {
         emptyView.setVisibility(View.GONE);
         int itemSize = (getResources().getDisplayMetrics().widthPixels - dp(8)) / 3;
         for (File mediaFile : mediaFiles) {
-            addMediaItem(mediaFile, itemSize);
+            addMediaItem(mediaFile, itemSize, generation);
         }
     }
 
-    private void addMediaItem(File mediaFile, int itemSize) {
+    private void addMediaItem(File mediaFile, int itemSize, int generation) {
         FrameLayout item = new FrameLayout(this);
         GridLayout.LayoutParams itemParams = new GridLayout.LayoutParams();
         itemParams.width = itemSize;
@@ -107,7 +115,8 @@ public class GalleryActivity extends BaseAct {
         thumbnail.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         thumbnail.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        thumbnail.setImageBitmap(createThumbnail(mediaFile));
+        thumbnail.setBackgroundColor(0xFF202020);
+        loadThumbnailAsync(mediaFile, itemSize, thumbnail, generation);
         item.addView(thumbnail);
 
         View selectionOverlay = new View(this);
@@ -153,17 +162,32 @@ public class GalleryActivity extends BaseAct {
         mediaGrid.addView(item);
     }
 
-    private Bitmap createThumbnail(File mediaFile) {
+    private void loadThumbnailAsync(File mediaFile, int itemSize, ImageView thumbnail,
+            int generation) {
+        thumbnailExecutor.execute(() -> {
+            Bitmap bitmap = createThumbnail(mediaFile, itemSize);
+            mainHandler.post(() -> {
+                if (generation != thumbnailGeneration || isFinishing() || isDestroyed()) {
+                    if (bitmap != null) bitmap.recycle();
+                    return;
+                }
+                thumbnail.setImageBitmap(bitmap);
+            });
+        });
+    }
+
+    private Bitmap createThumbnail(File mediaFile, int itemSize) {
         if (!isVideo(mediaFile)) {
-            BitmapFactory.Options options = new BitmapFactory.Options();
-            options.inSampleSize = 4;
-            return MediaOrientationUtils.decodeOrientedImage(mediaFile.getAbsolutePath(), options);
+            // Subsample aggressively for grid tiles (36M/64M full decode will OOM).
+            return MediaOrientationUtils.decodeOrientedImageForDisplay(
+                    mediaFile.getAbsolutePath(), Math.max(itemSize * 2, 256));
         }
 
         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
         try {
             retriever.setDataSource(mediaFile.getAbsolutePath());
-            return retriever.getFrameAtTime(0);
+            return retriever.getScaledFrameAtTime(0,
+                    MediaMetadataRetriever.OPTION_CLOSEST_SYNC, itemSize, itemSize);
         } catch (RuntimeException ignored) {
             return null;
         } finally {
@@ -173,6 +197,15 @@ public class GalleryActivity extends BaseAct {
                 // The thumbnail has already been read, so a release failure is non-fatal.
             }
         }
+    }
+
+    private int calculateSampleSize(BitmapFactory.Options bounds, int targetSize) {
+        int sampleSize = 1;
+        while (bounds.outWidth / sampleSize > targetSize
+                || bounds.outHeight / sampleSize > targetSize) {
+            sampleSize *= 2;
+        }
+        return sampleSize;
     }
 
     private void openMedia(File mediaFile) {
@@ -268,6 +301,13 @@ public class GalleryActivity extends BaseAct {
             return;
         }
         super.onBackPressed();
+    }
+
+    @Override
+    protected void onDestroy() {
+        thumbnailGeneration++;
+        thumbnailExecutor.shutdownNow();
+        super.onDestroy();
     }
 
     private int dp(int value) {

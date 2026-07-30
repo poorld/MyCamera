@@ -1,10 +1,16 @@
 package com.android.mycamera.ui.activity;
 
 import android.annotation.SuppressLint;
+import android.content.res.ColorStateList;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.graphics.Insets;
 import android.hardware.camera2.CameraAccessException;
+import android.media.AudioManager;
+import android.media.ToneGenerator;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -15,6 +21,7 @@ import android.view.KeyEvent;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewConfiguration;
+import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.Button;
@@ -40,11 +47,20 @@ import com.android.mycamera.camera.config.CameraConfig;
 import com.android.mycamera.focus.GeminiFocusView;
 import com.android.mycamera.model.CameraApiType;
 import com.android.mycamera.model.CameraState;
+import com.android.mycamera.model.CaptureMode;
 import com.android.mycamera.model.Quality;
 import com.android.mycamera.model.Resolution;
 import com.android.mycamera.ui.view.ZoomDialView;
 import com.android.mycamera.utils.CameraUtils;
+import com.android.mycamera.utils.SettingsManager;
+import com.android.mycamera.utils.SystemPropertyUtils;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
 public class MainActivity extends BaseAct implements CameraStateObserver {
@@ -53,8 +69,22 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     private static final int REQUEST_CODE_PERMISSIONS = 10;
     private static final int Y1_RECORD_KEY = KeyEvent.KEYCODE_F10;
     private static final int EXPOSURE_SLIDER_STEPS = 1000;
+    private static final String PROP_YUV_DUMP_ENABLE = "vendor.debug.p2f.dump.enable";
+    private static final String PROP_YUV_DUMP_CONTINUE = "vendor.debug.camera.continue.dump";
+    // This product's camera HAL advertises flash support, but no torch is wired.
+    private static final boolean FLASH_UI_ENABLED = false;
+    private static final String OIS_AF_NODE_PATH = "/sys/class/sensordrv/kd_camera_hw/imx563_ois_vldo28";
 
     public static final String TAG = "MainActivity";
+    private MyBr myBr;
+
+    private class MyBr extends BroadcastReceiver {
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            switchCamera();
+        }
+    }
     
     private CameraManager mCameraManager;
     private TextureView cameraPreview;
@@ -62,11 +92,13 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     private ImageButton captureButton;
     private ImageButton settingsButton;
     private ImageButton switchCameraButton;
+    private ImageButton focusAfButton;
     private ImageButton exposureButton;
     private ImageButton flashButton;
     private ImageButton galleryButton;
     private ImageButton photoModeButton;
     private ImageButton videoModeButton;
+    private View captureFlashOverlay;
     private ProgressBar loadingIndicator;
     private TextView recordingTime;
     private TextView statusText;
@@ -97,7 +129,9 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
 
     private boolean isVideoMode = false;
     private boolean isRecording = false;
+    private boolean isFocusAfEnabled = false;
     private boolean isSyncingApiSelection = false;
+    private SettingsManager settingsManager;
     private boolean isSyncingExposureControls = false;
     private Handler recordingTimerHandler;
     private final Handler hardwareKeyHandler = new Handler(Looper.getMainLooper());
@@ -136,6 +170,8 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
 
         CameraUtils.createCameraDirectory(this);
 
+        myBr = new MyBr();
+        registerReceiver(myBr, new IntentFilter("android.intent.action.POWEROFF"));
 
     }
 
@@ -151,12 +187,14 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         focusView = findViewById(R.id.focusView);
         captureButton = findViewById(R.id.captureButton);
         settingsButton = findViewById(R.id.settingsButton);
+        focusAfButton = findViewById(R.id.focusAfButton);
         switchCameraButton = findViewById(R.id.switchCameraButton);
         exposureButton = findViewById(R.id.exposureButton);
         flashButton = findViewById(R.id.flashButton);
         galleryButton = findViewById(R.id.galleryButton);
         photoModeButton = findViewById(R.id.photoModeButton);
         videoModeButton = findViewById(R.id.videoModeButton);
+        captureFlashOverlay = findViewById(R.id.captureFlashOverlay);
         loadingIndicator = findViewById(R.id.loadingIndicator);
         recordingTime = findViewById(R.id.recordingTime);
         statusText = findViewById(R.id.statusText);
@@ -185,38 +223,48 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         isoValueText = findViewById(R.id.isoValueText);
         shutterValueText = findViewById(R.id.shutterValueText);
 
+        settingsManager = new SettingsManager(this);
+        applyTopControlsSafeArea();
         updateModeButtons();
+        updateApiSwitcherVisibility();
+        refreshFocusAfStateFromNode();
+    }
+
+    private void applyTopControlsSafeArea() {
+        View topControls = findViewById(R.id.topControls);
+        if (topControls == null) return;
+
+        int baseLeft = topControls.getPaddingLeft();
+        int baseTop = topControls.getPaddingTop();
+        int baseRight = topControls.getPaddingRight();
+        int baseBottom = topControls.getPaddingBottom();
+        topControls.setOnApplyWindowInsetsListener((view, windowInsets) -> {
+            Insets safeInsets = windowInsets.getInsetsIgnoringVisibility(
+                    WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+            view.setPadding(baseLeft + safeInsets.left,
+                    baseTop,
+                    baseRight + safeInsets.right,
+                    baseBottom);
+            return windowInsets;
+        });
+        topControls.requestApplyInsets();
     }
 
     private void initializeCameraManager() {
         Log.d(TAG, "initializeCameraManager: ");
         mCameraManager = CameraManager.getInstance(this);
-        applyY1DefaultPreviewConfiguration();
         mCameraManager.addStateObserver(this);
         mCameraManager.preInitializeCamera();
-    }
-
-    /**
-     * Y1 always starts the app with a Full HD preview, even when an earlier
-     * settings session saved another resolution or CameraX quality.
-     */
-    private void applyY1DefaultPreviewConfiguration() {
-        CameraConfig currentConfig = mCameraManager.getCurrentConfig();
-        if (currentConfig == null
-                || (Resolution.FULL_HD_1080P.equals(currentConfig.getResolution())
-                && Quality.FULL_HD == currentConfig.getQuality())) {
-            return;
-        }
-
-        mCameraManager.updateConfiguration(new CameraConfig.Builder(currentConfig)
-                .setResolution(Resolution.FULL_HD_1080P)
-                .setQuality(Quality.FULL_HD)
-                .build());
     }
     
     private void setupClickListeners() {
         captureButton.setOnClickListener(v -> handleCaptureAction());
         settingsButton.setOnClickListener(v -> openSettings());
+        settingsButton.setOnLongClickListener(v -> {
+            requestYuvDumpFrame();
+            return true;
+        });
+        focusAfButton.setOnClickListener(v -> toggleFocusAf());
         switchCameraButton.setOnClickListener(v -> switchCamera());
         flashButton.setOnClickListener(v -> toggleFlash());
         galleryButton.setOnClickListener(v -> startActivity(new Intent(this, GalleryActivity.class)));
@@ -340,30 +388,22 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         super.onResume();
         if (!hasAllPermissions()) {
             ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS);
-        } else {
-
-
-            if (mCameraManager != null
-                    && (mCameraManager.isBackgroundReviewEnabled()
-                    || mCameraManager.isBackgroundRecordingEnabled())) {
-                return;
-            }
-
-            initializeCameraManager();
-            initializeCamera();
-
-            CameraApiType cameraApiType = mCameraManager.getCameraApiType();
-            isSyncingApiSelection = true;
-            if (cameraApiType == CameraApiType.CAMERA1) {
-                apiCamera1.setChecked(true);
-            } else if (cameraApiType == CameraApiType.CAMERA2) {
-                apiCamera2.setChecked(true);
-            } else if (cameraApiType == CameraApiType.CAMERAX) {
-                apiCameraX.setChecked(true);
-            }
-            isSyncingApiSelection = false;
+            return;
         }
-
+        // Settings only stages config; apply once when returning to preview.
+        if (mCameraManager != null && mCameraManager.isConfigurationDirty()) {
+            if (shouldKeepCameraInBackground() && mCameraManager.isCameraAvailable()) {
+                loadingIndicator.setVisibility(View.VISIBLE);
+                statusText.setText("Applying settings...");
+                mCameraManager.applyStagedConfigurationIfNeeded();
+                syncApiRadioFromConfig();
+                updateSettingsDisplay();
+            } else {
+                // Full re-init path below will open with staged currentConfig.
+                mCameraManager.applyStagedConfigurationIfNeeded();
+            }
+        }
+        startCameraSessionIfNeeded();
     }
     
     @Override
@@ -374,9 +414,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         super.onPause();
         Log.d(TAG, "onPause: ");
 
-        if (mCameraManager != null
-                && (mCameraManager.isBackgroundReviewEnabled()
-                || mCameraManager.isBackgroundRecordingEnabled())) {
+        if (shouldKeepCameraInBackground()) {
             return;
         }
 
@@ -388,28 +426,121 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+
+        unregisterReceiver(myBr);
+    }
+
+    private boolean shouldKeepCameraInBackground() {
+        return mCameraManager != null
+                && (mCameraManager.isBackgroundReviewEnabled()
+                || mCameraManager.isBackgroundRecordingEnabled());
+    }
+
+    private void resetRecordingUiState() {
+        isRecording = false;
+        if (recordingTime != null) {
+            recordingTime.setVisibility(View.GONE);
+        }
+        stopRecordingTimer();
     }
 
     private void release() {
         Log.d(TAG, "release: ");
-        if (isRecording) {
-            stopRecording();
-        }
-        stopPreview();
-        closeCamera();
-        stopRecordingTimer();
         if (mCameraManager != null) {
             mCameraManager.removeStateObserver(this);
-            mCameraManager.release();
+        }
+        if (isRecording && mCameraManager != null) {
+            try {
+                mCameraManager.stopRecording();
+            } catch (RuntimeException e) {
+                Log.w(TAG, "stopRecording during release failed", e);
+            }
+        }
+        resetRecordingUiState();
+        updateModeButtons();
+        updateCaptureButton();
+        if (mCameraManager != null) {
+            try {
+                mCameraManager.stopPreview();
+            } catch (RuntimeException e) {
+                Log.w(TAG, "stopPreview during release failed", e);
+            }
+            try {
+                mCameraManager.closeCamera();
+            } catch (RuntimeException e) {
+                Log.w(TAG, "closeCamera during release failed", e);
+            }
+            try {
+                mCameraManager.release();
+            } catch (RuntimeException e) {
+                Log.w(TAG, "release camera manager failed", e);
+            }
             mCameraManager = null;
         }
     }
     
+    private void startCameraSessionIfNeeded() {
+        if (!hasAllPermissions()) {
+            return;
+        }
+
+        if (shouldKeepCameraInBackground()) {
+            updateApiSwitcherVisibility();
+            refreshFocusAfStateFromNode();
+            updateModeButtons();
+            updateCaptureButton();
+            updateSettingsDisplay();
+            return;
+        }
+
+        resetRecordingUiState();
+        initializeCameraManager();
+        initializeCamera();
+
+        CameraApiType cameraApiType = mCameraManager.getCameraApiType();
+        isSyncingApiSelection = true;
+        if (cameraApiType == CameraApiType.CAMERA1) {
+            apiCamera1.setChecked(true);
+        } else if (cameraApiType == CameraApiType.CAMERA2) {
+            apiCamera2.setChecked(true);
+        } else if (cameraApiType == CameraApiType.CAMERAX) {
+            apiCameraX.setChecked(true);
+        }
+        isSyncingApiSelection = false;
+        updateApiSwitcherVisibility();
+        refreshFocusAfStateFromNode();
+        updateModeButtons();
+        updateCaptureButton();
+    }
+
     private void initializeCamera() {
         Log.d(TAG, "initializeCamera: ");
+        if (mCameraManager == null) {
+            initializeCameraManager();
+        }
+        if (mCameraManager == null) {
+            Log.e(TAG, "initializeCamera failed: camera manager is null");
+            statusText.setText("Camera init failed");
+            loadingIndicator.setVisibility(View.GONE);
+            return;
+        }
         loadingIndicator.setVisibility(View.VISIBLE);
         statusText.setText("Initializing camera...");
         mCameraManager.initializeCamera(this);
+        // Safety timeout so resolution switch never leaves UI spinning forever.
+        cameraPreview.postDelayed(() -> {
+            if (loadingIndicator != null && loadingIndicator.getVisibility() == View.VISIBLE) {
+                Log.w(TAG, "initializeCamera: loading timeout, force hide spinner");
+                loadingIndicator.setVisibility(View.GONE);
+                if (mCameraManager != null && mCameraManager.isCameraAvailable()) {
+                    statusText.setText("Camera ready");
+                    mCameraManager.startPreview(cameraPreview, MainActivity.this);
+                    updateSettingsDisplay();
+                } else {
+                    statusText.setText("Camera init timeout");
+                }
+            }
+        }, 2500);
     }
     
     private boolean hasAllPermissions() {
@@ -423,12 +554,12 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     
     private void handleCaptureAction() {
         Log.d(TAG, String.format("handleCaptureAction: isVideoMode=%s,isRecording=%s", isVideoMode, isRecording));
+        if (isRecording) {
+            stopRecording();
+            return;
+        }
         if (isVideoMode) {
-            if (isRecording) {
-                stopRecording();
-            } else {
-                startRecording();
-            }
+            startRecording();
         } else {
             capturePhoto();
         }
@@ -441,37 +572,86 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         if (isRecording) {
             stopRecording();
         } else {
+            enterVideoModeForRecording();
             startRecording();
         }
+    }
+
+    /**
+     * Long-press / record button: switch UI + CaptureMode to video without requiring
+     * the user to tap the video tab first. Pipeline is restored as video after stop.
+     */
+    private void enterVideoModeForRecording() {
+        isVideoMode = true;
+        updateModeButtons();
+        updateCaptureButton();
+        if (mCameraManager != null) {
+            // false: do not rebuild preview now; startRecording creates record session.
+            mCameraManager.ensureCaptureMode(CaptureMode.VIDEO, false);
+        }
+        updateSettingsDisplay();
     }
     
     private void startRecording() {
         Log.d(TAG, "startRecording: ");
+        if (mCameraManager == null) {
+            Log.w(TAG, "startRecording ignored: camera manager is null");
+            return;
+        }
+        enterVideoModeForRecording();
         mCameraManager.startRecording();
     }
     
     private void stopRecording() {
         Log.d(TAG, "stopRecording: ");
+        if (mCameraManager == null) {
+            resetRecordingUiState();
+            updateModeButtons();
+            updateCaptureButton();
+            return;
+        }
         mCameraManager.stopRecording();
     }
 
     private void stopPreview() {
         Log.d(TAG, "stopPreview: ");
-        mCameraManager.stopPreview();
+        if (mCameraManager != null) {
+            mCameraManager.stopPreview();
+        }
     }
 
     private void closeCamera() {
         Log.d(TAG, "closeCamera: ");
-        mCameraManager.closeCamera();
+        if (mCameraManager != null) {
+            mCameraManager.closeCamera();
+        }
     }
     
     private void capturePhoto() {
+        if (isRecording || mCameraManager == null) {
+            return;
+        }
+        showCaptureFlash();
         mCameraManager.capturePhoto();
     }
     
     private void openSettings() {
         Intent intent = new Intent(this, SettingsActivity.class);
         startActivity(intent);
+    }
+
+    private void requestYuvDumpFrame() {
+        if (!"1".equals(SystemPropertyUtils.get(PROP_YUV_DUMP_ENABLE, "0"))) {
+            Toast.makeText(this, R.string.yuv_dump_disabled, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        hardwareKeyHandler.removeCallbacksAndMessages(null);
+        SystemPropertyUtils.set(PROP_YUV_DUMP_CONTINUE, "0");
+        hardwareKeyHandler.postDelayed(
+                () -> SystemPropertyUtils.set(PROP_YUV_DUMP_CONTINUE, "1"), 150);
+        hardwareKeyHandler.postDelayed(
+                () -> SystemPropertyUtils.set(PROP_YUV_DUMP_CONTINUE, "0"), 1150);
+        Toast.makeText(this, R.string.yuv_dump_triggered, Toast.LENGTH_SHORT).show();
     }
     
     private void switchCamera() {
@@ -542,20 +722,83 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     }
     
     private void setPhotoMode() {
+        if (isRecording) {
+            return;
+        }
+        if (!isVideoMode) {
+            return;
+        }
         isVideoMode = false;
         updateModeButtons();
         updateCaptureButton();
+        reapplyCameraForModeSwitch("photo");
+        Log.d(TAG, "setPhotoMode: isVideoMode=false");
     }
     
     private void setVideoMode() {
+        if (isRecording) {
+            return;
+        }
+        if (isVideoMode) {
+            return;
+        }
         isVideoMode = true;
         updateModeButtons();
         updateCaptureButton();
+        reapplyCameraForModeSwitch("video");
+        Log.d(TAG, "setVideoMode: isVideoMode=true");
+    }
+
+    /**
+     * Photo/video sizes are independent. Re-open current API so preview/capture
+     * pipelines pick up the active mode's configured size.
+     */
+    private void reapplyCameraForModeSwitch(String mode) {
+        if (mCameraManager == null) {
+            return;
+        }
+        CameraConfig config = mCameraManager.getCurrentConfig();
+        if (config == null) {
+            return;
+        }
+        CaptureMode captureMode = "video".equals(mode) ? CaptureMode.VIDEO : CaptureMode.PHOTO;
+        CameraConfig.Builder configBuilder = new CameraConfig.Builder(config)
+                .setCaptureMode(captureMode);
+        if (captureMode == CaptureMode.PHOTO) {
+            // High-speed recording settings must not leak into the JPEG pipeline.
+            configBuilder.setFrameRate(30);
+        }
+        config = configBuilder.build();
+        Log.d(TAG, "reapplyCameraForModeSwitch mode=" + mode
+                + ", api=" + config.getApiType()
+                + ", captureMode=" + config.getCaptureMode()
+                + ", videoQuality=" + config.getQuality()
+                + ", videoResolution=" + config.getResolution()
+                + ", photoResolution=" + config.getPhotoResolution());
+        loadingIndicator.setVisibility(View.VISIBLE);
+        statusText.setText("Switching " + mode + " mode...");
+        // Rebuild pipeline for the selected mode (Camera2: JPEG vs VIDEO_ENCODER).
+        mCameraManager.updateConfiguration(config);
+        updateSettingsDisplay();
     }
     
     private void updateModeButtons() {
-        photoModeButton.setAlpha(isVideoMode ? 0.5f : 1.0f);
-        videoModeButton.setAlpha(isVideoMode ? 1.0f : 0.5f);
+        if (photoModeButton == null || videoModeButton == null) {
+            return;
+        }
+        boolean videoSelected = isRecording || isVideoMode;
+        int activeColor = getColor(R.color.zoom_active);
+        int inactiveColor = 0xB3FFFFFF;
+        photoModeButton.setClickable(!isRecording);
+        photoModeButton.setEnabled(!isRecording);
+        photoModeButton.setAlpha(1f);
+        videoModeButton.setAlpha(1f);
+        photoModeButton.setColorFilter(videoSelected ? inactiveColor : activeColor);
+        videoModeButton.setColorFilter(videoSelected ? activeColor : inactiveColor);
+        photoModeButton.setImageTintList(null);
+        videoModeButton.setImageTintList(null);
+        photoModeButton.setSelected(!videoSelected);
+        videoModeButton.setSelected(videoSelected);
     }
 
     @Override
@@ -585,7 +828,10 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     public boolean onKeyUp(int keyCode, KeyEvent event) {
         if (keyCode == Y1_RECORD_KEY) {
             hardwareKeyHandler.removeCallbacks(recordKeyLongPressRunnable);
-            if (!recordKeyLongPressHandled && !event.isCanceled()) {
+            if (!recordKeyLongPressHandled && !event.isCanceled() && !isRecording) {
+                if (isVideoMode) {
+                    setPhotoMode();
+                }
                 capturePhoto();
             }
             return true;
@@ -598,21 +844,31 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     }
     
     private void updateCaptureButton() {
-        if (isVideoMode) {
-            captureButton.setImageResource(isRecording ? R.drawable.ic_stop_button : R.drawable.ic_record_button);
+        if (captureButton == null) {
+            return;
+        }
+        if (isRecording) {
+            captureButton.setImageResource(R.drawable.ic_stop_button);
+        } else if (isVideoMode) {
+            captureButton.setImageResource(R.drawable.ic_record_button);
         } else {
             captureButton.setImageResource(R.drawable.ic_capture_button);
         }
+        captureButton.setImageTintList(ColorStateList.valueOf(getColor(R.color.white)));
     }
     
     private void updateFlashButton() {
-        if (mCameraManager != null && mCameraManager.isFlashAvailable()) {
-            flashButton.setEnabled(true);
-            flashButton.setImageResource(mCameraManager.isFlashEnabled() ? R.drawable.ic_flash_on : R.drawable.ic_flash_off);
-        } else {
-            flashButton.setEnabled(false);
-            flashButton.setImageResource(R.drawable.ic_flash_off);
-        }
+        if (flashButton == null) return;
+
+        boolean flashAvailable = FLASH_UI_ENABLED
+                && mCameraManager != null
+                && mCameraManager.isFlashAvailable();
+        flashButton.setVisibility(flashAvailable ? View.VISIBLE : View.GONE);
+        if (!flashAvailable) return;
+
+        flashButton.setEnabled(true);
+        flashButton.setImageResource(mCameraManager.isFlashEnabled()
+                ? R.drawable.ic_flash_on : R.drawable.ic_flash_off);
     }
 
     private boolean handleZoomTouch(MotionEvent event) {
@@ -772,10 +1028,111 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         return zoom < 10f ? String.format(Locale.US, "%.1fx", zoom) : String.format(Locale.US, "%.0fx", zoom);
     }
     
+    private void updateApiSwitcherVisibility() {
+        if (apiSwitcherButton == null) {
+            return;
+        }
+        boolean show = settingsManager != null && settingsManager.isShowApiSwitcherEnabled();
+        apiSwitcherButton.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (!show && apiSwitcherPanel != null) {
+            apiSwitcherPanel.setVisibility(View.GONE);
+        }
+    }
+
+    private void toggleFocusAf() {
+        boolean targetEnabled = !isFocusAfEnabled;
+        if (writeOisAfNode(targetEnabled ? "1" : "0")) {
+            isFocusAfEnabled = targetEnabled;
+            updateFocusAfButton();
+            Toast.makeText(
+                    this,
+                    isFocusAfEnabled ? R.string.af_ois_enabled : R.string.af_ois_disabled,
+                    Toast.LENGTH_SHORT
+            ).show();
+        } else {
+            Toast.makeText(this, R.string.af_ois_failed, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void refreshFocusAfStateFromNode() {
+        String value = readOisAfNode();
+        if (value != null) {
+            isFocusAfEnabled = "1".equals(value.trim());
+        }
+        updateFocusAfButton();
+    }
+
+    private void updateFocusAfButton() {
+        if (focusAfButton == null) {
+            return;
+        }
+        int color = getColor(isFocusAfEnabled ? R.color.zoom_active : R.color.white);
+        focusAfButton.setImageTintList(ColorStateList.valueOf(color));
+        focusAfButton.setSelected(isFocusAfEnabled);
+    }
+
+    private String readOisAfNode() {
+        File node = new File(OIS_AF_NODE_PATH);
+        if (!node.exists()) {
+            Log.w(TAG, "OIS/AF node missing: " + OIS_AF_NODE_PATH);
+            return null;
+        }
+        try (BufferedReader reader = new BufferedReader(new FileReader(node))) {
+            return reader.readLine();
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to read OIS/AF node", e);
+            return null;
+        }
+    }
+
+    private boolean writeOisAfNode(String value) {
+        File node = new File(OIS_AF_NODE_PATH);
+        try (FileOutputStream outputStream = new FileOutputStream(node)) {
+            outputStream.write(value.getBytes(StandardCharsets.UTF_8));
+            outputStream.flush();
+            return true;
+        } catch (IOException directWriteError) {
+            Log.w(TAG, "Direct OIS/AF node write failed, try shell", directWriteError);
+        }
+
+        try {
+            Process process = Runtime.getRuntime().exec(new String[]{
+                    "sh", "-c", "echo " + value + " > " + OIS_AF_NODE_PATH
+            });
+            int exitCode = process.waitFor();
+            if (exitCode == 0) {
+                return true;
+            }
+            Log.e(TAG, "Shell OIS/AF write failed, exit=" + exitCode);
+        } catch (Exception shellError) {
+            Log.e(TAG, "Shell OIS/AF node write failed", shellError);
+        }
+        return false;
+    }
+
     private void switchCameraApi(CameraApiType apiType) {
         loadingIndicator.setVisibility(View.VISIBLE);
         statusText.setText("Switching camera API...");
         mCameraManager.switchCameraApi(apiType);
+        // Effective API may differ (e.g. CameraX+2K forced Camera2, or CameraX demotes 2K->FHD).
+        syncApiRadioFromConfig();
+        updateSettingsDisplay();
+    }
+
+    private void syncApiRadioFromConfig() {
+        if (mCameraManager == null || apiRadioGroup == null) {
+            return;
+        }
+        CameraApiType effective = mCameraManager.getCameraApiType();
+        isSyncingApiSelection = true;
+        if (effective == CameraApiType.CAMERA1) {
+            apiCamera1.setChecked(true);
+        } else if (effective == CameraApiType.CAMERA2) {
+            apiCamera2.setChecked(true);
+        } else {
+            apiCameraX.setChecked(true);
+        }
+        isSyncingApiSelection = false;
     }
     
     private void startRecordingTimer() {
@@ -808,7 +1165,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQUEST_CODE_PERMISSIONS) {
             if (hasAllPermissions()) {
-                initializeCamera();
+                startCameraSessionIfNeeded();
             } else {
                 Toast.makeText(this, "Permissions denied", Toast.LENGTH_SHORT).show();
                 finish();
@@ -828,7 +1185,10 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
                     break;
                 case OPENED:
                     statusText.setText("Camera ready");
-                    mCameraManager.startPreview(cameraPreview, this);
+                    // Only start preview on true open. Avoid restarting after stop-recording.
+                    if (!isRecording) {
+                        mCameraManager.startPreview(cameraPreview, this);
+                    }
                     updateFlashButton();
                     updateZoomUi();
                     updateManualExposureUi();
@@ -862,9 +1222,14 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         Log.d(TAG, "onRecordingStarted: ");
         runOnUiThread(() -> {
             isRecording = true;
+            isVideoMode = true;
+            updateModeButtons();
             recordingTime.setVisibility(View.VISIBLE);
             startRecordingTimer();
             updateCaptureButton();
+            // Show video resolution (e.g. 1920x1080), not still 36M photo size.
+            updateSettingsDisplay();
+            playRecordBeep();
         });
     }
     
@@ -873,17 +1238,41 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         Log.d(TAG, "onRecordingStopped: ");
         runOnUiThread(() -> {
             isRecording = false;
+            // Stay in video mode after long-press record; keep video resolution on HUD.
+            isVideoMode = true;
             recordingTime.setVisibility(View.GONE);
             stopRecordingTimer();
+            updateModeButtons();
             updateCaptureButton();
+            updateSettingsDisplay();
+            playRecordBeep();
         });
+    }
+
+    private void playRecordBeep() {
+        try {
+            ToneGenerator toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 90);
+            toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP, 250);
+            hardwareKeyHandler.postDelayed(toneGenerator::release, 250);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "playRecordBeep failed", e);
+        }
     }
     
     @Override
     public void onPhotoCaptured(String filePath) {
-        runOnUiThread(() -> {
-            Toast.makeText(this, "Photo saved: " + filePath, Toast.LENGTH_SHORT).show();
-        });
+    }
+
+    private void showCaptureFlash() {
+        if (captureFlashOverlay == null) return;
+        captureFlashOverlay.animate().cancel();
+        captureFlashOverlay.setAlpha(0.75f);
+        captureFlashOverlay.setVisibility(View.VISIBLE);
+        captureFlashOverlay.animate()
+                .alpha(0f)
+                .setDuration(160)
+                .withEndAction(() -> captureFlashOverlay.setVisibility(View.GONE))
+                .start();
     }
     
     @Override
@@ -909,7 +1298,16 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
 
         CameraApiType apiType = mCameraManager.getCameraApiType();
 
-        if (apiType == CameraApiType.CAMERA1 || apiType == CameraApiType.CAMERA2) {
+        if (!isVideoMode) {
+            // Still capture mode: show photo resolution.
+            com.android.mycamera.model.PhotoResolution photoResolution =
+                    com.android.mycamera.model.PhotoResolution.normalize(
+                            config.getPhotoResolution(), config.getCameraId());
+            settingsResolutionText.setText(photoResolution.getDisplayName());
+            settingsResolutionText.setVisibility(View.VISIBLE);
+            settingsFramerateText.setVisibility(View.GONE);
+            return;
+        } else if (apiType == CameraApiType.CAMERA1 || apiType == CameraApiType.CAMERA2) {
             com.android.mycamera.model.Resolution resolution = config.getResolution();
             if (resolution != null) {
                 settingsResolutionText.setText(resolution.getWidth() + "x" + resolution.getHeight());
@@ -917,7 +1315,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             } else {
                 settingsResolutionText.setVisibility(View.GONE);
             }
-        } else { // CameraX
+        } else { // CameraX video
             com.android.mycamera.model.Quality quality = config.getQuality();
             if (quality != null) {
                 settingsResolutionText.setText(quality.getDisplayName());

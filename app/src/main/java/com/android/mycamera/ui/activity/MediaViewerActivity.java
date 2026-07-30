@@ -1,7 +1,11 @@
 package com.android.mycamera.ui.activity;
 
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.DisplayMetrics;
 import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -20,6 +24,8 @@ import com.android.mycamera.utils.MediaOrientationUtils;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MediaViewerActivity extends BaseAct {
 
@@ -32,6 +38,10 @@ public class MediaViewerActivity extends BaseAct {
     private TextView mediaPosition;
     private GestureDetector gestureDetector;
     private FrameLayout viewerRoot;
+    private Bitmap currentBitmap;
+    private final ExecutorService decodeExecutor = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private int loadGeneration;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -55,6 +65,14 @@ public class MediaViewerActivity extends BaseAct {
         showCurrentMedia();
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        loadGeneration++;
+        recycleCurrentBitmap();
+        decodeExecutor.shutdownNow();
+    }
+
     private void showCurrentMedia() {
         String path = mediaPaths.get(currentIndex);
         File mediaFile = new File(path);
@@ -62,42 +80,54 @@ public class MediaViewerActivity extends BaseAct {
         mediaVideo.stopPlayback();
 
         if (path.toLowerCase().endsWith(".mp4")) {
+            recycleCurrentBitmap();
+            mediaImage.setImageBitmap(null);
             mediaImage.setVisibility(View.GONE);
             mediaVideo.setVisibility(View.VISIBLE);
+            mediaVideo.setRotation(0f);
+            FrameLayout.LayoutParams videoLayoutParams = new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT);
+            videoLayoutParams.gravity = Gravity.CENTER;
+            mediaVideo.setLayoutParams(videoLayoutParams);
             MediaController controller = new MediaController(this);
             controller.setAnchorView(mediaVideo);
             mediaVideo.setMediaController(controller);
+            mediaVideo.setOnPreparedListener(player -> mediaVideo.start());
             mediaVideo.setVideoURI(Uri.fromFile(mediaFile));
-            mediaVideo.setOnPreparedListener(player -> {
-                int rotation = MediaOrientationUtils.getVideoRotation(path);
-                layoutVideo(player.getVideoWidth(), player.getVideoHeight(), rotation);
-                mediaVideo.start();
-            });
         } else {
             mediaVideo.setVisibility(View.GONE);
             mediaImage.setVisibility(View.VISIBLE);
-            mediaImage.setImageBitmap(MediaOrientationUtils.decodeOrientedImage(path, null));
+            loadImageAsync(path);
         }
     }
 
-    private void layoutVideo(int sourceWidth, int sourceHeight, int rotation) {
-        if (sourceWidth <= 0 || sourceHeight <= 0) return;
-        boolean rotated = rotation == 90 || rotation == 270;
-        int displayWidth = rotated ? sourceHeight : sourceWidth;
-        int displayHeight = rotated ? sourceWidth : sourceHeight;
-        float scale = Math.min((float) viewerRoot.getWidth() / displayWidth,
-                (float) viewerRoot.getHeight() / displayHeight);
-        int renderedWidth = Math.round(displayWidth * scale);
-        int renderedHeight = Math.round(displayHeight * scale);
+    private void loadImageAsync(String path) {
+        final int generation = ++loadGeneration;
+        mediaImage.setImageBitmap(null);
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        final int maxSide = Math.max(metrics.widthPixels, metrics.heightPixels) * 2;
+        decodeExecutor.execute(() -> {
+            Bitmap bitmap = MediaOrientationUtils.decodeOrientedImageForDisplay(path, maxSide);
+            mainHandler.post(() -> {
+                if (generation != loadGeneration || isFinishing() || isDestroyed()) {
+                    if (bitmap != null) {
+                        bitmap.recycle();
+                    }
+                    return;
+                }
+                recycleCurrentBitmap();
+                currentBitmap = bitmap;
+                mediaImage.setImageBitmap(bitmap);
+            });
+        });
+    }
 
-        FrameLayout.LayoutParams params;
-        if (rotated) {
-            params = new FrameLayout.LayoutParams(renderedHeight, renderedWidth, Gravity.CENTER);
-        } else {
-            params = new FrameLayout.LayoutParams(renderedWidth, renderedHeight, Gravity.CENTER);
+    private void recycleCurrentBitmap() {
+        if (currentBitmap != null && !currentBitmap.isRecycled()) {
+            currentBitmap.recycle();
         }
-        mediaVideo.setLayoutParams(params);
-        mediaVideo.setRotation(rotation);
+        currentBitmap = null;
     }
 
     private void showNextMedia() {
@@ -124,7 +154,8 @@ public class MediaViewerActivity extends BaseAct {
         public boolean onFling(MotionEvent start, MotionEvent end, float velocityX, float velocityY) {
             if (start == null || end == null) return false;
             float horizontalDistance = end.getX() - start.getX();
-            if (Math.abs(horizontalDistance) < 100 || Math.abs(horizontalDistance) < Math.abs(end.getY() - start.getY())) {
+            if (Math.abs(horizontalDistance) < 100
+                    || Math.abs(horizontalDistance) < Math.abs(end.getY() - start.getY())) {
                 return false;
             }
             if (horizontalDistance < 0) {

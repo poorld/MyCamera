@@ -16,6 +16,7 @@ import android.util.Log;
 
 import com.android.mycamera.camera.config.CameraConfig;
 import com.android.mycamera.model.CameraState;
+import com.android.mycamera.model.PhotoResolution;
 import com.android.mycamera.model.Resolution;
 import com.android.mycamera.utils.CameraUtils;
 
@@ -362,7 +363,8 @@ public class Camera1Strategy extends BaseCameraStrategy {
         if (camera == null || currentConfig == null) return;
         try {
             Camera.Parameters parameters = camera.getParameters();
-            Resolution resolution = currentConfig.getResolution();
+            PhotoResolution photoResolution = PhotoResolution.normalize(currentConfig.getPhotoResolution());
+            Resolution resolution = Resolution.of(photoResolution.getWidth(), photoResolution.getHeight());
             Camera.Size targetPictureSize = chooseBestPictureSize(parameters.getSupportedPictureSizes(), resolution);
             if (targetPictureSize != null) {
                 parameters.setPictureSize(targetPictureSize.width, targetPictureSize.height);
@@ -491,8 +493,9 @@ public class Camera1Strategy extends BaseCameraStrategy {
         if (camera == null) return false;
         try {
             Camera.Parameters parameters = camera.getParameters();
-            if (parameters.getSupportedFlashModes() == null) {
+            if (!isTorchSupported(parameters)) {
                 isFlashAvailable = false;
+                isFlashEnabled = false;
                 return false;
             }
             isFlashAvailable = true;
@@ -510,7 +513,12 @@ public class Camera1Strategy extends BaseCameraStrategy {
     @Override
     public boolean isFlashAvailable() {
         if (camera == null) return false;
-        return camera.getParameters().getSupportedFlashModes() != null;
+        return isTorchSupported(camera.getParameters());
+    }
+
+    private boolean isTorchSupported(Camera.Parameters parameters) {
+        List<String> flashModes = parameters.getSupportedFlashModes();
+        return flashModes != null && flashModes.contains(Camera.Parameters.FLASH_MODE_TORCH);
     }
     
     @Override
