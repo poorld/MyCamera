@@ -9,6 +9,10 @@
     <string name="af_ois_enabled">AF/OIS On</string>
     <string name="af_ois_disabled">AF/OIS Off</string>
     <string name="af_ois_failed">Failed to switch AF/OIS</string>
+    <string name="microphone_denoise">Microphone denoise</string>
+    <string name="denoise_enabled">Denoise On</string>
+    <string name="denoise_disabled">Denoise Off</string>
+    <string name="denoise_failed">Failed to switch denoise</string>
     <string name="language">Language</string>
     <string name="language_follow_system">Follow System</string>
     <string name="language_chinese">Chinese</string>

@@ -42,6 +42,7 @@ import java.util.Set;
 
 public class SettingsActivity extends AppCompatActivity {
 
+    private static final int DEFAULT_VIDEO_FRAME_RATE = 30;
     private static final String[] LANGUAGE_VALUES = {
             SettingsManager.LANGUAGE_SYSTEM,
             SettingsManager.LANGUAGE_CHINESE,
@@ -325,7 +326,7 @@ public class SettingsActivity extends AppCompatActivity {
                 int selectedFps = selectedOption.fixedHighSpeedFps != null
                         ? selectedOption.fixedHighSpeedFps
                         : (selectedOption.preferredFps != null
-                                ? selectedOption.preferredFps : currentConfig.getFrameRate());
+                                ? selectedOption.preferredFps : DEFAULT_VIDEO_FRAME_RATE);
                 if (!selectedOption.resolution.equals(currentConfig.getResolution())
                         || selectedFps != currentConfig.getFrameRate()) {
                     // Camera2/1 are resolution-driven; keep quality label in sync.

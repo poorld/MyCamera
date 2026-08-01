@@ -116,14 +116,30 @@
             android:contentDescription="Flash"
             android:tint="@color/white" />
 
-        <ImageButton
-            android:id="@+id/galleryButton"
+        <LinearLayout
             android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/ic_gallery"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Gallery"
-            android:tint="@color/white" />
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <ImageButton
+                android:id="@+id/galleryButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_gallery"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Gallery"
+                android:tint="@color/white" />
+
+            <ImageButton
+                android:id="@+id/denoiseButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:padding="5dp"
+                android:src="@drawable/ic_denoise"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/microphone_denoise"
+                android:tint="@color/white" />
+        </LinearLayout>
         
         
     </LinearLayout>

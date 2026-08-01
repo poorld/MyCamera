@@ -74,6 +74,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     // This product's camera HAL advertises flash support, but no torch is wired.
     private static final boolean FLASH_UI_ENABLED = false;
     private static final String OIS_AF_NODE_PATH = "/sys/class/sensordrv/kd_camera_hw/imx563_ois_vldo28";
+    private static final String DENOISE_NODE_PATH = "/sys/class/leds/alermled/denoise";
 
     public static final String TAG = "MainActivity";
     private MyBr myBr;
@@ -96,6 +97,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     private ImageButton exposureButton;
     private ImageButton flashButton;
     private ImageButton galleryButton;
+    private ImageButton denoiseButton;
     private ImageButton photoModeButton;
     private ImageButton videoModeButton;
     private View captureFlashOverlay;
@@ -130,6 +132,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     private boolean isVideoMode = false;
     private boolean isRecording = false;
     private boolean isFocusAfEnabled = false;
+    private boolean isDenoiseEnabled = false;
     private boolean isSyncingApiSelection = false;
     private SettingsManager settingsManager;
     private boolean isSyncingExposureControls = false;
@@ -173,6 +176,8 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         myBr = new MyBr();
         registerReceiver(myBr, new IntentFilter("android.intent.action.POWEROFF"));
 
+        Toast.makeText(this, "versionName 1.3", Toast.LENGTH_SHORT).show();
+
     }
 
     @Override
@@ -192,6 +197,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         exposureButton = findViewById(R.id.exposureButton);
         flashButton = findViewById(R.id.flashButton);
         galleryButton = findViewById(R.id.galleryButton);
+        denoiseButton = findViewById(R.id.denoiseButton);
         photoModeButton = findViewById(R.id.photoModeButton);
         videoModeButton = findViewById(R.id.videoModeButton);
         captureFlashOverlay = findViewById(R.id.captureFlashOverlay);
@@ -228,6 +234,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         updateModeButtons();
         updateApiSwitcherVisibility();
         refreshFocusAfStateFromNode();
+        setDenoiseEnabled(false, false);
     }
 
     private void applyTopControlsSafeArea() {
@@ -268,6 +275,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         switchCameraButton.setOnClickListener(v -> switchCamera());
         flashButton.setOnClickListener(v -> toggleFlash());
         galleryButton.setOnClickListener(v -> startActivity(new Intent(this, GalleryActivity.class)));
+        denoiseButton.setOnClickListener(v -> toggleDenoise());
         photoModeButton.setOnClickListener(v -> setPhotoMode());
         videoModeButton.setOnClickListener(v -> setVideoMode());
         apiSwitcherButton.setOnClickListener(v -> {
@@ -1052,6 +1060,62 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         } else {
             Toast.makeText(this, R.string.af_ois_failed, Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void toggleDenoise() {
+        setDenoiseEnabled(!isDenoiseEnabled, true);
+    }
+
+    private void setDenoiseEnabled(boolean enabled, boolean showToast) {
+        if (writeDenoiseNode(enabled ? "1" : "0")) {
+            isDenoiseEnabled = enabled;
+            updateDenoiseButton();
+            if (showToast) {
+                Toast.makeText(this,
+                        enabled ? R.string.denoise_enabled : R.string.denoise_disabled,
+                        Toast.LENGTH_SHORT).show();
+            }
+        } else {
+            isDenoiseEnabled = false;
+            updateDenoiseButton();
+            if (showToast) {
+                Toast.makeText(this, R.string.denoise_failed, Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private void updateDenoiseButton() {
+        if (denoiseButton == null) {
+            return;
+        }
+        int color = getColor(isDenoiseEnabled ? R.color.zoom_active : R.color.white);
+        denoiseButton.setImageTintList(ColorStateList.valueOf(color));
+        denoiseButton.setSelected(isDenoiseEnabled);
+    }
+
+    private boolean writeDenoiseNode(String value) {
+        File node = new File(DENOISE_NODE_PATH);
+        try (FileOutputStream outputStream = new FileOutputStream(node)) {
+            outputStream.write(value.getBytes(StandardCharsets.UTF_8));
+            outputStream.flush();
+            return true;
+        } catch (IOException directWriteError) {
+            Log.w(TAG, "Direct denoise node write failed, try shell", directWriteError);
+        }
+
+        try {
+            Process process = Runtime.getRuntime().exec(new String[]{
+                    "sh", "-c", "echo " + value + " > " + DENOISE_NODE_PATH
+            });
+            int exitCode = process.waitFor();
+            if (exitCode == 0) {
+                return true;
+            }
+            Log.e(TAG, "Shell denoise node write failed, exit=" + exitCode);
+        } catch (Exception shellError) {
+            Log.e(TAG, "Shell denoise node write failed", shellError);
+        }
+        return false;
     }
 
     private void refreshFocusAfStateFromNode() {
