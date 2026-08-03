@@ -11,7 +11,7 @@
         android:layout_height="match_parent"
         android:scaleType="fitCenter" />
 
-    <VideoView
+    <android.view.TextureView
         android:id="@+id/mediaVideo"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -19,6 +19,7 @@
         android:visibility="gone" />
 
     <LinearLayout
+        android:id="@+id/viewerTopBar"
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:gravity="center_vertical"
@@ -42,5 +43,84 @@
             android:layout_weight="1"
             android:textColor="@color/white"
             android:textSize="16sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/playbackControls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="#99000000"
+        android:orientation="vertical"
+        android:paddingStart="8dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="4dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:gravity="center">
+
+            <ImageButton
+                android:id="@+id/rewindButton"
+                android:layout_width="48dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Rewind 10 seconds"
+                android:src="@android:drawable/ic_media_rew"
+                android:tint="@color/white" />
+
+            <ImageButton
+                android:id="@+id/playButton"
+                android:layout_width="56dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Play"
+                android:src="@android:drawable/ic_media_play"
+                android:tint="@color/white" />
+
+            <ImageButton
+                android:id="@+id/forwardButton"
+                android:layout_width="48dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Forward 10 seconds"
+                android:src="@android:drawable/ic_media_ff"
+                android:tint="@color/white" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/playbackCurrentTime"
+                android:layout_width="48dp"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="00:00"
+                android:textColor="@color/white"
+                android:textSize="11sp" />
+
+            <SeekBar
+                android:id="@+id/playbackSeekBar"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:max="1000"
+                android:progress="0" />
+
+            <TextView
+                android:id="@+id/playbackDuration"
+                android:layout_width="48dp"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="00:00"
+                android:textColor="@color/white"
+                android:textSize="11sp" />
+        </LinearLayout>
     </LinearLayout>
 </FrameLayout>

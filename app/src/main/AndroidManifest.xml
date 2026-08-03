@@ -66,11 +66,13 @@
         <activity
             android:name=".ui.activity.GalleryActivity"
             android:exported="false"
-            android:screenOrientation="portrait" />
+            android:screenOrientation="fullSensor"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity
             android:name=".ui.activity.MediaViewerActivity"
             android:exported="false"
-            android:screenOrientation="portrait" />
+            android:screenOrientation="fullSensor"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

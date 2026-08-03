@@ -423,9 +423,42 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         }
     }
 
+    public boolean isVideoFocusSupported() {
+        return currentStrategy != null && currentStrategy.isVideoFocusSupported();
+    }
+
+    public float getVideoMinimumFocusDistance() {
+        return currentStrategy != null ? currentStrategy.getVideoMinimumFocusDistance() : 0f;
+    }
+
+    public float getVideoFocusDistance() {
+        return currentStrategy != null ? currentStrategy.getVideoFocusDistance() : 0f;
+    }
+
+    public boolean isVideoManualFocusEnabled() {
+        return currentStrategy != null && currentStrategy.isVideoManualFocusEnabled();
+    }
+
+    public boolean isVideoTapFocusActive() {
+        return currentStrategy != null && currentStrategy.isVideoTapFocusActive();
+    }
+
+    public void setVideoFocusDistance(float focusDistance) {
+        if (currentStrategy != null) {
+            currentStrategy.setVideoFocusDistance(focusDistance);
+        }
+    }
+
+    public void resetVideoFocus() {
+        if (currentStrategy != null) {
+            currentStrategy.resetVideoFocus();
+        }
+    }
+
     public boolean isFocusSupported() {
-        Log.d(TAG, "isFocusSupported: " + currentStrategy.isFocusSupported());
-        return currentStrategy != null && currentStrategy.isFocusSupported();
+        boolean supported = currentStrategy != null && currentStrategy.isFocusSupported();
+        Log.d(TAG, "isFocusSupported: " + supported);
+        return supported;
     }
 
     /**

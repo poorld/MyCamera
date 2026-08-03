@@ -69,6 +69,8 @@ public class Camera2Strategy extends BaseCameraStrategy {
     private static final int MTK_HFPS_MODE_60FPS = 1;
     private static final int SLOW_MOTION_PLAYBACK_FPS = 30;
     private static final int RECORDING_SEGMENT_DURATION_MS = 10 * 60 * 1000;
+    private static final int PREVIEW_WIDTH = 1920;
+    private static final int PREVIEW_HEIGHT = 1080;
     
     private CameraDevice cameraDevice;
     private CameraCaptureSession captureSession;
@@ -107,6 +109,16 @@ public class Camera2Strategy extends BaseCameraStrategy {
     private boolean manualExposureEnabled;
     private int manualIso = 100;
     private long manualExposureTimeNs = 10_000_000L;
+    private volatile boolean videoFocusSupported;
+    private volatile float videoMinimumFocusDistance;
+    private volatile boolean videoManualFocusEnabled;
+    private volatile float videoFocusDistance;
+    private volatile boolean videoTapFocusActive;
+    private MeteringRectangle[] videoTapFocusRegions;
+    private boolean photoTapFocusActive;
+    private MeteringRectangle[] photoTapFocusRegions;
+    private volatile int reportedVideoAfMode = -1;
+    private volatile float reportedVideoFocusDistance = Float.NaN;
     private Range<Integer> autoBrightnessCompensationRange;
     private int autoBrightnessCompensationIndex;
     private long lastAutoBrightnessAdjustmentMs;
@@ -116,6 +128,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
                 public void onCaptureCompleted(@NonNull CameraCaptureSession session,
                                                @NonNull CaptureRequest request,
                                                @NonNull TotalCaptureResult result) {
+                    updateReportedVideoFocus(result);
                     adjustAutoBrightness(result);
                 }
             };
@@ -126,6 +139,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
                 public void onCaptureCompleted(@NonNull CameraCaptureSession session,
                                                 @NonNull CaptureRequest request,
                                                 @NonNull TotalCaptureResult result) {
+                    updateReportedVideoFocus(result);
                     adjustAutoBrightness(result);
                     if (isRecording) {
                         recordingFrameCount.incrementAndGet();
@@ -162,6 +176,15 @@ public class Camera2Strategy extends BaseCameraStrategy {
             return;
         }
 
+        boolean focusContextChanged = currentConfig != null
+                && (CaptureMode.normalize(currentConfig.getCaptureMode())
+                        != CaptureMode.normalize(config.getCaptureMode())
+                || !TextUtilsEquals(currentConfig.getCameraId(), config.getCameraId()));
+        if (focusContextChanged) {
+            resetVideoFocusStateToFar();
+            resetPhotoFocusStateToFar();
+        }
+
         boolean sameDevice = cameraDevice != null
                 && currentState != CameraState.ERROR
                 && currentState != CameraState.CLOSED
@@ -172,6 +195,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
                 || currentConfig.getFrameRate() != config.getFrameRate()
                 || currentConfig.getCaptureMode() != config.getCaptureMode()
                 || currentConfig.getPhotoResolution() != config.getPhotoResolution()
+                || currentConfig.isLowMemoryModeEnabled() != config.isLowMemoryModeEnabled()
                 || !TextUtilsEquals(currentConfig.getCameraId(), config.getCameraId());
 
         this.currentConfig = config;
@@ -195,6 +219,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
         }
 
         loadManualExposureCapabilities(config.getCameraId());
+        loadVideoFocusCapabilities(config.getCameraId());
         startOrientationUpdates();
         startBackgroundThread();
         CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
@@ -301,7 +326,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
         try {
             CaptureRequest.Builder captureBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
             captureBuilder.addTarget(imageReader.getSurface());
-            captureBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+            applyPhotoFocusToRequest(captureBuilder);
             captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getJpegOrientation());
             applyZoom(captureBuilder);
             applyFlashToRequest(captureBuilder);
@@ -359,6 +384,19 @@ public class Camera2Strategy extends BaseCameraStrategy {
             // Set new focus area
             previewRequestBuilder.set(CaptureRequest.CONTROL_AF_REGIONS, new MeteringRectangle[]{focusArea});
             previewRequestBuilder.set(CaptureRequest.CONTROL_AE_REGIONS, new MeteringRectangle[]{focusArea});
+            if (isVideoCaptureMode()) {
+                videoTapFocusActive = true;
+                videoTapFocusRegions = new MeteringRectangle[]{focusArea};
+                videoManualFocusEnabled = false;
+                videoFocusDistance = 0f;
+                previewRequestBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, null);
+                Log.i(TAG, "video tap focus: AF_MODE=AUTO, x=" + x + ", y=" + y);
+            } else {
+                photoTapFocusActive = true;
+                photoTapFocusRegions = new MeteringRectangle[]{focusArea};
+                previewRequestBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, null);
+                Log.i(TAG, "photo tap focus: AF_MODE=AUTO, x=" + x + ", y=" + y);
+            }
             previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_AUTO);
             previewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START);
 
@@ -383,7 +421,11 @@ public class Camera2Strategy extends BaseCameraStrategy {
                 private void finishFocus(boolean success) {
                     if (focusFinished) return;
                     focusFinished = true;
-                    resetFocusMode();
+                    if (isVideoCaptureMode()) {
+                        finishVideoTapFocus(success);
+                    } else {
+                        finishPhotoTapFocus(success);
+                    }
                 }
             };
 
@@ -394,20 +436,27 @@ public class Camera2Strategy extends BaseCameraStrategy {
         }
     }
 
-    private void resetFocusMode() {
+    private void finishPhotoTapFocus(boolean success) {
         if (captureSession == null || previewRequestBuilder == null) return;
         try {
             previewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, null);
-            previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+            previewRequestBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, null);
+            previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
+                    CaptureRequest.CONTROL_AF_MODE_AUTO);
+            applyPhotoTapFocusRegions(previewRequestBuilder);
             captureSession.setRepeatingRequest(previewRequestBuilder.build(), null, backgroundHandler);
-        } catch (CameraAccessException e) {
-            logError("Failed to reset focus", e);
+            Log.i(TAG, "photo tap focus finished success=" + success
+                    + ", AF_MODE=AUTO, focus remains locked until next tap");
+        } catch (CameraAccessException | IllegalStateException e) {
+            logError("Failed to keep photo tap focus", e);
         }
     }
 
     @Override
     public void closeCamera() {
         Log.d(TAG, "closeCamera: ");
+        resetVideoFocusStateToFar();
+        resetPhotoFocusStateToFar();
         stopOrientationUpdates();
         pendingStopAfterRotation = false;
         if (isRecording) {
@@ -547,7 +596,9 @@ public class Camera2Strategy extends BaseCameraStrategy {
             }
             
             Resolution resolution = currentConfig.getResolution();
-            surfaceTexture.setDefaultBufferSize(resolution.getWidth(), resolution.getHeight());
+            // Keep the on-screen preview stable; the recorder surface below
+            // still uses the configured recording resolution.
+            surfaceTexture.setDefaultBufferSize(PREVIEW_WIDTH, PREVIEW_HEIGHT);
             Surface previewSurface = new Surface(surfaceTexture);
             Surface recorderSurface = mediaRecorder.getSurface();
 
@@ -556,7 +607,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
             final CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
             builder.addTarget(previewSurface);
             builder.addTarget(recorderSurface);
-            builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO);
+            applyVideoFocusToRequest(builder);
             applyFpsToRequest(builder);
             applyMtkHfpsMode(builder);
             applyFlashToRequest(builder);
@@ -572,8 +623,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
             // 60fps sensor scenario rather than the normal VIDEO 30fps mode.
             CaptureRequest.Builder sessionParamsBuilder =
                     cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
-            sessionParamsBuilder.set(CaptureRequest.CONTROL_AF_MODE,
-                    CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO);
+            applyVideoFocusModeToRequest(sessionParamsBuilder);
             applyFpsToRequest(sessionParamsBuilder);
             applyMtkHfpsMode(sessionParamsBuilder);
 
@@ -622,6 +672,21 @@ public class Camera2Strategy extends BaseCameraStrategy {
         } catch (IllegalArgumentException | IllegalStateException e) {
             logError("Failed to start Camera2 recording", e);
             handleRecordingStartFailure(rotationAttempt, "Recording start failed");
+        }
+    }
+
+    private void finishVideoTapFocus(boolean success) {
+        if (captureSession == null || previewRequestBuilder == null) return;
+        try {
+            previewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, null);
+            previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
+                    CaptureRequest.CONTROL_AF_MODE_AUTO);
+            applyVideoTapFocusRegions(previewRequestBuilder);
+            captureSession.setRepeatingRequest(previewRequestBuilder.build(), null, backgroundHandler);
+            Log.i(TAG, "video tap focus finished success=" + success
+                    + ", AF_MODE=AUTO, focus remains locked until next tap or reset");
+        } catch (CameraAccessException | IllegalStateException e) {
+            logError("Failed to keep video tap focus", e);
         }
     }
 
@@ -723,8 +788,25 @@ public class Camera2Strategy extends BaseCameraStrategy {
             if (map == null) {
                 return null;
             }
+            if (currentConfig.getResolution() == null) {
+                return null;
+            }
             Size size = new Size(currentConfig.getResolution().getWidth(),
                     currentConfig.getResolution().getHeight());
+            Size[] highSpeedSizes = map.getHighSpeedVideoSizes();
+            boolean sizeSupported = false;
+            if (highSpeedSizes != null) {
+                for (Size highSpeedSize : highSpeedSizes) {
+                    if (size.equals(highSpeedSize)) {
+                        sizeSupported = true;
+                        break;
+                    }
+                }
+            }
+            if (!sizeSupported) {
+                // getHighSpeedVideoFpsRangesFor throws for ordinary video sizes.
+                return null;
+            }
             Range<Integer> bestRange = null;
             for (Range<Integer> range : map.getHighSpeedVideoFpsRangesFor(size)) {
                 if (range != null && range.getUpper() == currentConfig.getFrameRate()) {
@@ -884,23 +966,16 @@ public class Camera2Strategy extends BaseCameraStrategy {
             boolean videoMode = isVideoCaptureMode();
             Resolution resolution = currentConfig.getResolution();
 
-            Size previewBufferSize;
+            // Keep the on-screen preview stream identical in photo and video
+            // modes. The still JPEG remains at its selected high-resolution
+            // size on a separate ImageReader.
+            Size previewBufferSize = new Size(PREVIEW_WIDTH, PREVIEW_HEIGHT);
             Size photoSize = null;
-            if (videoMode) {
-                previewBufferSize = new Size(resolution.getWidth(), resolution.getHeight());
-            } else {
-                // Still mode: choose JPEG first, then a moderate 4:3 preview so HAL
-                // maxImageSize follows the still target (12M/36M/...), not video 2560x1440.
+            if (!videoMode) {
+                // Still mode uses the same preview stream as video. The JPEG
+                // ImageReader below still uses the exact selected photo size.
                 photoSize = requirePhotoCaptureSize();
-                try {
-                    CameraManager cm = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
-                    StreamConfigurationMap map = cm.getCameraCharacteristics(currentConfig.getCameraId())
-                            .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-                    previewBufferSize = choosePhotoPreviewSize(map, photoSize);
-                } catch (Exception e) {
-                    previewBufferSize = new Size(1440, 1080);
-                    Log.w(TAG, "photo preview size fallback", e);
-                }
+                Log.d(TAG, "photo preview uses fixed preview size=" + previewBufferSize);
             }
             surfaceTexture.setDefaultBufferSize(previewBufferSize.getWidth(), previewBufferSize.getHeight());
             Surface previewSurface = new Surface(surfaceTexture);
@@ -921,7 +996,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
                 releasePhotoImageReader();
                 outputs.add(videoImageReader.getSurface());
                 builder.addTarget(videoImageReader.getSurface());
-                builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO);
+                applyVideoFocusToRequest(builder);
                 Log.d(TAG, "createPreviewSession: VIDEO pipeline encoderSurface="
                         + resolution.getWidth() + "x" + resolution.getHeight());
             } else {
@@ -941,7 +1016,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
                             : imageReader.getWidth() + "x" + imageReader.getHeight()));
                 }
                 outputs.add(imageReader.getSurface());
-                builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+                applyPhotoFocusToRequest(builder);
                 Log.i(TAG, "createPreviewSession: PHOTO pipeline jpegReader="
                         + imageReader.getWidth() + "x" + imageReader.getHeight()
                         + ", preview=" + previewBufferSize.getWidth() + "x" + previewBufferSize.getHeight()
@@ -998,15 +1073,16 @@ public class Camera2Strategy extends BaseCameraStrategy {
                                 + configuredPhotoSize);
                         try {
                             closeCaptureSession();
-                            surfaceTexture.setDefaultBufferSize(1440, 1080);
+                            surfaceTexture.setDefaultBufferSize(
+                                    configuredPreviewSize.getWidth(),
+                                    configuredPreviewSize.getHeight());
                             Surface retryPreview = new Surface(surfaceTexture);
                             ensurePhotoImageReader(configuredPhotoSize.getWidth(),
                                     configuredPhotoSize.getHeight());
                             CaptureRequest.Builder retryBuilder =
                                     cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
                             retryBuilder.addTarget(retryPreview);
-                            retryBuilder.set(CaptureRequest.CONTROL_AF_MODE,
-                                    CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+                            applyPhotoFocusToRequest(retryBuilder);
                             applyFpsToRequest(retryBuilder);
                             applyFlashToRequest(retryBuilder);
                             applyZoom(retryBuilder);
@@ -1062,12 +1138,12 @@ public class Camera2Strategy extends BaseCameraStrategy {
             return;
         }
         releasePhotoImageReader();
-        // Match MTK system camera CaptureSurface: ImageReader.newInstance(pictureW, pictureH, JPEG, n)
-        // maxImages=2: still capture does not need a deep queue; large stills are costly.
-        imageReader = ImageReader.newInstance(width, height, ImageFormat.JPEG, 2);
+        int maxImages = currentConfig != null && currentConfig.isLowMemoryModeEnabled() ? 1 : 2;
+        // Still capture does not need a deep queue; low-memory mode keeps one buffer.
+        imageReader = ImageReader.newInstance(width, height, ImageFormat.JPEG, maxImages);
         Log.i(TAG, "ensurePhotoImageReader NEW jpeg ImageReader "
                 + imageReader.getWidth() + "x" + imageReader.getHeight()
-                + " format=JPEG");
+                + " format=JPEG, maxImages=" + maxImages);
     }
 
     private void ensureVideoEncoderReader(int width, int height) {
@@ -1078,15 +1154,23 @@ public class Camera2Strategy extends BaseCameraStrategy {
         }
         releaseVideoEncoderReader();
         // PRIVATE + USAGE_VIDEO_ENCODE => GRALLOC_USAGE_HW_VIDEO_ENCODER in HAL.
+        final boolean lowMemoryMode = currentConfig != null && currentConfig.isLowMemoryModeEnabled();
+        int maxImages = lowMemoryMode ? 1 : 2;
         videoImageReader = ImageReader.newInstance(
                 width,
                 height,
                 ImageFormat.PRIVATE,
-                2,
+                maxImages,
                 HardwareBuffer.USAGE_VIDEO_ENCODE);
+        Log.i(TAG, "ensureVideoEncoderReader NEW private ImageReader "
+                + width + "x" + height + ", maxImages=" + maxImages
+                + ", lowMemoryMode=" + lowMemoryMode);
         videoImageReader.setOnImageAvailableListener(reader -> {
             try {
-                android.media.Image image = reader.acquireLatestImage();
+                // acquireLatestImage() needs a queue of at least two images.
+                android.media.Image image = lowMemoryMode
+                        ? reader.acquireNextImage()
+                        : reader.acquireLatestImage();
                 if (image != null) {
                     image.close();
                 }
@@ -1250,6 +1334,176 @@ public class Camera2Strategy extends BaseCameraStrategy {
             builder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fpsRange);
         } catch (IllegalArgumentException e) {
             logError("Unsupported FPS range for current camera: " + fpsRange, e);
+        }
+    }
+
+    private void loadVideoFocusCapabilities(String cameraId) {
+        videoFocusSupported = false;
+        videoMinimumFocusDistance = 0f;
+        videoManualFocusEnabled = false;
+        videoFocusDistance = 0f;
+        videoTapFocusActive = false;
+        videoTapFocusRegions = null;
+        photoTapFocusActive = false;
+        photoTapFocusRegions = null;
+        reportedVideoAfMode = -1;
+        reportedVideoFocusDistance = Float.NaN;
+        try {
+            CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            if (manager == null) {
+                return;
+            }
+            CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
+            Float minimumDistance = characteristics.get(
+                    CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
+            int[] availableAfModes = characteristics.get(
+                    CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES);
+            boolean offSupported = false;
+            if (availableAfModes != null) {
+                for (int mode : availableAfModes) {
+                    if (mode == CameraMetadata.CONTROL_AF_MODE_OFF) {
+                        offSupported = true;
+                        break;
+                    }
+                }
+            }
+            if (minimumDistance != null && minimumDistance > 0f && offSupported) {
+                videoMinimumFocusDistance = minimumDistance;
+                videoFocusSupported = true;
+            }
+            Log.i(TAG, "video focus capabilities camera=" + cameraId
+                    + ", manual=" + videoFocusSupported
+                    + ", minDistance=" + videoMinimumFocusDistance
+                    + ", afOff=" + offSupported);
+        } catch (CameraAccessException | IllegalArgumentException e) {
+            logError("Failed to query video focus capabilities", e);
+        }
+    }
+
+    private void applyVideoFocusModeToRequest(CaptureRequest.Builder builder) {
+        if (builder == null) {
+            return;
+        }
+        if (videoTapFocusActive) {
+            builder.set(CaptureRequest.CONTROL_AF_MODE,
+                    CaptureRequest.CONTROL_AF_MODE_AUTO);
+            applyVideoTapFocusRegions(builder);
+            return;
+        }
+        builder.set(CaptureRequest.CONTROL_AF_MODE,
+                videoFocusSupported
+                        ? CaptureRequest.CONTROL_AF_MODE_OFF
+                        : CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO);
+    }
+
+    private void applyPhotoFocusToRequest(CaptureRequest.Builder builder) {
+        if (builder == null) {
+            return;
+        }
+        if (photoTapFocusActive) {
+            builder.set(CaptureRequest.LENS_FOCUS_DISTANCE, null);
+            builder.set(CaptureRequest.CONTROL_AF_MODE,
+                    CaptureRequest.CONTROL_AF_MODE_AUTO);
+            builder.set(CaptureRequest.CONTROL_AF_TRIGGER, null);
+            applyPhotoTapFocusRegions(builder);
+            Log.i(TAG, "applyPhotoFocus AF_MODE=AUTO, mode=TAP_AF");
+            return;
+        }
+        if (videoFocusSupported) {
+            try {
+                builder.set(CaptureRequest.CONTROL_AF_MODE,
+                        CaptureRequest.CONTROL_AF_MODE_OFF);
+                builder.set(CaptureRequest.LENS_FOCUS_DISTANCE, 0f);
+                Log.i(TAG, "applyPhotoFocus AF_MODE=OFF, lensFocusDistance=0.0D, mode=AUTO_FAR");
+            } catch (IllegalArgumentException e) {
+                logError("Failed to set fixed far photo focus", e);
+            }
+        } else {
+            builder.set(CaptureRequest.CONTROL_AF_MODE,
+                    CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+        }
+    }
+
+    private void applyVideoFocusToRequest(CaptureRequest.Builder builder) {
+        if (builder == null) {
+            return;
+        }
+        if (videoTapFocusActive) {
+            builder.set(CaptureRequest.LENS_FOCUS_DISTANCE, null);
+            builder.set(CaptureRequest.CONTROL_AF_MODE,
+                    CaptureRequest.CONTROL_AF_MODE_AUTO);
+            builder.set(CaptureRequest.CONTROL_AF_TRIGGER, null);
+            applyVideoTapFocusRegions(builder);
+            Log.i(TAG, "applyVideoFocus AF_MODE=AUTO, mode=TAP_AF");
+            return;
+        }
+        applyVideoFocusModeToRequest(builder);
+        if (!videoFocusSupported) {
+            return;
+        }
+        float distance = videoManualFocusEnabled ? videoFocusDistance : 0f;
+        try {
+            builder.set(CaptureRequest.LENS_FOCUS_DISTANCE, distance);
+            Log.i(TAG, "applyVideoFocus AF_MODE=OFF, lensFocusDistance=" + distance
+                    + "D, mode=" + (videoManualFocusEnabled ? "MANUAL" : "AUTO_FAR"));
+        } catch (IllegalArgumentException e) {
+            logError("Failed to set video lens focus distance", e);
+        }
+    }
+
+    private void applyVideoTapFocusRegions(CaptureRequest.Builder builder) {
+        if (builder == null || videoTapFocusRegions == null) {
+            return;
+        }
+        builder.set(CaptureRequest.CONTROL_AF_REGIONS, videoTapFocusRegions);
+        builder.set(CaptureRequest.CONTROL_AE_REGIONS, videoTapFocusRegions);
+    }
+
+    private void applyPhotoTapFocusRegions(CaptureRequest.Builder builder) {
+        if (builder == null || photoTapFocusRegions == null) {
+            return;
+        }
+        builder.set(CaptureRequest.CONTROL_AF_REGIONS, photoTapFocusRegions);
+        builder.set(CaptureRequest.CONTROL_AE_REGIONS, photoTapFocusRegions);
+    }
+
+    private void resetVideoFocusStateToFar() {
+        videoTapFocusActive = false;
+        videoTapFocusRegions = null;
+        videoManualFocusEnabled = false;
+        videoFocusDistance = 0f;
+    }
+
+    private void resetPhotoFocusStateToFar() {
+        photoTapFocusActive = false;
+        photoTapFocusRegions = null;
+    }
+
+    private float clampVideoFocusDistance(float requestedDistance) {
+        if (Float.isNaN(requestedDistance) || Float.isInfinite(requestedDistance)) {
+            return 0f;
+        }
+        return Math.max(0f, Math.min(requestedDistance, videoMinimumFocusDistance));
+    }
+
+    private String formatFocusDistance(float diopters) {
+        if (diopters <= 0f) {
+            return "infinity";
+        }
+        return String.format(java.util.Locale.US, "%.1fcm", 100f / diopters);
+    }
+
+    private void updateReportedVideoFocus(TotalCaptureResult result) {
+        if (!isVideoCaptureMode() || result == null) {
+            return;
+        }
+        Integer afMode = result.get(CaptureResult.CONTROL_AF_MODE);
+        if (afMode != null) {
+            reportedVideoAfMode = afMode;
+        }
+        Float focusDistance = result.get(CaptureResult.LENS_FOCUS_DISTANCE);
+        if (focusDistance != null) {
+            reportedVideoFocusDistance = focusDistance;
         }
     }
 
@@ -1444,10 +1698,12 @@ public class Camera2Strategy extends BaseCameraStrategy {
                     (CameraConstrainedHighSpeedCaptureSession) captureSession;
             highSpeedSession.setRepeatingBurst(
                     highSpeedSession.createHighSpeedRequestList(request),
-                    null,
+                    isRecording ? recordingCaptureCallback : autoBrightnessCaptureCallback,
                     backgroundHandler);
         } else {
-            captureSession.setRepeatingRequest(request, autoBrightnessCaptureCallback, backgroundHandler);
+            captureSession.setRepeatingRequest(request,
+                    isRecording ? recordingCaptureCallback : autoBrightnessCaptureCallback,
+                    backgroundHandler);
         }
     }
 
@@ -1575,7 +1831,19 @@ public class Camera2Strategy extends BaseCameraStrategy {
                 lastRecordingFrameTimestampNs,
                 RECORDING_SEGMENT_DURATION_MS,
                 recordingOutputFile,
-                lastRecordingError);
+                lastRecordingError,
+                videoFocusSupported,
+                videoManualFocusEnabled,
+                videoFocusDistance,
+                videoMinimumFocusDistance,
+                videoFocusSupported
+                        ? (videoTapFocusActive
+                                ? CaptureRequest.CONTROL_AF_MODE_AUTO
+                                : CaptureRequest.CONTROL_AF_MODE_OFF)
+                        : CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO,
+                reportedVideoAfMode,
+                reportedVideoFocusDistance,
+                videoTapFocusActive);
     }
 
     @Override
@@ -1643,6 +1911,74 @@ public class Camera2Strategy extends BaseCameraStrategy {
             }
         }
         return keys;
+    }
+
+    @Override
+    public boolean isVideoFocusSupported() {
+        return videoFocusSupported;
+    }
+
+    @Override
+    public float getVideoMinimumFocusDistance() {
+        return videoMinimumFocusDistance;
+    }
+
+    @Override
+    public float getVideoFocusDistance() {
+        return videoFocusDistance;
+    }
+
+    @Override
+    public boolean isVideoManualFocusEnabled() {
+        return videoManualFocusEnabled;
+    }
+
+    @Override
+    public void setVideoFocusDistance(float focusDistance) {
+        if (!videoFocusSupported) {
+            Log.w(TAG, "Manual video focus is not supported");
+            return;
+        }
+        videoTapFocusActive = false;
+        videoTapFocusRegions = null;
+        videoFocusDistance = clampVideoFocusDistance(focusDistance);
+        videoManualFocusEnabled = true;
+        Log.i(TAG, "video focus=MANUAL, distance=" + videoFocusDistance
+                + "D, approxDistance=" + formatFocusDistance(videoFocusDistance));
+        submitVideoFocusChange();
+    }
+
+    @Override
+    public void resetVideoFocus() {
+        resetVideoFocusStateToFar();
+        Log.i(TAG, "video focus=AUTO_FAR, distance=0.0D");
+        submitVideoFocusChange();
+    }
+
+    @Override
+    public boolean isVideoTapFocusActive() {
+        return videoTapFocusActive;
+    }
+
+    private void submitVideoFocusChange() {
+        Runnable applyChange = () -> {
+            if (previewRequestBuilder == null || captureSession == null) {
+                return;
+            }
+            if (isVideoCaptureMode()) {
+                applyVideoFocusToRequest(previewRequestBuilder);
+            }
+            try {
+                submitRepeatingRequest(previewRequestBuilder);
+            } catch (CameraAccessException | IllegalStateException e) {
+                logError("Failed to apply video focus", e);
+            }
+        };
+        if (backgroundHandler != null) {
+            backgroundHandler.post(applyChange);
+        } else {
+            applyChange.run();
+        }
     }
 
     @Override

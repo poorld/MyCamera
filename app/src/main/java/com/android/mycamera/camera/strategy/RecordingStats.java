@@ -33,6 +33,14 @@ public final class RecordingStats {
     private final long segmentDurationMs;
     private final File outputFile;
     private final String lastError;
+    private final boolean videoFocusSupported;
+    private final boolean videoManualFocusEnabled;
+    private boolean videoTapFocusActive;
+    private final float videoFocusDistance;
+    private final float videoMinimumFocusDistance;
+    private final int requestedVideoAfMode;
+    private final int reportedVideoAfMode;
+    private final float reportedVideoFocusDistance;
 
     public RecordingStats(boolean recording,
                           boolean stopping,
@@ -55,6 +63,41 @@ public final class RecordingStats {
                           long segmentDurationMs,
                           File outputFile,
                           String lastError) {
+        this(recording, stopping, rotatingSegment, strategyName, requestedCodec, appliedCodec,
+                targetBitrate, profileBitrate, captureFps, playbackFps, width, height,
+                audioEnabled, recordingStartElapsedMs, segmentStartElapsedMs, segmentIndex,
+                frameCount, lastFrameTimestampNs, segmentDurationMs, outputFile, lastError,
+                false, false, 0f, 0f, -1, -1, Float.NaN);
+    }
+
+    public RecordingStats(boolean recording,
+                          boolean stopping,
+                          boolean rotatingSegment,
+                          String strategyName,
+                          VideoCodec requestedCodec,
+                          VideoCodec appliedCodec,
+                          long targetBitrate,
+                          long profileBitrate,
+                          int captureFps,
+                          int playbackFps,
+                          int width,
+                          int height,
+                          boolean audioEnabled,
+                          long recordingStartElapsedMs,
+                          long segmentStartElapsedMs,
+                          int segmentIndex,
+                          long frameCount,
+                          long lastFrameTimestampNs,
+                          long segmentDurationMs,
+                          File outputFile,
+                          String lastError,
+                          boolean videoFocusSupported,
+                          boolean videoManualFocusEnabled,
+                          float videoFocusDistance,
+                          float videoMinimumFocusDistance,
+                          int requestedVideoAfMode,
+                          int reportedVideoAfMode,
+                          float reportedVideoFocusDistance) {
         this.recording = recording;
         this.stopping = stopping;
         this.rotatingSegment = rotatingSegment;
@@ -76,6 +119,53 @@ public final class RecordingStats {
         this.segmentDurationMs = segmentDurationMs;
         this.outputFile = outputFile;
         this.lastError = lastError;
+        this.videoFocusSupported = videoFocusSupported;
+        this.videoManualFocusEnabled = videoManualFocusEnabled;
+        this.videoTapFocusActive = false;
+        this.videoFocusDistance = videoFocusDistance;
+        this.videoMinimumFocusDistance = videoMinimumFocusDistance;
+        this.requestedVideoAfMode = requestedVideoAfMode;
+        this.reportedVideoAfMode = reportedVideoAfMode;
+        this.reportedVideoFocusDistance = reportedVideoFocusDistance;
+    }
+
+    public RecordingStats(boolean recording,
+                          boolean stopping,
+                          boolean rotatingSegment,
+                          String strategyName,
+                          VideoCodec requestedCodec,
+                          VideoCodec appliedCodec,
+                          long targetBitrate,
+                          long profileBitrate,
+                          int captureFps,
+                          int playbackFps,
+                          int width,
+                          int height,
+                          boolean audioEnabled,
+                          long recordingStartElapsedMs,
+                          long segmentStartElapsedMs,
+                          int segmentIndex,
+                          long frameCount,
+                          long lastFrameTimestampNs,
+                          long segmentDurationMs,
+                          File outputFile,
+                          String lastError,
+                          boolean videoFocusSupported,
+                          boolean videoManualFocusEnabled,
+                          float videoFocusDistance,
+                          float videoMinimumFocusDistance,
+                          int requestedVideoAfMode,
+                          int reportedVideoAfMode,
+                          float reportedVideoFocusDistance,
+                          boolean videoTapFocusActive) {
+        this(recording, stopping, rotatingSegment, strategyName, requestedCodec, appliedCodec,
+                targetBitrate, profileBitrate, captureFps, playbackFps, width, height,
+                audioEnabled, recordingStartElapsedMs, segmentStartElapsedMs, segmentIndex,
+                frameCount, lastFrameTimestampNs, segmentDurationMs, outputFile, lastError,
+                videoFocusSupported, videoManualFocusEnabled, videoFocusDistance,
+                videoMinimumFocusDistance, requestedVideoAfMode, reportedVideoAfMode,
+                reportedVideoFocusDistance);
+        this.videoTapFocusActive = videoTapFocusActive;
     }
 
     public static RecordingStats idle(String strategyName) {
@@ -167,5 +257,37 @@ public final class RecordingStats {
 
     public String getLastError() {
         return lastError;
+    }
+
+    public boolean isVideoFocusSupported() {
+        return videoFocusSupported;
+    }
+
+    public boolean isVideoManualFocusEnabled() {
+        return videoManualFocusEnabled;
+    }
+
+    public boolean isVideoTapFocusActive() {
+        return videoTapFocusActive;
+    }
+
+    public float getVideoFocusDistance() {
+        return videoFocusDistance;
+    }
+
+    public float getVideoMinimumFocusDistance() {
+        return videoMinimumFocusDistance;
+    }
+
+    public int getRequestedVideoAfMode() {
+        return requestedVideoAfMode;
+    }
+
+    public int getReportedVideoAfMode() {
+        return reportedVideoAfMode;
+    }
+
+    public float getReportedVideoFocusDistance() {
+        return reportedVideoFocusDistance;
     }
 }

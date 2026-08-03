@@ -26,6 +26,7 @@ import androidx.core.content.FileProvider;
 import com.android.mycamera.BaseAct;
 import com.android.mycamera.R;
 import com.android.mycamera.utils.CameraUtils;
+import com.android.mycamera.utils.GravityOrientationHelper;
 import com.android.mycamera.utils.MediaOrientationUtils;
 
 import java.io.File;
@@ -52,11 +53,13 @@ public class GalleryActivity extends BaseAct {
     private final ExecutorService thumbnailExecutor = Executors.newFixedThreadPool(2);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private int thumbnailGeneration;
+    private GravityOrientationHelper gravityOrientationHelper;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_gallery);
+        gravityOrientationHelper = new GravityOrientationHelper(this);
         mediaGrid = findViewById(R.id.mediaGrid);
         emptyView = findViewById(R.id.emptyView);
         galleryTitle = findViewById(R.id.galleryTitle);
@@ -68,7 +71,18 @@ public class GalleryActivity extends BaseAct {
     @Override
     protected void onResume() {
         super.onResume();
+        if (gravityOrientationHelper != null) {
+            gravityOrientationHelper.start();
+        }
         loadMedia();
+    }
+
+    @Override
+    protected void onPause() {
+        if (gravityOrientationHelper != null) {
+            gravityOrientationHelper.stop();
+        }
+        super.onPause();
     }
 
     private void loadMedia() {

@@ -238,21 +238,10 @@
             android:layout_marginBottom="8dp"/>
 
         <Switch
-            android:id="@+id/hardwareAccelerationSwitch"
+            android:id="@+id/lowMemoryModeSwitch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/hardware_acceleration"
-            android:thumb="@drawable/settings_switch_thumb"
-            android:track="@drawable/settings_switch_track"
-            android:textColor="@color/white"
-            android:checked="true"
-            android:layout_marginBottom="16dp"/>
-
-        <Switch
-            android:id="@+id/memoryOptimizationSwitch"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/memory_optimization"
+            android:text="@string/low_memory_mode"
             android:thumb="@drawable/settings_switch_thumb"
             android:track="@drawable/settings_switch_track"
             android:textColor="@color/white"

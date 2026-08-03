@@ -34,6 +34,7 @@ public class SettingsManager {
     private static final String PREF_BACKGROUND_REVIEW = "background_review";
     private static final String PREF_BACKGROUND_RECORDING = "background_recording";
     private static final String PREF_KEEP_SCREEN_ON = "keep_screen_on";
+    private static final String PREF_LOW_MEMORY_MODE = "low_memory_mode";
     private static final String PREF_APP_LANGUAGE = "app_language";
     private static final String PREF_CAMERA2_CUSTOM_RESOLUTION = "camera2_custom_resolution";
     private static final String PREF_SHOW_API_SWITCHER = "show_api_switcher";
@@ -73,6 +74,7 @@ public class SettingsManager {
         editor.putString(PREF_CAMERA_ID, config.getCameraId());
         editor.putBoolean(PREF_BACKGROUND_REVIEW, config.isBackgroundReviewEnabled());
         editor.putBoolean(PREF_BACKGROUND_RECORDING, config.isBackgroundRecordingEnabled());
+        editor.putBoolean(PREF_LOW_MEMORY_MODE, config.isLowMemoryModeEnabled());
 
         editor.apply();
     }
@@ -140,6 +142,7 @@ public class SettingsManager {
         
         boolean backgroundReviewEnabled = preferences.getBoolean(PREF_BACKGROUND_REVIEW, false);
         boolean backgroundRecordingEnabled = preferences.getBoolean(PREF_BACKGROUND_RECORDING, false);
+        boolean lowMemoryModeEnabled = preferences.getBoolean(PREF_LOW_MEMORY_MODE, true);
 
         return new CameraConfig.Builder()
                 .setApiType(apiType)
@@ -154,6 +157,7 @@ public class SettingsManager {
                 .setCameraId(cameraId)
                 .setBackgroundReviewEnabled(backgroundReviewEnabled)
                 .setBackgroundRecordingEnabled(backgroundRecordingEnabled)
+                .setLowMemoryModeEnabled(lowMemoryModeEnabled)
                 .build();
     }
     
@@ -259,6 +263,14 @@ public class SettingsManager {
 
     public void setKeepScreenOnEnabled(boolean enabled) {
         preferences.edit().putBoolean(PREF_KEEP_SCREEN_ON, enabled).apply();
+    }
+
+    public boolean isLowMemoryModeEnabled() {
+        return preferences.getBoolean(PREF_LOW_MEMORY_MODE, true);
+    }
+
+    public void setLowMemoryModeEnabled(boolean enabled) {
+        preferences.edit().putBoolean(PREF_LOW_MEMORY_MODE, enabled).apply();
     }
 
     public boolean isCamera2CustomResolutionEnabled() {

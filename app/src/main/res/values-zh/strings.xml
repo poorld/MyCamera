@@ -28,8 +28,7 @@
     <string name="recording_storage_low">存储空间不足，录像需至少保留 2 GB 可用空间。</string>
     <string name="save_location">保存位置</string>
     <string name="performance">性能</string>
-    <string name="hardware_acceleration">硬件加速</string>
-    <string name="memory_optimization">内存优化</string>
+    <string name="low_memory_mode">低内存模式</string>
     <string name="camera_size">相机尺寸</string>
     <string name="old_camera">旧版相机</string>
     <string name="yuv_dump_test">YUV 抓帧测试</string>

@@ -21,6 +21,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -64,6 +65,7 @@ public class VideoDebugActivity extends BaseAct implements CameraStateObserver {
     private static final int REQUEST_CODE_PERMISSIONS = 60;
     private static final long STATS_REFRESH_MS = 500L;
     private static final long RECONFIGURE_DELAY_MS = 250L;
+    private static final int FOCUS_DISTANCE_SCALE = 100;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final String[] requiredPermissions = CameraUtils.getRequiredPermissions();
@@ -71,6 +73,9 @@ public class VideoDebugActivity extends BaseAct implements CameraStateObserver {
     private CameraManager cameraManager;
     private TextureView previewView;
     private Spinner resolutionSpinner;
+    private Spinner focusModeSpinner;
+    private SeekBar focusSeekBar;
+    private TextView focusValueText;
     private Button recordButton;
     private TextView statusText;
     private TabLayout debugTabs;
@@ -91,6 +96,7 @@ public class VideoDebugActivity extends BaseAct implements CameraStateObserver {
     private boolean pendingStartAfterReconfigure;
     private boolean restartAfterResolutionSwitch;
     private boolean syncingResolution;
+    private boolean syncingFocus;
     private boolean modeRestored;
     private String lastEvent = "created";
 
@@ -143,6 +149,9 @@ public class VideoDebugActivity extends BaseAct implements CameraStateObserver {
 
         previewView = findViewById(R.id.debugPreview);
         resolutionSpinner = findViewById(R.id.debugResolutionSpinner);
+        focusModeSpinner = findViewById(R.id.debugFocusModeSpinner);
+        focusSeekBar = findViewById(R.id.debugFocusSeekBar);
+        focusValueText = findViewById(R.id.debugFocusValue);
         recordButton = findViewById(R.id.debugRecordButton);
         statusText = findViewById(R.id.debugStatus);
         debugTabs = findViewById(R.id.debugTabs);
@@ -163,6 +172,7 @@ public class VideoDebugActivity extends BaseAct implements CameraStateObserver {
         if (originalConfig != null) {
             originalCaptureMode = CaptureMode.normalize(originalConfig.getCaptureMode());
         }
+        setupFocusControls();
         setupResolutionSpinner();
     }
 
@@ -261,6 +271,102 @@ public class VideoDebugActivity extends BaseAct implements CameraStateObserver {
                     .build());
         }
         modeRestored = true;
+    }
+
+    private void setupFocusControls() {
+        if (focusModeSpinner == null || focusSeekBar == null) {
+            return;
+        }
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                this,
+                R.layout.spinner_item_light,
+                new String[]{
+                        getString(R.string.video_debug_focus_auto_far),
+                        getString(R.string.video_debug_focus_manual)
+                });
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        focusModeSpinner.setAdapter(adapter);
+        focusModeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (syncingFocus || cameraManager == null
+                        || !cameraManager.isVideoFocusSupported()) {
+                    return;
+                }
+                if (position == 0) {
+                    cameraManager.resetVideoFocus();
+                    lastEvent = "video focus auto far";
+                } else {
+                    float distance = focusSeekBar.getProgress() / (float) FOCUS_DISTANCE_SCALE;
+                    cameraManager.setVideoFocusDistance(distance);
+                    lastEvent = "video focus manual " + formatDiopters(distance);
+                }
+                refreshDebugDetails();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+        focusSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (!fromUser || syncingFocus || cameraManager == null
+                        || !cameraManager.isVideoFocusSupported()
+                        || !cameraManager.isVideoManualFocusEnabled()) {
+                    return;
+                }
+                float distance = progress / (float) FOCUS_DISTANCE_SCALE;
+                cameraManager.setVideoFocusDistance(distance);
+                lastEvent = "video focus manual " + formatDiopters(distance);
+                updateFocusValueText(distance, cameraManager.getVideoMinimumFocusDistance(), true);
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+            }
+        });
+        syncFocusControls();
+    }
+
+    private void syncFocusControls() {
+        if (cameraManager == null || focusModeSpinner == null || focusSeekBar == null) {
+            return;
+        }
+        boolean supported = cameraManager.isVideoFocusSupported();
+        boolean manual = supported && cameraManager.isVideoManualFocusEnabled();
+        float minimumDistance = cameraManager.getVideoMinimumFocusDistance();
+        int maxProgress = Math.max(1, (int) Math.ceil(minimumDistance * FOCUS_DISTANCE_SCALE));
+        if (focusSeekBar.getMax() != maxProgress) {
+            focusSeekBar.setMax(maxProgress);
+        }
+        float requestedDistance = supported
+                ? Math.max(0f, Math.min(cameraManager.getVideoFocusDistance(), minimumDistance))
+                : 0f;
+        syncingFocus = true;
+        focusModeSpinner.setEnabled(supported);
+        focusModeSpinner.setSelection(manual ? 1 : 0, false);
+        focusSeekBar.setEnabled(manual);
+        focusSeekBar.setProgress(Math.round(requestedDistance * FOCUS_DISTANCE_SCALE));
+        syncingFocus = false;
+        updateFocusValueText(requestedDistance, minimumDistance, manual && supported);
+    }
+
+    private void updateFocusValueText(float requestedDistance, float minimumDistance, boolean manual) {
+        if (focusValueText == null) {
+            return;
+        }
+        if (minimumDistance <= 0f) {
+            focusValueText.setText(getString(R.string.video_debug_focus_unavailable));
+            return;
+        }
+        String mode = cameraManager != null && cameraManager.isVideoTapFocusActive()
+                ? "TAP AF" : (manual ? "MANUAL" : "AUTO FAR");
+        focusValueText.setText(mode + "  " + formatDiopters(requestedDistance));
     }
 
     private void setupResolutionSpinner() {
@@ -494,6 +600,7 @@ public class VideoDebugActivity extends BaseAct implements CameraStateObserver {
         }
         CameraConfig config = cameraManager.getCurrentConfig();
         RecordingStats stats = cameraManager.getRecordingStats();
+        syncFocusControls();
         long now = SystemClock.elapsedRealtime();
         File outputFile = stats.getOutputFile();
         long fileBytes = outputFile != null && outputFile.exists() ? outputFile.length() : 0L;
@@ -540,6 +647,8 @@ public class VideoDebugActivity extends BaseAct implements CameraStateObserver {
         appendLine(overview, "average FPS           : " + formatFps(averageFps));
         appendLine(overview, "frame count           : " + stats.getFrameCount());
         appendLine(overview, "last sensor timestamp : " + stats.getLastFrameTimestampNs() + " ns");
+        appendLine(overview, "video focus mode      : " + videoFocusModeText(stats));
+        appendLine(overview, "reported lens         : " + formatFocusDistance(stats.getReportedVideoFocusDistance()));
 
         StringBuilder encoder = new StringBuilder(1800);
         appendLine(encoder, "CONFIGURATION");
@@ -571,6 +680,15 @@ public class VideoDebugActivity extends BaseAct implements CameraStateObserver {
         appendLine(encoder, "high-speed mode       : " + (stats.getCaptureFps() > 30));
         appendLine(encoder, "segment limit         : " + formatDuration(stats.getSegmentDurationMs()));
         appendLine(encoder, "last sensor timestamp : " + stats.getLastFrameTimestampNs() + " ns");
+        appendLine(encoder, "");
+        appendLine(encoder, "FOCUS / LENS");
+        appendLine(encoder, "focus supported       : " + stats.isVideoFocusSupported());
+        appendLine(encoder, "focus mode            : " + videoFocusModeText(stats));
+        appendLine(encoder, "requested AF mode     : " + afModeText(stats.getRequestedVideoAfMode()));
+        appendLine(encoder, "reported AF mode      : " + afModeText(stats.getReportedVideoAfMode()));
+        appendLine(encoder, "requested lens        : " + formatFocusDistance(stats.getVideoFocusDistance()));
+        appendLine(encoder, "reported lens         : " + formatFocusDistance(stats.getReportedVideoFocusDistance()));
+        appendLine(encoder, "nearest limit         : " + formatFocusDistance(stats.getVideoMinimumFocusDistance()));
 
         StringBuilder storage = new StringBuilder(1200);
         appendLine(storage, "FILE / SEGMENT");
@@ -756,6 +874,52 @@ public class VideoDebugActivity extends BaseAct implements CameraStateObserver {
 
     private String resolutionText(Resolution resolution) {
         return resolution == null ? "-" : resolution.getWidth() + "x" + resolution.getHeight();
+    }
+
+    private String videoFocusModeText(RecordingStats stats) {
+        if (stats == null || !stats.isVideoFocusSupported()) {
+            return "unavailable";
+        }
+        if (stats.isVideoTapFocusActive()) {
+            return "TAP_AF";
+        }
+        return stats.isVideoManualFocusEnabled() ? "MANUAL" : "AUTO_FAR";
+    }
+
+    private String afModeText(int mode) {
+        switch (mode) {
+            case 0:
+                return "OFF(0)";
+            case 1:
+                return "AUTO(1)";
+            case 2:
+                return "MACRO(2)";
+            case 3:
+                return "CONTINUOUS_VIDEO(3)";
+            case 4:
+                return "CONTINUOUS_PICTURE(4)";
+            case 5:
+                return "EDOF(5)";
+            default:
+                return mode < 0 ? "-" : String.valueOf(mode);
+        }
+    }
+
+    private String formatDiopters(float distance) {
+        if (Float.isNaN(distance) || Float.isInfinite(distance)) {
+            return "-";
+        }
+        return String.format(Locale.US, "%.2fD", distance);
+    }
+
+    private String formatFocusDistance(float distance) {
+        if (Float.isNaN(distance) || Float.isInfinite(distance)) {
+            return "-";
+        }
+        if (distance <= 0f) {
+            return "infinity (0.00D)";
+        }
+        return String.format(Locale.US, "%.1fcm (%.2fD)", 100f / distance, distance);
     }
 
     private String value(Object object) {

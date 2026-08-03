@@ -117,6 +117,26 @@ public interface CameraStrategy {
 
     default void resetAutoExposure() { }
 
+    /** Returns whether the active video pipeline supports lens focus control. */
+    default boolean isVideoFocusSupported() { return false; }
+
+    /** Returns the nearest-focus limit in diopters (0 means no controllable lens). */
+    default float getVideoMinimumFocusDistance() { return 0f; }
+
+    /** Returns the requested video lens position in diopters. Zero is infinity. */
+    default float getVideoFocusDistance() { return 0f; }
+
+    default boolean isVideoManualFocusEnabled() { return false; }
+
+    /** Returns whether a video tap-to-focus lock is currently active. */
+    default boolean isVideoTapFocusActive() { return false; }
+
+    /** Applies a manual video lens position in diopters. */
+    default void setVideoFocusDistance(float focusDistance) { }
+
+    /** Restores the default fixed-infinity video focus. */
+    default void resetVideoFocus() { }
+
     void setFocusPoint(float x, float y);
 
     boolean isFocusSupported();

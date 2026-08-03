@@ -92,6 +92,50 @@
             android:layout_weight="1" />
     </LinearLayout>
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="42dp"
+        android:layout_marginTop="2dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/video_debug_focus_short"
+            android:textColor="@color/white"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <Spinner
+            android:id="@+id/debugFocusModeSpinner"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="42dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/debugFocusValue"
+            android:layout_width="112dp"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_secondary_light"
+            android:textSize="12sp" />
+
+        <SeekBar
+            android:id="@+id/debugFocusSeekBar"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:contentDescription="@string/video_debug_focus_manual" />
+    </LinearLayout>
+
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/debugTabs"
         android:layout_width="match_parent"

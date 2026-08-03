@@ -184,7 +184,15 @@ public abstract class BaseCameraStrategy implements CameraStrategy {
                 CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
                 Integer sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
                 if (sensorOrientation != null) {
-                    return (sensorOrientation + deviceOrientationDegrees) % 360;
+                    Integer lensFacing = characteristics.get(CameraCharacteristics.LENS_FACING);
+                    if (lensFacing != null
+                            && lensFacing == CameraCharacteristics.LENS_FACING_FRONT) {
+                        return (sensorOrientation + deviceOrientationDegrees) % 360;
+                    }
+                    // Back-camera video uses the same sensor-minus-device
+                    // orientation convention as JPEG capture. This makes a
+                    // landscape recording carry the correct rotation hint.
+                    return (sensorOrientation - deviceOrientationDegrees + 360) % 360;
                 }
             }
         } catch (CameraAccessException e) {

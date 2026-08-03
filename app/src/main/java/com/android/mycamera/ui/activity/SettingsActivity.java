@@ -54,6 +54,7 @@ public class SettingsActivity extends AppCompatActivity {
     private Switch backgroundRecordingSwitch;
     private Switch keepScreenOnSwitch;
     private Switch showApiSwitcherSwitch;
+    private Switch lowMemoryModeSwitch;
     private Spinner languageSpinner;
     private TextView resolutionLabel;
     private TextView qualityLabel;
@@ -90,6 +91,7 @@ public class SettingsActivity extends AppCompatActivity {
         backgroundRecordingSwitch = findViewById(R.id.backgroundRecordingSwitch);
         keepScreenOnSwitch = findViewById(R.id.keepScreenOnSwitch);
         showApiSwitcherSwitch = findViewById(R.id.showApiSwitcherSwitch);
+        lowMemoryModeSwitch = findViewById(R.id.lowMemoryModeSwitch);
         languageSpinner = findViewById(R.id.languageSpinner);
         resolutionLabel = findViewById(R.id.resolutionLabel);
         qualityLabel = findViewById(R.id.qualityLabel);
@@ -134,6 +136,7 @@ public class SettingsActivity extends AppCompatActivity {
         backgroundRecordingSwitch.setChecked(currentConfig.isBackgroundRecordingEnabled());
         keepScreenOnSwitch.setChecked(settingsManager.isKeepScreenOnEnabled());
         showApiSwitcherSwitch.setChecked(settingsManager.isShowApiSwitcherEnabled());
+        lowMemoryModeSwitch.setChecked(currentConfig.isLowMemoryModeEnabled());
         // Force public DCIM path for capture output.
         currentConfig = new CameraConfig.Builder(currentConfig)
                 .setSaveLocation(CameraUtils.createCameraDirectory(this))
@@ -485,6 +488,15 @@ public class SettingsActivity extends AppCompatActivity {
         showApiSwitcherSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (isChecked != settingsManager.isShowApiSwitcherEnabled()) {
                 settingsManager.setShowApiSwitcherEnabled(isChecked);
+            }
+        });
+
+        lowMemoryModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked != currentConfig.isLowMemoryModeEnabled()) {
+                currentConfig = new CameraConfig.Builder(currentConfig)
+                        .setLowMemoryModeEnabled(isChecked)
+                        .build();
+                applyAndSaveChanges();
             }
         });
 

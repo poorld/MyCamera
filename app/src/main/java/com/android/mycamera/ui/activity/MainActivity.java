@@ -100,7 +100,6 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     private ImageButton denoiseButton;
     private ImageButton photoModeButton;
     private ImageButton videoModeButton;
-    private View captureFlashOverlay;
     private ProgressBar loadingIndicator;
     private TextView recordingTime;
     private TextView statusText;
@@ -199,7 +198,6 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         denoiseButton = findViewById(R.id.denoiseButton);
         photoModeButton = findViewById(R.id.photoModeButton);
         videoModeButton = findViewById(R.id.videoModeButton);
-        captureFlashOverlay = findViewById(R.id.captureFlashOverlay);
         loadingIndicator = findViewById(R.id.loadingIndicator);
         recordingTime = findViewById(R.id.recordingTime);
         statusText = findViewById(R.id.statusText);
@@ -638,7 +636,6 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         if (isRecording || mCameraManager == null) {
             return;
         }
-        showCaptureFlash();
         mCameraManager.capturePhoto();
     }
     
@@ -1328,18 +1325,6 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     public void onPhotoCaptured(String filePath) {
     }
 
-    private void showCaptureFlash() {
-        if (captureFlashOverlay == null) return;
-        captureFlashOverlay.animate().cancel();
-        captureFlashOverlay.setAlpha(0.75f);
-        captureFlashOverlay.setVisibility(View.VISIBLE);
-        captureFlashOverlay.animate()
-                .alpha(0f)
-                .setDuration(160)
-                .withEndAction(() -> captureFlashOverlay.setVisibility(View.GONE))
-                .start();
-    }
-    
     @Override
     public void onPreviewStarted() {
         runOnUiThread(() -> {

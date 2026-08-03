@@ -29,6 +29,7 @@ public class CameraConfig {
     private final CameraApiType apiType;
     private final boolean backgroundRecordingEnabled;
     private final boolean backgroundReviewEnabled;
+    private final boolean lowMemoryModeEnabled;
 
     private CameraConfig(Builder builder) {
         this.cameraId = builder.cameraId;
@@ -44,6 +45,7 @@ public class CameraConfig {
         this.apiType = builder.apiType;
         this.backgroundRecordingEnabled = builder.backgroundRecordingEnabled;
         this.backgroundReviewEnabled = builder.backgroundReviewEnabled;
+        this.lowMemoryModeEnabled = builder.lowMemoryModeEnabled;
     }
 
     public String getCameraId() {
@@ -98,6 +100,10 @@ public class CameraConfig {
         return backgroundReviewEnabled;
     }
 
+    public boolean isLowMemoryModeEnabled() {
+        return lowMemoryModeEnabled;
+    }
+
     /**
      * Builder pattern for CameraConfig
      */
@@ -115,6 +121,7 @@ public class CameraConfig {
         private CameraApiType apiType = CameraApiType.CAMERA2; // default Camera2 (CameraX resolution switching is unreliable)
         private boolean backgroundRecordingEnabled = false;
         private boolean backgroundReviewEnabled = false;
+        private boolean lowMemoryModeEnabled = true;
 
         public Builder() {
         }
@@ -133,6 +140,7 @@ public class CameraConfig {
             this.apiType = config.apiType;
             this.backgroundRecordingEnabled = config.backgroundRecordingEnabled;
             this.backgroundReviewEnabled = config.backgroundReviewEnabled;
+            this.lowMemoryModeEnabled = config.lowMemoryModeEnabled;
         }
 
         public Builder setCameraId(String cameraId) {
@@ -200,6 +208,11 @@ public class CameraConfig {
             return this;
         }
 
+        public Builder setLowMemoryModeEnabled(boolean lowMemoryModeEnabled) {
+            this.lowMemoryModeEnabled = lowMemoryModeEnabled;
+            return this;
+        }
+
         public CameraConfig build() {
             return new CameraConfig(this);
         }
@@ -221,6 +234,7 @@ public class CameraConfig {
                 ", apiType=" + apiType +
                 ", backgroundRecordingEnabled=" + backgroundRecordingEnabled +
                 ", backgroundReviewEnabled=" + backgroundReviewEnabled +
+                ", lowMemoryModeEnabled=" + lowMemoryModeEnabled +
                 '}';
     }
 }

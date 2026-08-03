@@ -32,8 +32,7 @@
     <string name="recording_storage_low">Not enough storage to record. Keep at least 2 GB free.</string>
     <string name="save_location">Save Location</string>
     <string name="performance">Performance</string>
-    <string name="hardware_acceleration">Hardware Acceleration</string>
-    <string name="memory_optimization">Memory Optimization</string>
+    <string name="low_memory_mode">Low Memory Mode</string>
     <string name="camera_size">Camera Size</string>
     <string name="old_camera">Old Camera</string>
     <string name="yuv_dump_test">YUV Dump Test</string>
@@ -43,6 +42,10 @@
     <string name="video_debug_stop">Stop Recording</string>
     <string name="video_debug_resolution">Recording Resolution</string>
     <string name="video_debug_resolution_short">Resolution</string>
+    <string name="video_debug_focus_short">Focus</string>
+    <string name="video_debug_focus_auto_far">Auto far (infinity)</string>
+    <string name="video_debug_focus_manual">Manual focus</string>
+    <string name="video_debug_focus_unavailable">Focus control unavailable</string>
     <string name="video_debug_tab_info">Info</string>
     <string name="video_debug_tab_codec">Enc</string>
     <string name="video_debug_tab_disk">Disk</string>
