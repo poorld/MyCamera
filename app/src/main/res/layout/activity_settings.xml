@@ -77,16 +77,6 @@
             android:textColor="@color/white"
             android:layout_marginBottom="8dp"/>
 
-        <Switch
-            android:id="@+id/customResolutionSwitch"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/custom_camera2_resolution"
-            android:thumb="@drawable/settings_switch_thumb"
-            android:track="@drawable/settings_switch_track"
-            android:textColor="@color/white"
-            android:layout_marginBottom="12dp"/>
-
         <Spinner
             android:id="@+id/resolutionSpinner"
             android:layout_width="match_parent"
@@ -105,6 +95,40 @@
 
         <Spinner
             android:id="@+id/frameRateSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"/>
+
+        <!-- Video Bitrate Settings -->
+        <TextView
+            android:id="@+id/bitrateLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/video_bitrate"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/white"
+            android:layout_marginBottom="8dp"/>
+
+        <Spinner
+            android:id="@+id/bitrateSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"/>
+
+        <!-- Video Codec Settings -->
+        <TextView
+            android:id="@+id/videoCodecLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/video_codec"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/white"
+            android:layout_marginBottom="8dp"/>
+
+        <Spinner
+            android:id="@+id/videoCodecSpinner"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="24dp"/>
@@ -285,6 +309,26 @@
                 android:layout_height="wrap_content"
                 android:layout_centerVertical="true"
                 android:text="@string/yuv_dump_test"
+                android:textColor="@color/white" />
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_alignParentEnd="true"
+                android:src="@mipmap/icon_setting_in" />
+        </RelativeLayout>
+
+        <RelativeLayout
+            android:id="@+id/videoDebugTest"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="30dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:text="@string/video_debug_test"
                 android:textColor="@color/white" />
 
             <ImageView

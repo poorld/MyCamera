@@ -14,12 +14,14 @@ import com.android.mycamera.camera.observer.CameraStateObserver;
 import com.android.mycamera.camera.observer.CameraStateManager;
 import com.android.mycamera.camera.strategy.BackgroundRecordingService;
 import com.android.mycamera.camera.strategy.CameraStrategy;
+import com.android.mycamera.camera.strategy.RecordingStats;
 import com.android.mycamera.model.CameraApiType;
 import com.android.mycamera.model.CaptureMode;
 import com.android.mycamera.model.CameraState;
 import com.android.mycamera.model.PhotoResolution;
 import com.android.mycamera.model.Quality;
 import com.android.mycamera.model.Resolution;
+import com.android.mycamera.model.VideoCodec;
 import com.android.mycamera.utils.MemoryManager;
 import com.android.mycamera.utils.PerformanceUtils;
 import com.android.mycamera.utils.SettingsManager;
@@ -440,6 +442,15 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         return currentConfig;
     }
 
+    /**
+     * Get a point-in-time snapshot of the active recorder for diagnostics UI.
+     */
+    public RecordingStats getRecordingStats() {
+        return currentStrategy != null
+                ? currentStrategy.getRecordingStats()
+                : RecordingStats.idle("none");
+    }
+
     public CameraApiType getCameraApiType() {
         if (currentConfig != null && currentConfig.getApiType() != null) {
             return currentConfig.getApiType();
@@ -465,8 +476,13 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         Resolution videoResolution = config.getResolution() != null
                 ? config.getResolution()
                 : Resolution.FULL_HD_1080P;
+        VideoCodec videoCodec = config.getVideoCodec() != null
+                ? config.getVideoCodec()
+                : VideoCodec.DEFAULT;
 
         if (apiType == CameraApiType.CAMERAX) {
+            // CameraX 1.4.2 uses the system Recorder codec and cannot select HEVC.
+            videoCodec = VideoCodec.H264;
             if (quality == Quality.QHD) {
                 Log.w(TAG, "2K (2560x1440) is not a CameraX quality preset; using Camera2 so target size can apply");
                 apiType = CameraApiType.CAMERA2;
@@ -485,7 +501,8 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
 
         if (apiType == config.getApiType()
                 && quality == config.getQuality()
-                && videoResolution.equals(config.getResolution())) {
+                && videoResolution.equals(config.getResolution())
+                && videoCodec == config.getVideoCodec()) {
             return config;
         }
 
@@ -496,6 +513,7 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
                 .setApiType(apiType)
                 .setQuality(quality)
                 .setResolution(videoResolution)
+                .setVideoCodec(videoCodec)
                 .build();
     }
 
@@ -776,6 +794,14 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
     @Override
     public void onStateChanged(CameraState state) {
         Log.d(TAG, "onStateChanged: " + state);
+        CameraState previousState = stateManager.getCurrentState();
+        // Camera2 uses a repeated OPENED event to signal that its capture
+        // pipeline was rebuilt. Preserve that event for the UI so it can
+        // recreate the preview and finish a mode switch.
+        if (state == CameraState.OPENED && previousState == CameraState.OPENED) {
+            stateManager.forceNotifyState(state);
+            return;
+        }
         stateManager.setState(state);
     }
 

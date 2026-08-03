@@ -39,11 +39,13 @@ import android.view.WindowManager;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 
+import com.android.mycamera.R;
 import com.android.mycamera.camera.config.CameraConfig;
 import com.android.mycamera.model.CameraState;
 import com.android.mycamera.model.CaptureMode;
 import com.android.mycamera.model.PhotoResolution;
 import com.android.mycamera.model.Resolution;
+import com.android.mycamera.model.VideoCodec;
 import com.android.mycamera.utils.CameraUtils;
 
 import java.io.File;
@@ -57,6 +59,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class Camera2Strategy extends BaseCameraStrategy {
     
@@ -65,6 +68,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
             "com.mediatek.streamingfeature.hfpsMode";
     private static final int MTK_HFPS_MODE_60FPS = 1;
     private static final int SLOW_MOTION_PLAYBACK_FPS = 30;
+    private static final int RECORDING_SEGMENT_DURATION_MS = 10 * 60 * 1000;
     
     private CameraDevice cameraDevice;
     private CameraCaptureSession captureSession;
@@ -82,7 +86,20 @@ public class Camera2Strategy extends BaseCameraStrategy {
     private MediaRecorder mediaRecorder;
     private boolean isRecording = false;
     private boolean isStoppingRecording = false;
+    private boolean isRotatingSegment = false;
+    private boolean pendingStopAfterRotation = false;
     private File recordingOutputFile;
+    private volatile VideoCodec appliedVideoCodec = VideoCodec.DEFAULT;
+    private volatile long profileVideoBitrate;
+    private volatile int configuredPlaybackFps;
+    private volatile boolean configuredAudio;
+    private volatile boolean activeHighSpeed;
+    private volatile long recordingStartElapsedMs;
+    private volatile long recordingSegmentStartElapsedMs;
+    private volatile int recordingSegmentIndex;
+    private volatile long lastRecordingFrameTimestampNs;
+    private volatile String lastRecordingError = "";
+    private final AtomicLong recordingFrameCount = new AtomicLong();
     private float zoomRatio = 1f;
     private Range<Integer> supportedIsoRange;
     private Range<Long> supportedExposureTimeRange;
@@ -100,6 +117,23 @@ public class Camera2Strategy extends BaseCameraStrategy {
                                                @NonNull CaptureRequest request,
                                                @NonNull TotalCaptureResult result) {
                     adjustAutoBrightness(result);
+                }
+            };
+
+    private final CameraCaptureSession.CaptureCallback recordingCaptureCallback =
+            new CameraCaptureSession.CaptureCallback() {
+                @Override
+                public void onCaptureCompleted(@NonNull CameraCaptureSession session,
+                                                @NonNull CaptureRequest request,
+                                                @NonNull TotalCaptureResult result) {
+                    adjustAutoBrightness(result);
+                    if (isRecording) {
+                        recordingFrameCount.incrementAndGet();
+                        Long timestampNs = result.get(CaptureResult.SENSOR_TIMESTAMP);
+                        if (timestampNs != null) {
+                            lastRecordingFrameTimestampNs = timestampNs;
+                        }
+                    }
                 }
             };
 
@@ -296,6 +330,11 @@ public class Camera2Strategy extends BaseCameraStrategy {
     @Override
     public void setFocusPoint(float x, float y) {
         if (cameraDevice == null || captureSession == null || textureView == null || previewRequestBuilder == null) return;
+        if (captureSession instanceof CameraConstrainedHighSpeedCaptureSession) {
+            // High-speed sessions reject regular single-capture AF requests.
+            Log.d(TAG, "Ignoring touch focus during constrained high-speed recording");
+            return;
+        }
 
         try {
             CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
@@ -370,9 +409,11 @@ public class Camera2Strategy extends BaseCameraStrategy {
     public void closeCamera() {
         Log.d(TAG, "closeCamera: ");
         stopOrientationUpdates();
+        pendingStopAfterRotation = false;
         if (isRecording) {
             stopRecordingInternal(false);
         }
+        isRotatingSegment = false;
         if (captureSession != null) {
             closeCaptureSession();
         }
@@ -449,10 +490,33 @@ public class Camera2Strategy extends BaseCameraStrategy {
 
     @Override
     public void startRecording() {
+        startRecordingInternal(true);
+    }
+
+    private void startRecordingInternal(boolean notifyStarted) {
         Log.d(TAG, "startRecording: ");
         Log.d(TAG, "cameraDevice=" + cameraDevice);
         Log.d(TAG, "isRecording=" + isRecording);
         if (cameraDevice == null || isRecording) return;
+        if (notifyStarted) {
+            recordingStartElapsedMs = SystemClock.elapsedRealtime();
+            recordingSegmentIndex = 0;
+            recordingFrameCount.set(0L);
+            lastRecordingFrameTimestampNs = 0L;
+            lastRecordingError = "";
+        }
+        boolean rotationAttempt = isRotatingSegment;
+
+        if (!CameraUtils.hasEnoughRecordingStorage(context)) {
+            if (isRotatingSegment) {
+                isRotatingSegment = false;
+                pendingStopAfterRotation = false;
+                notifyRecordingStopped();
+                createPreviewSession();
+            }
+            notifyError(context.getString(R.string.recording_storage_low));
+            return;
+        }
 
         // Recording always uses the video pipeline. Keep CaptureMode.VIDEO so
         // stopRecording -> createPreviewSession does not fall back to photo/JPEG.
@@ -465,17 +529,20 @@ public class Camera2Strategy extends BaseCameraStrategy {
         }
 
         try {
-            if (!setupMediaRecorder()) return;
+            if (!setupMediaRecorder()) {
+                handleRecordingStartFailure(rotationAttempt, "Recording setup failed");
+                return;
+            }
 
             if (textureView == null) {
                 logError("Cannot start Camera2 recording: textureView is null", null);
-                releaseMediaRecorder();
+                handleRecordingStartFailure(rotationAttempt, "Recording preview is unavailable");
                 return;
             }
             SurfaceTexture surfaceTexture = textureView.getSurfaceTexture();
             if (surfaceTexture == null) {
                 logError("Cannot start Camera2 recording: surfaceTexture is null", null);
-                releaseMediaRecorder();
+                handleRecordingStartFailure(rotationAttempt, "Recording surface is unavailable");
                 return;
             }
             
@@ -495,7 +562,8 @@ public class Camera2Strategy extends BaseCameraStrategy {
             applyFlashToRequest(builder);
 
             if (isCurrentHighSpeedVideoConfiguration()) {
-                startConstrainedHighSpeedRecording(previewSurface, recorderSurface, builder);
+                startConstrainedHighSpeedRecording(
+                        previewSurface, recorderSurface, builder, rotationAttempt, notifyStarted);
                 return;
             }
 
@@ -518,49 +586,51 @@ public class Camera2Strategy extends BaseCameraStrategy {
                 public void onConfigured(@NonNull CameraCaptureSession session) {
                     if (cameraDevice == null || backgroundHandler == null) {
                         session.close();
+                        handleRecordingStartFailure(rotationAttempt, "Camera became unavailable while recording");
                         return;
                     }
 
                     captureSession = session;
                     previewRequestBuilder = builder;
                     try {
-                        session.setRepeatingRequest(builder.build(), null, backgroundHandler);
+                        session.setRepeatingRequest(builder.build(), recordingCaptureCallback, backgroundHandler);
                         mediaRecorder.start();
                         isRecording = true;
-                        notifyRecordingStarted();
+                        markRecordingSegmentStarted();
+                        if (notifyStarted) {
+                            notifyRecordingStarted();
+                        }
+                        completeSegmentStartIfNeeded();
                     } catch (CameraAccessException | IllegalStateException e) {
                         logError("Failed to start Camera2 media recorder", e);
                         closeCaptureSession();
-                        releaseMediaRecorder();
-                        createPreviewSession();
+                        handleRecordingStartFailure(rotationAttempt, "Recording start failed");
                     }
                 }
 
                 @Override
                 public void onConfigureFailed(@NonNull CameraCaptureSession session) {
                     session.close();
-                    releaseMediaRecorder();
-                    createPreviewSession();
-                    notifyError("Recording configuration failed");
+                    handleRecordingStartFailure(rotationAttempt, "Recording configuration failed");
                 }
             });
             sessionConfiguration.setSessionParameters(sessionParamsBuilder.build());
             cameraDevice.createCaptureSession(sessionConfiguration);
         } catch (CameraAccessException e) {
             logError("Failed to create recording session", e);
-            releaseMediaRecorder();
-            createPreviewSession();
+            handleRecordingStartFailure(rotationAttempt, "Recording session creation failed");
         } catch (IllegalArgumentException | IllegalStateException e) {
             logError("Failed to start Camera2 recording", e);
-            releaseMediaRecorder();
-            createPreviewSession();
+            handleRecordingStartFailure(rotationAttempt, "Recording start failed");
         }
     }
 
     private void startConstrainedHighSpeedRecording(
             Surface previewSurface,
             Surface recorderSurface,
-            CaptureRequest.Builder builder) throws CameraAccessException {
+            CaptureRequest.Builder builder,
+            boolean rotationAttempt,
+            boolean notifyStarted) throws CameraAccessException {
         final int highSpeedFps = currentConfig.getFrameRate();
         Range<Integer> highSpeedRange = getCurrentHighSpeedFpsRange();
         if (highSpeedRange == null) {
@@ -577,9 +647,8 @@ public class Camera2Strategy extends BaseCameraStrategy {
                         if (!(session instanceof CameraConstrainedHighSpeedCaptureSession)
                                 || cameraDevice == null || backgroundHandler == null) {
                             session.close();
-                            releaseMediaRecorder();
-                            createPreviewSession();
-                            notifyError("High-speed recording configuration failed");
+                            handleRecordingStartFailure(rotationAttempt,
+                                    "High-speed recording configuration failed");
                             return;
                         }
 
@@ -590,26 +659,48 @@ public class Camera2Strategy extends BaseCameraStrategy {
                         try {
                             List<CaptureRequest> requests =
                                     highSpeedSession.createHighSpeedRequestList(builder.build());
-                            highSpeedSession.setRepeatingBurst(requests, null, backgroundHandler);
+                            highSpeedSession.setRepeatingBurst(requests, recordingCaptureCallback, backgroundHandler);
                             mediaRecorder.start();
                             isRecording = true;
-                            notifyRecordingStarted();
+                            markRecordingSegmentStarted();
+                            if (notifyStarted) {
+                                notifyRecordingStarted();
+                            }
+                            completeSegmentStartIfNeeded();
                         } catch (CameraAccessException | IllegalStateException e) {
                             logError("Failed to start constrained high-speed recording", e);
                             closeCaptureSession();
-                            releaseMediaRecorder();
-                            createPreviewSession();
+                            handleRecordingStartFailure(rotationAttempt,
+                                    "High-speed recording start failed");
                         }
                     }
 
                     @Override
                     public void onConfigureFailed(@NonNull CameraCaptureSession session) {
                         session.close();
-                        releaseMediaRecorder();
-                        createPreviewSession();
-                        notifyError("High-speed recording configuration failed");
+                        handleRecordingStartFailure(rotationAttempt,
+                                "High-speed recording configuration failed");
                     }
-                }, backgroundHandler);
+                 }, backgroundHandler);
+    }
+
+    private void handleRecordingStartFailure(boolean rotationAttempt, String message) {
+        isRecording = false;
+        lastRecordingError = message;
+        closeCaptureSession();
+        releaseMediaRecorder();
+        if (rotationAttempt || isRotatingSegment) {
+            isRotatingSegment = false;
+            pendingStopAfterRotation = false;
+            notifyRecordingStopped();
+        }
+        createPreviewSession();
+        notifyError(message);
+    }
+
+    private void markRecordingSegmentStarted() {
+        recordingSegmentIndex++;
+        recordingSegmentStartElapsedMs = SystemClock.elapsedRealtime();
     }
 
     private boolean isCurrentHighSpeedVideoConfiguration() {
@@ -656,10 +747,18 @@ public class Camera2Strategy extends BaseCameraStrategy {
     public void stopRecording() {
         Log.d(TAG, "stopRecording: ");
         if (backgroundHandler == null) {
-            stopRecordingInternal(true);
+            requestStopRecordingInternal();
             return;
         }
-        backgroundHandler.post(() -> stopRecordingInternal(true));
+        backgroundHandler.post(this::requestStopRecordingInternal);
+    }
+
+    private void requestStopRecordingInternal() {
+        if (isRotatingSegment) {
+            pendingStopAfterRotation = true;
+            return;
+        }
+        stopRecordingInternal(true);
     }
 
     private void stopRecordingInternal(boolean restartPreview) {
@@ -668,28 +767,13 @@ public class Camera2Strategy extends BaseCameraStrategy {
         isStoppingRecording = true;
         boolean wasRecording = isRecording;
         try {
-            if (captureSession != null) {
-                try {
-                    captureSession.stopRepeating();
-                    captureSession.abortCaptures();
-                } catch (CameraAccessException | IllegalStateException e) {
-                    logError("Failed to stop recording session requests", e);
-                }
-            }
-            if (mediaRecorder != null) {
-                try {
-                    mediaRecorder.stop();
-                } catch (RuntimeException e) {
-                    logError("Failed to stop media recorder cleanly", e);
-                }
-            }
-            closeCaptureSession();
-            releaseMediaRecorder();
-            isRecording = false;
+            File completedFile = finishCurrentRecordingSegment();
+            isRotatingSegment = false;
+            pendingStopAfterRotation = false;
             if (wasRecording) {
                 notifyRecordingStopped();
-                if (recordingOutputFile != null) {
-                    notifyPhotoCaptured(recordingOutputFile.getAbsolutePath());
+                if (completedFile != null) {
+                    notifyPhotoCaptured(completedFile.getAbsolutePath());
                 }
             }
             if (restartPreview) {
@@ -707,6 +791,76 @@ public class Camera2Strategy extends BaseCameraStrategy {
             }
         } finally {
             isStoppingRecording = false;
+        }
+    }
+
+    private File finishCurrentRecordingSegment() {
+        if (!isRecording && mediaRecorder == null) {
+            return null;
+        }
+
+        if (captureSession != null) {
+            try {
+                captureSession.stopRepeating();
+                captureSession.abortCaptures();
+            } catch (CameraAccessException | IllegalStateException e) {
+                logError("Failed to stop recording session requests", e);
+            }
+        }
+        if (mediaRecorder != null) {
+            try {
+                mediaRecorder.stop();
+            } catch (RuntimeException e) {
+                logError("Failed to stop media recorder cleanly", e);
+            }
+        }
+        File completedFile = recordingOutputFile;
+        closeCaptureSession();
+        releaseMediaRecorder();
+        isRecording = false;
+        return completedFile;
+    }
+
+    private void rotateRecordingSegment() {
+        if (!isRecording || isStoppingRecording || isRotatingSegment) {
+            return;
+        }
+
+        isRotatingSegment = true;
+        File completedFile = finishCurrentRecordingSegment();
+        if (completedFile == null) {
+            isRotatingSegment = false;
+            pendingStopAfterRotation = false;
+            notifyRecordingStopped();
+            createPreviewSession();
+            return;
+        }
+
+        if (!CameraUtils.hasEnoughRecordingStorage(context)) {
+            isRotatingSegment = false;
+            pendingStopAfterRotation = false;
+            notifyRecordingStopped();
+            createPreviewSession();
+            notifyError(context.getString(R.string.recording_storage_low));
+            return;
+        }
+
+        startRecordingInternal(false);
+    }
+
+    private void completeSegmentStartIfNeeded() {
+        if (!isRotatingSegment) {
+            return;
+        }
+        isRotatingSegment = false;
+        if (!pendingStopAfterRotation) {
+            return;
+        }
+        pendingStopAfterRotation = false;
+        if (backgroundHandler != null) {
+            backgroundHandler.post(() -> stopRecordingInternal(true));
+        } else {
+            stopRecordingInternal(true);
         }
     }
 
@@ -994,37 +1148,54 @@ public class Camera2Strategy extends BaseCameraStrategy {
         if (useAudio) {
             mediaRecorder.setAudioEncoder(profile.audioCodec);
         }
-        mediaRecorder.setVideoEncoder(profile.videoCodec);
+        VideoCodec requestedCodec = currentConfig.getVideoCodec();
+        VideoCodec appliedCodec = VideoCodec.resolveForMediaRecorder(requestedCodec);
+        appliedVideoCodec = appliedCodec;
+        mediaRecorder.setVideoEncoder(appliedCodec.getMediaRecorderEncoder());
 
         Resolution resolution = currentConfig.getResolution();
         int captureFps = currentConfig.getFrameRate();
         int playbackFps = slowMotion ? SLOW_MOTION_PLAYBACK_FPS : captureFps;
+        configuredPlaybackFps = playbackFps;
+        configuredAudio = useAudio;
+        profileVideoBitrate = profile.videoBitRate;
+        activeHighSpeed = slowMotion;
         mediaRecorder.setVideoSize(resolution.getWidth(), resolution.getHeight());
         mediaRecorder.setVideoFrameRate(playbackFps);
         if (slowMotion) {
             mediaRecorder.setCaptureRate(captureFps);
         }
-        mediaRecorder.setVideoEncodingBitRate(profile.videoBitRate);
+        int targetBitrate = currentConfig.getVideoBitrate().getBitsPerSecond();
+        mediaRecorder.setVideoEncodingBitRate(targetBitrate);
         if (useAudio) {
             mediaRecorder.setAudioEncodingBitRate(profile.audioBitRate);
             mediaRecorder.setAudioChannels(profile.audioChannels);
         }
         int orientationHint = getVideoOrientationHint(currentConfig.getCameraId());
         mediaRecorder.setOrientationHint(orientationHint);
+        mediaRecorder.setMaxDuration(RECORDING_SEGMENT_DURATION_MS);
+        long recordingStorageBudget = CameraUtils.getRecordingStorageBudget();
+        if (recordingStorageBudget > 1024L * 1024L) {
+            mediaRecorder.setMaxFileSize(recordingStorageBudget);
+        }
         Log.d(TAG, "setupMediaRecorder orientationHint=" + orientationHint);
-
-        // mediaRecorder.setMaxFileSize();
-        // mediaRecorder.setMaxDuration(1 * 1000);
+        Log.d(TAG, "setupMediaRecorder bitrate=" + targetBitrate
+                + ", profileBitrate=" + profile.videoBitRate
+                + ", codec=" + appliedCodec
+                + ", requestedCodec=" + requestedCodec
+                + ", segmentDurationMs=" + RECORDING_SEGMENT_DURATION_MS
+                + ", storageBudget=" + recordingStorageBudget);
         mediaRecorder.setOnInfoListener(new MediaRecorder.OnInfoListener() {
             @Override
             public void onInfo(MediaRecorder mr, int what, int extra) {
                 Log.d(TAG, "onInfo: " + mr + " what=" + what + " extra=" + extra);
                 if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED
                         || what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED) {
+                    Runnable limitHandler = () -> handleRecorderLimitReached(what);
                     if (backgroundHandler != null) {
-                        backgroundHandler.post(() -> stopRecordingInternal(true));
+                        backgroundHandler.post(limitHandler);
                     } else {
-                        stopRecordingInternal(true);
+                        limitHandler.run();
                     }
                 }
             }
@@ -1049,6 +1220,19 @@ public class Camera2Strategy extends BaseCameraStrategy {
             return false;
         }
         return true;
+    }
+
+    private void handleRecorderLimitReached(int what) {
+        if (!isRecording || isStoppingRecording || isRotatingSegment) {
+            return;
+        }
+        Log.d(TAG, "handleRecorderLimitReached what=" + what
+                + ", availableStorage=" + CameraUtils.getAvailableStorageSpace());
+        if (CameraUtils.hasEnoughRecordingStorage(context)) {
+            rotateRecordingSegment();
+        } else {
+            stopRecordingInternal(true);
+        }
     }
 
     private File generateCamera2VideoFile() {
@@ -1358,6 +1542,40 @@ public class Camera2Strategy extends BaseCameraStrategy {
     @Override
     public boolean isCameraAvailable() {
         return cameraDevice != null;
+    }
+
+    @Override
+    public RecordingStats getRecordingStats() {
+        CameraConfig config = currentConfig;
+        Resolution resolution = config != null ? config.getResolution() : null;
+        VideoCodec requestedCodec = config != null && config.getVideoCodec() != null
+                ? config.getVideoCodec() : VideoCodec.DEFAULT;
+        int captureFps = config != null ? config.getFrameRate() : 0;
+        long targetBitrate = config != null && config.getVideoBitrate() != null
+                ? config.getVideoBitrate().getBitsPerSecond() : 0L;
+        boolean audioEnabled = config != null && config.isAudioEnabled();
+        return new RecordingStats(
+                isRecording,
+                isStoppingRecording,
+                isRotatingSegment,
+                getClass().getSimpleName(),
+                requestedCodec,
+                appliedVideoCodec,
+                targetBitrate,
+                profileVideoBitrate,
+                captureFps,
+                configuredPlaybackFps,
+                resolution != null ? resolution.getWidth() : 0,
+                resolution != null ? resolution.getHeight() : 0,
+                configuredAudio || audioEnabled,
+                recordingStartElapsedMs,
+                recordingSegmentStartElapsedMs,
+                recordingSegmentIndex,
+                recordingFrameCount.get(),
+                lastRecordingFrameTimestampNs,
+                RECORDING_SEGMENT_DURATION_MS,
+                recordingOutputFile,
+                lastRecordingError);
     }
 
     @Override

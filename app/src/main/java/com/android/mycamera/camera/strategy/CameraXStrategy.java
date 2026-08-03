@@ -59,6 +59,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.lifecycle.LifecycleOwner;
 
+import com.android.mycamera.R;
 import com.android.mycamera.camera.config.CameraConfig;
 import com.android.mycamera.model.CameraState;
 import com.android.mycamera.model.PhotoResolution;
@@ -94,9 +95,8 @@ public class CameraXStrategy extends BaseCameraStrategy {
     // private Executor executor;
 
     private static final long MAX_FILE_SIZE = 1024 * 1024 * 500; // 500M
-    private static final long SEGMENT_DURATION_MS = 60 * 1000 * 20L; // 20m
-    // private static final long SEGMENT_DURATION_MS = 5 * 1000; // 5s
-    private static final boolean SPLIT_SEGMENT = false;
+    private static final long SEGMENT_DURATION_MS = 10 * 60 * 1000L;
+    private static final boolean SPLIT_SEGMENT = true;
     private boolean isUserStopping = false;
     private boolean isSplitting = false;
 
@@ -196,6 +196,7 @@ public class CameraXStrategy extends BaseCameraStrategy {
 
                 Recorder recorder = new Recorder.Builder()
                         .setQualitySelector(QualitySelector.from(finalQuality, FallbackStrategy.lowerQualityOrHigherThan(finalQuality)))
+                        .setTargetVideoEncodingBitRate(currentConfig.getVideoBitrate().getBitsPerSecond())
                         .build();
                 videoCapture = VideoCapture.withOutput(recorder);
                 videoCapture.setTargetRotation(targetRotation);
@@ -289,6 +290,10 @@ public class CameraXStrategy extends BaseCameraStrategy {
                 + ", stableVideoPipelineBound=" + stableVideoPipelineBound);
         if (videoCapture == null || previewUseCase == null || currentCameraSelector == null || lifecycleOwner == null) return;
         if (recording != null) return;
+        if (!CameraUtils.hasEnoughRecordingStorage(context)) {
+            notifyError(context.getString(R.string.recording_storage_low));
+            return;
+        }
         cameraProviderFuture.addListener(() -> {
             try {
                 ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
@@ -330,6 +335,16 @@ public class CameraXStrategy extends BaseCameraStrategy {
 
             long size = stats.getNumBytesRecorded();
             long duration = stats.getRecordedDurationNanos() / 1_000_000;
+
+            if (!isUserStopping && !CameraUtils.hasEnoughRecordingStorage(context)) {
+                Log.w(TAG, "Recording storage reserve reached, stopping recording");
+                isUserStopping = true;
+                isSplitting = false;
+                if (recording != null) {
+                    recording.stop();
+                }
+                return;
+            }
 
             // 条件 1：大小分段
             // if (!isUserStopping && size >= MAX_FILE_SIZE) {
@@ -373,6 +388,14 @@ public class CameraXStrategy extends BaseCameraStrategy {
 
     private void startNextSegment() {
         if (SPLIT_SEGMENT) {
+            if (!CameraUtils.hasEnoughRecordingStorage(context)) {
+                isUserStopping = true;
+                isSplitting = false;
+                restorePhotoUseCases();
+                notifyRecordingStopped();
+                notifyError(context.getString(R.string.recording_storage_low));
+                return;
+            }
             isSplitting = false;
             startRecording();
         }
@@ -381,6 +404,13 @@ public class CameraXStrategy extends BaseCameraStrategy {
     private void splitSegment() {
         if (SPLIT_SEGMENT) {
             if (recording == null) return;
+
+            if (!CameraUtils.hasEnoughRecordingStorage(context)) {
+                isUserStopping = true;
+                isSplitting = false;
+                recording.stop();
+                return;
+            }
 
             isSplitting = true;
             recording.stop();

@@ -14,10 +14,12 @@ import android.view.SurfaceHolder;
 import android.view.TextureView;
 import android.util.Log;
 
+import com.android.mycamera.R;
 import com.android.mycamera.camera.config.CameraConfig;
 import com.android.mycamera.model.CameraState;
 import com.android.mycamera.model.PhotoResolution;
 import com.android.mycamera.model.Resolution;
+import com.android.mycamera.model.VideoCodec;
 import com.android.mycamera.utils.CameraUtils;
 
 import java.io.File;
@@ -34,14 +36,19 @@ import java.util.Locale;
 public class Camera1Strategy extends BaseCameraStrategy {
     
     private static final String TAG = "Camera1Strategy";
+    private static final int RECORDING_SEGMENT_DURATION_MS = 10 * 60 * 1000;
     
     private Camera camera;
     private MediaRecorder mediaRecorder;
     private TextureView textureView;
     private boolean isRecording = false;
+    private boolean isRotatingSegment = false;
+    private boolean pendingStopAfterRotation = false;
     private boolean isPreviewing = false;
     private CameraConfig currentConfig;
     private int currentCameraId = 0;
+    private File recordingOutputFile;
+    private final Handler recordingHandler = new Handler(Looper.getMainLooper());
     
     // Flash related fields
     private boolean isFlashEnabled = false;
@@ -217,9 +224,25 @@ public class Camera1Strategy extends BaseCameraStrategy {
     
     @Override
     public void startRecording() {
+        startRecordingInternal(true);
+    }
+
+    private void startRecordingInternal(boolean notifyStarted) {
         if (camera == null || isRecording) {
             return;
         }
+
+        if (!CameraUtils.hasEnoughRecordingStorage(context)) {
+            if (isRotatingSegment) {
+                isRotatingSegment = false;
+                pendingStopAfterRotation = false;
+                notifyRecordingStopped();
+                startPreviewIfAvailable();
+            }
+            notifyError(context.getString(R.string.recording_storage_low));
+            return;
+        }
+        boolean rotationAttempt = isRotatingSegment;
         
         logDebug("Starting Camera1 recording");
         
@@ -249,22 +272,44 @@ public class Camera1Strategy extends BaseCameraStrategy {
             if (currentConfig.isAudioEnabled()) {
                 mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
             }
-            mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
+            VideoCodec requestedCodec = currentConfig.getVideoCodec();
+            VideoCodec appliedCodec = VideoCodec.resolveForMediaRecorder(requestedCodec);
+            mediaRecorder.setVideoEncoder(appliedCodec.getMediaRecorderEncoder());
             
             // Set video size and frame rate
             Resolution resolution = currentConfig.getResolution();
             mediaRecorder.setVideoSize(resolution.getWidth(), resolution.getHeight());
             mediaRecorder.setVideoFrameRate(currentConfig.getFrameRate());
+            int targetBitrate = currentConfig.getVideoBitrate().getBitsPerSecond();
+            mediaRecorder.setVideoEncodingBitRate(targetBitrate);
+            logDebug("Camera1 videoCodec requested=" + requestedCodec
+                    + ", applied=" + appliedCodec
+                    + ", bitrate=" + targetBitrate);
+            mediaRecorder.setMaxDuration(RECORDING_SEGMENT_DURATION_MS);
+            long recordingStorageBudget = CameraUtils.getRecordingStorageBudget();
+            if (recordingStorageBudget > 1024L * 1024L) {
+                mediaRecorder.setMaxFileSize(recordingStorageBudget);
+            }
+            mediaRecorder.setOnInfoListener((mr, what, extra) -> {
+                if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED
+                        || what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED) {
+                    recordingHandler.post(() -> handleRecorderLimitReached(what));
+                }
+            });
             
             // Set output file
             File outputFile = CameraUtils.generateUniqueMediaFile(context, "mp4");
+            recordingOutputFile = outputFile;
             mediaRecorder.setOutputFile(outputFile.getAbsolutePath());
             
             // Prepare and start recording
             mediaRecorder.prepare();
             mediaRecorder.start();
             isRecording = true;
-            notifyRecordingStarted();
+            if (notifyStarted) {
+                notifyRecordingStarted();
+            }
+            completeSegmentStartIfNeeded();
             logDebug("Camera1 recording started");
             
         } catch (Exception e) {
@@ -273,6 +318,12 @@ public class Camera1Strategy extends BaseCameraStrategy {
             if (camera != null) {
                 camera.lock();
             }
+            if (rotationAttempt) {
+                isRotatingSegment = false;
+                pendingStopAfterRotation = false;
+                notifyRecordingStopped();
+                startPreviewIfAvailable();
+            }
             notifyError("Recording start failed: " + e.getMessage());
         }
     }
@@ -280,23 +331,24 @@ public class Camera1Strategy extends BaseCameraStrategy {
     @Override
     public void stopRecording() {
         logDebug("Stopping Camera1 recording");
+
+        if (isRotatingSegment) {
+            pendingStopAfterRotation = true;
+            return;
+        }
         
         if (!isRecording || mediaRecorder == null) {
             return;
         }
         
         try {
-            mediaRecorder.stop();
-            String outputPath = getCurrentOutputPath();
-            releaseMediaRecorder();
-            isRecording = false;
+            File completedFile = finishCurrentRecordingSegment();
+            String outputPath = completedFile != null ? completedFile.getAbsolutePath() : "";
             
             // Re-lock camera and restart preview
             if (camera != null) {
                 camera.lock();
-                if (textureView != null) {
-                    startPreview(textureView, null);
-                }
+                startPreviewIfAvailable();
             }
             
             notifyRecordingStopped();
@@ -313,6 +365,60 @@ public class Camera1Strategy extends BaseCameraStrategy {
                 camera.lock();
             }
             notifyError("Recording stop failed: " + e.getMessage());
+        }
+    }
+
+    private File finishCurrentRecordingSegment() {
+        if (!isRecording && mediaRecorder == null) {
+            return null;
+        }
+        if (mediaRecorder != null) {
+            try {
+                mediaRecorder.stop();
+            } catch (RuntimeException e) {
+                logError("Failed to stop media recorder cleanly", e);
+            }
+        }
+        File completedFile = recordingOutputFile;
+        releaseMediaRecorder();
+        isRecording = false;
+        return completedFile;
+    }
+
+    private void handleRecorderLimitReached(int what) {
+        if (!isRecording || isRotatingSegment) {
+            return;
+        }
+        if (!CameraUtils.hasEnoughRecordingStorage(context)) {
+            stopRecording();
+            return;
+        }
+
+        isRotatingSegment = true;
+        File completedFile = finishCurrentRecordingSegment();
+        if (completedFile == null) {
+            isRotatingSegment = false;
+            notifyRecordingStopped();
+            startPreviewIfAvailable();
+            return;
+        }
+        startRecordingInternal(false);
+    }
+
+    private void completeSegmentStartIfNeeded() {
+        if (!isRotatingSegment) {
+            return;
+        }
+        isRotatingSegment = false;
+        if (pendingStopAfterRotation) {
+            pendingStopAfterRotation = false;
+            recordingHandler.post(this::stopRecording);
+        }
+    }
+
+    private void startPreviewIfAvailable() {
+        if (textureView != null) {
+            startPreview(textureView, null);
         }
     }
     
@@ -483,9 +589,7 @@ public class Camera1Strategy extends BaseCameraStrategy {
     }
     
     private String getCurrentOutputPath() {
-        // This would normally track the current output file path
-        // For now, return a placeholder
-        return "/sdcard/DCIM/Camera/" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis()) + "_C1.mp4";
+        return recordingOutputFile != null ? recordingOutputFile.getAbsolutePath() : "";
     }
     
     @Override

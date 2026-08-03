@@ -57,6 +57,16 @@ public class CameraStateManager {
             notifyStateChanged(oldState, newState);
         }
     }
+
+    /**
+     * Notify observers when a camera pipeline has been rebuilt without changing
+     * its public state, such as OPENED -> OPENED after a mode switch.
+     */
+    public void forceNotifyState(CameraState state) {
+        CameraState oldState = currentState;
+        currentState = state;
+        notifyStateChanged(oldState, state);
+    }
     
     /**
      * Notify observers of state change

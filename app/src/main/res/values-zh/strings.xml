@@ -16,6 +16,8 @@
     <string name="resolution">分辨率</string>
     <string name="custom_camera2_resolution">自定义 Camera2 分辨率</string>
     <string name="frame_rate">帧率</string>
+    <string name="video_bitrate">录像码率</string>
+    <string name="video_codec">视频编码</string>
     <string name="video_quality">录像画质</string>
     <string name="video_resolution">录像分辨率</string>
     <string name="photo_resolution">拍照分辨率</string>
@@ -23,6 +25,7 @@
     <string name="enable_audio">启用音频</string>
     <string name="background_review">后台预览</string>
     <string name="background_recording">后台录制</string>
+    <string name="recording_storage_low">存储空间不足，录像需至少保留 2 GB 可用空间。</string>
     <string name="save_location">保存位置</string>
     <string name="performance">性能</string>
     <string name="hardware_acceleration">硬件加速</string>

@@ -141,6 +141,13 @@ public interface CameraStrategy {
      * Used when capture mode flips for recording so stop-preview rebuilds the right pipeline.
      */
     default void bindConfiguration(CameraConfig config) {}
+
+    /**
+     * Return a best-effort snapshot for the recording diagnostics screen.
+     */
+    default RecordingStats getRecordingStats() {
+        return RecordingStats.idle(getClass().getSimpleName());
+    }
     
     /**
      * Interface for camera state listeners

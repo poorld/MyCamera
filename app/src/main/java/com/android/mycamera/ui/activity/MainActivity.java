@@ -176,7 +176,6 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         myBr = new MyBr();
         registerReceiver(myBr, new IntentFilter("android.intent.action.POWEROFF"));
 
-        Toast.makeText(this, "versionName 1.3", Toast.LENGTH_SHORT).show();
 
     }
 
@@ -783,6 +782,8 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
                 + ", videoQuality=" + config.getQuality()
                 + ", videoResolution=" + config.getResolution()
                 + ", photoResolution=" + config.getPhotoResolution());
+        // Set the loading state before reconfiguration. Camera2 may synchronously
+        // notify OPENED while rebuilding the pipeline, and that callback closes it.
         loadingIndicator.setVisibility(View.VISIBLE);
         statusText.setText("Switching " + mode + " mode...");
         // Rebuild pipeline for the selected mode (Camera2: JPEG vs VIDEO_ENCODER).

@@ -17,6 +17,9 @@ import java.util.Locale;
  * Utility class for camera-related operations
  */
 public class CameraUtils {
+
+    /** Keep enough free space for the operating system to boot and operate. */
+    public static final long MINIMUM_FREE_STORAGE_BYTES = 2L * 1024L * 1024L * 1024L;
     
     /**
      * Check if all required permissions are granted
@@ -121,6 +124,15 @@ public class CameraUtils {
      */
     public static boolean hasEnoughStorageSpace() {
         return getAvailableStorageSpace() > 100 * 1024 * 1024; // 100MB
+    }
+
+    public static boolean hasEnoughRecordingStorage(Context context) {
+        return getAvailableStorageSpace() > MINIMUM_FREE_STORAGE_BYTES;
+    }
+
+    /** Bytes that may be consumed by recording while preserving the reserve. */
+    public static long getRecordingStorageBudget() {
+        return Math.max(0L, getAvailableStorageSpace() - MINIMUM_FREE_STORAGE_BYTES);
     }
     
     /**

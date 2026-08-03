@@ -9,6 +9,8 @@ import com.android.mycamera.model.CameraApiType;
 import com.android.mycamera.model.PhotoResolution;
 import com.android.mycamera.model.Quality;
 import com.android.mycamera.model.Resolution;
+import com.android.mycamera.model.VideoBitrate;
+import com.android.mycamera.model.VideoCodec;
 
 import java.io.File;
 
@@ -21,6 +23,8 @@ public class SettingsManager {
     private static final String PREF_RESOLUTION = "resolution";
     private static final String PREF_FRAME_RATE = "frame_rate";
     private static final String PREF_QUALITY = "quality";
+    private static final String PREF_VIDEO_BITRATE = "video_bitrate";
+    private static final String PREF_VIDEO_CODEC = "video_codec";
     private static final String PREF_PHOTO_RESOLUTION = "photo_resolution";
     /** One-time: enforce product default still size 12M. */
     private static final String PREF_PHOTO_DEFAULT_12M_APPLIED = "photo_default_12m_applied_v1";
@@ -56,6 +60,8 @@ public class SettingsManager {
         editor.putString(PREF_RESOLUTION, config.getResolution().toString());
         editor.putInt(PREF_FRAME_RATE, config.getFrameRate());
         editor.putString(PREF_QUALITY, config.getQuality().name());
+        editor.putString(PREF_VIDEO_BITRATE, config.getVideoBitrate().name());
+        editor.putString(PREF_VIDEO_CODEC, config.getVideoCodec().name());
         editor.putString(PREF_PHOTO_RESOLUTION, config.getPhotoResolution().name());
         // Remember still size per camera (cam0 high-res vs cam1 4M/3M/...).
         if (config.getCameraId() != null) {
@@ -89,6 +95,10 @@ public class SettingsManager {
         int frameRate = preferences.getInt(PREF_FRAME_RATE, 30);
         
         Quality quality = Quality.normalizeSelectable(Quality.valueOf(preferences.getString(PREF_QUALITY, Quality.DEFAULT.name())));
+        VideoBitrate videoBitrate = VideoBitrate.fromName(
+                preferences.getString(PREF_VIDEO_BITRATE, VideoBitrate.DEFAULT.name()));
+        VideoCodec videoCodec = VideoCodec.fromName(
+                preferences.getString(PREF_VIDEO_CODEC, VideoCodec.DEFAULT.name()));
 
         boolean audioEnabled = preferences.getBoolean(PREF_AUDIO_ENABLED, true);
         
@@ -136,6 +146,8 @@ public class SettingsManager {
                 .setResolution(resolution)
                 .setFrameRate(frameRate)
                 .setQuality(quality)
+                .setVideoBitrate(videoBitrate)
+                .setVideoCodec(videoCodec)
                 .setPhotoResolution(photoResolution)
                 .setAudioEnabled(audioEnabled)
                 .setSaveLocation(saveLocation)

@@ -5,6 +5,8 @@ import com.android.mycamera.model.CaptureMode;
 import com.android.mycamera.model.PhotoResolution;
 import com.android.mycamera.model.Quality;
 import com.android.mycamera.model.Resolution;
+import com.android.mycamera.model.VideoBitrate;
+import com.android.mycamera.model.VideoCodec;
 
 import java.io.File;
 
@@ -20,6 +22,8 @@ public class CameraConfig {
     private final CaptureMode captureMode;
     private final int frameRate;
     private final Quality quality;
+    private final VideoBitrate videoBitrate;
+    private final VideoCodec videoCodec;
     private final boolean audioEnabled;
     private final File saveLocation;
     private final CameraApiType apiType;
@@ -33,6 +37,8 @@ public class CameraConfig {
         this.captureMode = builder.captureMode;
         this.frameRate = builder.frameRate;
         this.quality = builder.quality;
+        this.videoBitrate = builder.videoBitrate;
+        this.videoCodec = builder.videoCodec;
         this.audioEnabled = builder.audioEnabled;
         this.saveLocation = builder.saveLocation;
         this.apiType = builder.apiType;
@@ -62,6 +68,14 @@ public class CameraConfig {
 
     public Quality getQuality() {
         return quality;
+    }
+
+    public VideoBitrate getVideoBitrate() {
+        return videoBitrate;
+    }
+
+    public VideoCodec getVideoCodec() {
+        return videoCodec;
     }
 
     public boolean isAudioEnabled() {
@@ -94,6 +108,8 @@ public class CameraConfig {
         private CaptureMode captureMode = CaptureMode.PHOTO;
         private int frameRate = 30;
         private Quality quality = Quality.DEFAULT; // CameraX default FHD
+        private VideoBitrate videoBitrate = VideoBitrate.DEFAULT;
+        private VideoCodec videoCodec = VideoCodec.DEFAULT;
         private boolean audioEnabled = true;
         private File saveLocation = new File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DCIM), "Camera");
         private CameraApiType apiType = CameraApiType.CAMERA2; // default Camera2 (CameraX resolution switching is unreliable)
@@ -110,6 +126,8 @@ public class CameraConfig {
             this.captureMode = config.captureMode;
             this.frameRate = config.frameRate;
             this.quality = config.quality;
+            this.videoBitrate = config.videoBitrate;
+            this.videoCodec = config.videoCodec;
             this.audioEnabled = config.audioEnabled;
             this.saveLocation = config.saveLocation;
             this.apiType = config.apiType;
@@ -144,6 +162,16 @@ public class CameraConfig {
 
         public Builder setQuality(Quality quality) {
             this.quality = quality;
+            return this;
+        }
+
+        public Builder setVideoBitrate(VideoBitrate videoBitrate) {
+            this.videoBitrate = videoBitrate != null ? videoBitrate : VideoBitrate.DEFAULT;
+            return this;
+        }
+
+        public Builder setVideoCodec(VideoCodec videoCodec) {
+            this.videoCodec = videoCodec != null ? videoCodec : VideoCodec.DEFAULT;
             return this;
         }
 
@@ -186,6 +214,8 @@ public class CameraConfig {
                 ", captureMode=" + captureMode +
                 ", frameRate=" + frameRate +
                 ", quality=" + quality +
+                ", videoBitrate=" + videoBitrate +
+                ", videoCodec=" + videoCodec +
                 ", audioEnabled=" + audioEnabled +
                 ", saveLocation=" + saveLocation +
                 ", apiType=" + apiType +

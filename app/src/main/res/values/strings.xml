@@ -20,6 +20,8 @@
     <string name="resolution">Resolution</string>
     <string name="custom_camera2_resolution">Custom Camera2 Resolution</string>
     <string name="frame_rate">Frame Rate</string>
+    <string name="video_bitrate">Video Bitrate</string>
+    <string name="video_codec">Video Codec</string>
     <string name="video_quality">Video Quality</string>
     <string name="video_resolution">Video Resolution</string>
     <string name="photo_resolution">Photo Resolution</string>
@@ -27,6 +29,7 @@
     <string name="enable_audio">Enable Audio</string>
     <string name="background_review">Background Review</string>
     <string name="background_recording">Background Recording</string>
+    <string name="recording_storage_low">Not enough storage to record. Keep at least 2 GB free.</string>
     <string name="save_location">Save Location</string>
     <string name="performance">Performance</string>
     <string name="hardware_acceleration">Hardware Acceleration</string>
@@ -34,6 +37,16 @@
     <string name="camera_size">Camera Size</string>
     <string name="old_camera">Old Camera</string>
     <string name="yuv_dump_test">YUV Dump Test</string>
+    <string name="video_debug_test">Video Engineering Debug</string>
+    <string name="video_debug_title">Video Engineering Debug</string>
+    <string name="video_debug_start">Start Recording</string>
+    <string name="video_debug_stop">Stop Recording</string>
+    <string name="video_debug_resolution">Recording Resolution</string>
+    <string name="video_debug_resolution_short">Resolution</string>
+    <string name="video_debug_tab_info">Info</string>
+    <string name="video_debug_tab_codec">Enc</string>
+    <string name="video_debug_tab_disk">Disk</string>
+    <string name="video_debug_tab_device">Dev</string>
     <string name="yuv_dump_enable">Enable P2 dump</string>
     <string name="yuv_dump_rrzo">Dump RRZO input (RAW)</string>
     <string name="yuv_dump_display">Dump display output (YUV)</string>

@@ -47,6 +47,7 @@ dependencies {
     implementation libs.material
     implementation libs.activity
     implementation libs.constraintlayout
+    implementation libs.androidx.viewpager2
 
     // CameraX dependencies
     implementation libs.camera.core
