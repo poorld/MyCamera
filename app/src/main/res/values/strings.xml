@@ -55,9 +55,15 @@
     <string name="yuv_dump_display">Dump display output (YUV)</string>
     <string name="yuv_dump_record">Dump recording output (YUV)</string>
     <string name="yuv_dump_capture">Capture one frame</string>
+    <string name="yuv_dump_capture_running">Capturing one frame...</string>
+    <string name="yuv_dump_capture_requested">One-frame capture requested.</string>
+    <string name="yuv_dump_capture_refreshing">Capture finished. Refreshing dump files...</string>
+    <string name="yuv_dump_capture_no_output">Enable Display output or Record output first.</string>
+    <string name="yuv_dump_capture_error">Capture failed: %1$s</string>
     <string name="yuv_dump_overlay_start">Start floating capture button</string>
     <string name="yuv_dump_overlay_stop">Stop floating capture button</string>
     <string name="yuv_dump_overlay_capture">Dump YUV</string>
+    <string name="yuv_dump_overlay_capturing">Capturing...</string>
     <string name="yuv_dump_overlay_title">YUV dump capture</string>
     <string name="yuv_dump_overlay_notification">Tap the floating button to dump one P2 frame. Long-press it to close.</string>
     <string name="yuv_dump_overlay_permission">Allow display-over-other-apps permission, then tap the button again.</string>
@@ -65,4 +71,16 @@
     <string name="yuv_dump_disabled">Enable P2 dump first.</string>
     <string name="yuv_dump_triggered">One-frame dump requested.</string>
     <string name="yuv_dump_status">Input mask: %1$d, output mask: %2$d</string>
+    <string name="yuv_dump_device_files">Device YV12 dumps</string>
+    <string name="yuv_dump_refresh_files">Refresh files</string>
+    <string name="yuv_dump_decode">Parse selected</string>
+    <string name="yuv_dump_preview">YV12 dump preview</string>
+    <string name="yuv_dump_files_loading">Reading /data/vendor/p2_dump...</string>
+    <string name="yuv_dump_files_error">Unable to read dump directory: %1$s</string>
+    <string name="yuv_dump_files_empty">No parseable YV12 dumps found in /data/vendor/p2_dump.</string>
+    <string name="yuv_dump_files_found">Found %1$d YV12 dump(s).</string>
+    <string name="yuv_dump_file_not_selected">Select a YV12 dump first.</string>
+    <string name="yuv_dump_decoding">Parsing %1$s...</string>
+    <string name="yuv_dump_decode_error">YV12 parse failed: %1$s</string>
+    <string name="yuv_dump_decode_ready">Preview ready.</string>
 </resources>

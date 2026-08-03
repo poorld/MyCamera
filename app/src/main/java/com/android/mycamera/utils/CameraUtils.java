@@ -19,7 +19,7 @@ import java.util.Locale;
 public class CameraUtils {
 
     /** Keep enough free space for the operating system to boot and operate. */
-    public static final long MINIMUM_FREE_STORAGE_BYTES = 2L * 1024L * 1024L * 1024L;
+    public static final long MINIMUM_FREE_STORAGE_BYTES = 2L * 1024L * 1024L * 1024L; // 2G
     
     /**
      * Check if all required permissions are granted
