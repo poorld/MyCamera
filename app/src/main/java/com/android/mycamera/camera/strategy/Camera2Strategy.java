@@ -596,9 +596,17 @@ public class Camera2Strategy extends BaseCameraStrategy {
             }
             
             Resolution resolution = currentConfig.getResolution();
-            // Keep the on-screen preview stable; the recorder surface below
-            // still uses the configured recording resolution.
-            surfaceTexture.setDefaultBufferSize(PREVIEW_WIDTH, PREVIEW_HEIGHT);
+            boolean highSpeedConfiguration = isCurrentHighSpeedVideoConfiguration();
+            if (highSpeedConfiguration && resolution != null) {
+                // Constrained high-speed sessions only accept preview surfaces
+                // from the camera's high-speed size list (720p on this device).
+                surfaceTexture.setDefaultBufferSize(
+                        resolution.getWidth(), resolution.getHeight());
+            } else {
+                // Keep the regular on-screen preview stable; the recorder
+                // surface still uses the configured recording resolution.
+                surfaceTexture.setDefaultBufferSize(PREVIEW_WIDTH, PREVIEW_HEIGHT);
+            }
             Surface previewSurface = new Surface(surfaceTexture);
             Surface recorderSurface = mediaRecorder.getSurface();
 
@@ -612,7 +620,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
             applyMtkHfpsMode(builder);
             applyFlashToRequest(builder);
 
-            if (isCurrentHighSpeedVideoConfiguration()) {
+            if (highSpeedConfiguration) {
                 startConstrainedHighSpeedRecording(
                         previewSurface, recorderSurface, builder, rotationAttempt, notifyStarted);
                 return;
