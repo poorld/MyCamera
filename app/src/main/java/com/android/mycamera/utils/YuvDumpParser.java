@@ -16,7 +16,8 @@ import java.util.regex.Pattern;
 
 public final class YuvDumpParser {
     private static final Pattern NAME_PATTERN = Pattern.compile(
-            "(?<stream>inResized(?:_\\d+)?|record|display)_(?<width>\\d+)x(?<height>\\d+)"
+            "(?:(?:\\d+_\\d+m\\d+_\\d+)_)?"
+                    + "(?<stream>inResized(?:_\\d+)?|record|display)_(?<width>\\d+)x(?<height>\\d+)"
                     + "-PW(?<physicalWidth>\\d+)-PH(?<physicalHeight>\\d+)_(?<stride>\\d+)_.*"
                     + "\\.(?<format>[A-Za-z0-9_]+)$",
             Pattern.CASE_INSENSITIVE);
@@ -74,6 +75,7 @@ public final class YuvDumpParser {
         if (!"yv12".equalsIgnoreCase(format)) {
             return null;
         }
+        String pixelFormat = format.toLowerCase(Locale.US);
 
         int stride = parseInt(matcher.group("stride"));
         int physicalHeight = parseInt(matcher.group("physicalHeight"));
@@ -88,6 +90,7 @@ public final class YuvDumpParser {
                 parseInt(matcher.group("physicalWidth")),
                 physicalHeight,
                 stride,
+                pixelFormat,
                 file.length(),
                 expectedYv12Size(stride, physicalHeight));
     }
@@ -204,12 +207,13 @@ public final class YuvDumpParser {
         private final int physicalWidth;
         private final int physicalHeight;
         private final int stride;
+        private final String pixelFormat;
         private final long size;
         private final long expectedSize;
 
         private DumpFile(File file, String stream, int width, int height,
                 int physicalWidth, int physicalHeight, int stride,
-                long size, long expectedSize) {
+                String pixelFormat, long size, long expectedSize) {
             this.file = file;
             this.stream = stream;
             this.width = width;
@@ -217,6 +221,7 @@ public final class YuvDumpParser {
             this.physicalWidth = physicalWidth;
             this.physicalHeight = physicalHeight;
             this.stride = stride;
+            this.pixelFormat = pixelFormat;
             this.size = size;
             this.expectedSize = expectedSize;
         }
@@ -227,6 +232,10 @@ public final class YuvDumpParser {
 
         public String getStream() {
             return stream;
+        }
+
+        public String getPixelFormat() {
+            return pixelFormat;
         }
 
         public int getWidth() {
@@ -247,6 +256,10 @@ public final class YuvDumpParser {
 
         public int getStride() {
             return stride;
+        }
+
+        public int getChromaStride() {
+            return (int) align((stride + 1L) / 2L, 16);
         }
 
         public long getSize() {

@@ -60,6 +60,10 @@
             android:exported="false"
             android:screenOrientation="portrait" />
         <activity
+            android:name=".ui.activity.YuvDumpFilesActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
             android:name=".ui.activity.VideoDebugActivity"
             android:exported="false"
             android:screenOrientation="portrait" />

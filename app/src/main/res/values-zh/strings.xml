@@ -36,7 +36,9 @@
     <string name="yuv_dump_rrzo">抓取 RRZO 输入（RAW）</string>
     <string name="yuv_dump_display">抓取显示输出（YUV）</string>
     <string name="yuv_dump_record">抓取录像输出（YUV）</string>
-    <string name="yuv_dump_capture">抓取一帧</string>
+    <string name="yuv_dump_capture_no_output">请先启用显示输出或录像输出。</string>
+    <string name="yuv_dump_capture_requested">已请求抓取当前相机管线的一帧。</string>
+    <string name="yuv_dump_capture_error">抓取失败：%1$s</string>
     <string name="yuv_dump_overlay_start">开启悬浮抓帧按钮</string>
     <string name="yuv_dump_overlay_stop">关闭悬浮抓帧按钮</string>
     <string name="yuv_dump_overlay_capture">抓 YUV</string>
@@ -47,4 +49,33 @@
     <string name="yuv_dump_disabled">请先启用 P2 Dump。</string>
     <string name="yuv_dump_triggered">已请求抓取一帧。</string>
     <string name="yuv_dump_status">输入掩码：%1$d，输出掩码：%2$d</string>
+    <string name="yuv_dump_device_files">设备 YV12 文件</string>
+    <string name="yuv_dump_open_files">查看 YUV 文件</string>
+    <string name="yuv_dump_files_title">YUV 文件</string>
+    <string name="yuv_dump_files_directory">目录：/data/vendor/p2_dump</string>
+    <string name="yuv_dump_refresh_files">刷新文件</string>
+    <string name="yuv_dump_decode">解析已选文件</string>
+    <string name="yuv_dump_preview">YV12 文件预览</string>
+    <string name="yuv_dump_files_loading">正在读取 /data/vendor/p2_dump...</string>
+    <string name="yuv_dump_files_error">无法读取文件目录：%1$s</string>
+    <string name="yuv_dump_files_empty">/data/vendor/p2_dump 中没有可解析的 YV12 文件。</string>
+    <string name="yuv_dump_files_found">找到 %1$d 个 YV12 文件。</string>
+    <string name="yuv_dump_files_select">请选择上面的文件进行预览。</string>
+    <string name="yuv_dump_file_not_selected">请先选择一个 YV12 文件。</string>
+    <string name="yuv_dump_decoding">正在解析 %1$s...</string>
+    <string name="yuv_dump_decode_error">YV12 解析失败：%1$s</string>
+    <string name="yuv_dump_decode_ready">预览完成。</string>
+    <string name="yuv_dump_size_check_ok">正常</string>
+    <string name="yuv_dump_size_check_mismatch">不匹配</string>
+    <string name="yuv_dump_detail_file">文件：%1$s</string>
+    <string name="yuv_dump_detail_modified_time">修改时间：%1$s</string>
+    <string name="yuv_dump_detail_stream">流：%1$s</string>
+    <string name="yuv_dump_detail_logical_size">逻辑尺寸：%1$d x %2$d</string>
+    <string name="yuv_dump_detail_physical_size">物理尺寸：%1$d x %2$d</string>
+    <string name="yuv_dump_detail_pixel_format">像素格式：%1$s（Y + V + U，4:2:0）</string>
+    <string name="yuv_dump_detail_stride">Stride：Y=%1$d 字节，U/V=%2$d 字节</string>
+    <string name="yuv_dump_detail_file_size">文件大小：%1$d 字节；期望：%2$d 字节；校验：%3$s</string>
+    <string name="yuv_dump_detail_preview_conversion">预览转换：BT.709 limited range；原始 YUV 没有方向元数据。</string>
+    <string name="yuv_dump_detail_preview_bitmap">预览 Bitmap：在内存中生成，不写入 BMP 文件。</string>
+    <string name="yuv_dump_detail_source">源文件：%1$s</string>
 </resources>

@@ -54,11 +54,8 @@
     <string name="yuv_dump_rrzo">Dump RRZO input (RAW)</string>
     <string name="yuv_dump_display">Dump display output (YUV)</string>
     <string name="yuv_dump_record">Dump recording output (YUV)</string>
-    <string name="yuv_dump_capture">Capture one frame</string>
-    <string name="yuv_dump_capture_running">Capturing one frame...</string>
-    <string name="yuv_dump_capture_requested">One-frame capture requested.</string>
-    <string name="yuv_dump_capture_refreshing">Capture finished. Refreshing dump files...</string>
     <string name="yuv_dump_capture_no_output">Enable Display output or Record output first.</string>
+    <string name="yuv_dump_capture_requested">P2 frame dump requested.</string>
     <string name="yuv_dump_capture_error">Capture failed: %1$s</string>
     <string name="yuv_dump_overlay_start">Start floating capture button</string>
     <string name="yuv_dump_overlay_stop">Stop floating capture button</string>
@@ -72,6 +69,9 @@
     <string name="yuv_dump_triggered">One-frame dump requested.</string>
     <string name="yuv_dump_status">Input mask: %1$d, output mask: %2$d</string>
     <string name="yuv_dump_device_files">Device YV12 dumps</string>
+    <string name="yuv_dump_open_files">View YUV files</string>
+    <string name="yuv_dump_files_title">YUV dump files</string>
+    <string name="yuv_dump_files_directory">Directory: /data/vendor/p2_dump</string>
     <string name="yuv_dump_refresh_files">Refresh files</string>
     <string name="yuv_dump_decode">Parse selected</string>
     <string name="yuv_dump_preview">YV12 dump preview</string>
@@ -79,8 +79,22 @@
     <string name="yuv_dump_files_error">Unable to read dump directory: %1$s</string>
     <string name="yuv_dump_files_empty">No parseable YV12 dumps found in /data/vendor/p2_dump.</string>
     <string name="yuv_dump_files_found">Found %1$d YV12 dump(s).</string>
+    <string name="yuv_dump_files_select">Select a dump file above to preview it.</string>
     <string name="yuv_dump_file_not_selected">Select a YV12 dump first.</string>
     <string name="yuv_dump_decoding">Parsing %1$s...</string>
     <string name="yuv_dump_decode_error">YV12 parse failed: %1$s</string>
     <string name="yuv_dump_decode_ready">Preview ready.</string>
+    <string name="yuv_dump_size_check_ok">OK</string>
+    <string name="yuv_dump_size_check_mismatch">MISMATCH</string>
+    <string name="yuv_dump_detail_file">File: %1$s</string>
+    <string name="yuv_dump_detail_modified_time">Modified time: %1$s</string>
+    <string name="yuv_dump_detail_stream">Stream: %1$s</string>
+    <string name="yuv_dump_detail_logical_size">Logical size: %1$d x %2$d</string>
+    <string name="yuv_dump_detail_physical_size">Physical size: %1$d x %2$d</string>
+    <string name="yuv_dump_detail_pixel_format">Pixel format: %1$s (Y + V + U, 4:2:0)</string>
+    <string name="yuv_dump_detail_stride">Stride: Y=%1$d bytes, U/V=%2$d bytes</string>
+    <string name="yuv_dump_detail_file_size">File size: %1$d bytes; expected: %2$d bytes; check: %3$s</string>
+    <string name="yuv_dump_detail_preview_conversion">Preview conversion: BT.709 limited range; raw YUV has no orientation metadata.</string>
+    <string name="yuv_dump_detail_preview_bitmap">Preview bitmap: rendered in memory; no BMP file is written.</string>
+    <string name="yuv_dump_detail_source">Source dump: %1$s</string>
 </resources>
