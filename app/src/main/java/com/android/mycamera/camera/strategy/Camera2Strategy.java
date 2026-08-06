@@ -66,7 +66,11 @@ public class Camera2Strategy extends BaseCameraStrategy {
     private static final String TAG = "Camera2Strategy";
     private static final String MTK_HFPS_MODE_KEY =
             "com.mediatek.streamingfeature.hfpsMode";
+    private static final String MTK_HDR_MODE_KEY =
+            "com.mediatek.hdrfeature.hdrMode";
     private static final int MTK_HFPS_MODE_60FPS = 1;
+    private static final int MTK_HDR_MODE_OFF = 0;
+    private static final int MTK_HDR_MODE_VIDEO_ON = 3;
     private static final int SLOW_MOTION_PLAYBACK_FPS = 30;
     private static final int RECORDING_SEGMENT_DURATION_MS = 10 * 60 * 1000;
     private static final int PREVIEW_WIDTH = 1920;
@@ -195,6 +199,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
                 || currentConfig.getFrameRate() != config.getFrameRate()
                 || currentConfig.getCaptureMode() != config.getCaptureMode()
                 || currentConfig.getPhotoResolution() != config.getPhotoResolution()
+                || currentConfig.isPhotoHdrEnabled() != config.isPhotoHdrEnabled()
                 || currentConfig.isLowMemoryModeEnabled() != config.isLowMemoryModeEnabled()
                 || !TextUtilsEquals(currentConfig.getCameraId(), config.getCameraId());
 
@@ -330,6 +335,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
             captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getJpegOrientation());
             applyZoom(captureBuilder);
             applyFlashToRequest(captureBuilder);
+            applyMtkPhotoHdrMode(captureBuilder);
 
             imageReader.setOnImageAvailableListener(reader -> {
                 try (android.media.Image image = reader.acquireNextImage()) {
@@ -972,6 +978,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
             }
 
             boolean videoMode = isVideoCaptureMode();
+            boolean photoHdr = isPhotoHdrActive();
             Resolution resolution = currentConfig.getResolution();
 
             // Keep the on-screen preview stream identical in photo and video
@@ -1008,7 +1015,6 @@ public class Camera2Strategy extends BaseCameraStrategy {
                 Log.d(TAG, "createPreviewSession: VIDEO pipeline encoderSurface="
                         + resolution.getWidth() + "x" + resolution.getHeight());
             } else {
-                releaseVideoEncoderReader();
                 // Same as MTK PhotoDevice2Controller.setPictureSize -> CaptureSurface.updatePictureInfo:
                 // ImageReader is ALWAYS the selected still size (e.g. 6912x5184), never preview size.
                 PhotoResolution still = PhotoResolution.normalize(
@@ -1024,23 +1030,31 @@ public class Camera2Strategy extends BaseCameraStrategy {
                             : imageReader.getWidth() + "x" + imageReader.getHeight()));
                 }
                 outputs.add(imageReader.getSurface());
+                // A HW_VIDEO_ENCODER output makes MTK classify the session as video
+                // and select the 1920x1080 VIDEO sensor mode. HDR still photos must
+                // keep the full-size JPEG as the mode-selection target (CUSTOM3).
+                releaseVideoEncoderReader();
                 applyPhotoFocusToRequest(builder);
                 Log.i(TAG, "createPreviewSession: PHOTO pipeline jpegReader="
                         + imageReader.getWidth() + "x" + imageReader.getHeight()
                         + ", preview=" + previewBufferSize.getWidth() + "x" + previewBufferSize.getHeight()
                         + ", configPhoto=" + still.getDisplayName()
+                        + ", hdr=" + photoHdr
                         + ", outputs=" + outputs.size());
             }
 
             applyFpsToRequest(builder);
             applyFlashToRequest(builder);
             applyZoom(builder);
+            applyMtkPhotoHdrMode(builder);
             previewRequestBuilder = builder;
 
             final boolean photoPipeline = !videoMode;
+            final boolean hdrPhotoPipeline = photoHdr;
             final Size configuredPhotoSize = photoSize;
             final Size configuredPreviewSize = previewBufferSize;
-            cameraDevice.createCaptureSession(outputs, new CameraCaptureSession.StateCallback() {
+            CameraCaptureSession.StateCallback previewStateCallback =
+                    new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
                     if (cameraDevice == null) {
@@ -1094,11 +1108,16 @@ public class Camera2Strategy extends BaseCameraStrategy {
                             applyFpsToRequest(retryBuilder);
                             applyFlashToRequest(retryBuilder);
                             applyZoom(retryBuilder);
+                            applyMtkPhotoHdrMode(retryBuilder);
                             previewRequestBuilder = retryBuilder;
                             java.util.ArrayList<Surface> retryOutputs = new java.util.ArrayList<>();
                             retryOutputs.add(retryPreview);
                             retryOutputs.add(imageReader.getSurface());
-                            cameraDevice.createCaptureSession(retryOutputs,
+                            if (hdrPhotoPipeline && videoImageReader != null) {
+                                retryOutputs.add(videoImageReader.getSurface());
+                                retryBuilder.addTarget(videoImageReader.getSurface());
+                            }
+                            CameraCaptureSession.StateCallback retryStateCallback =
                                     new CameraCaptureSession.StateCallback() {
                                         @Override
                                         public void onConfigured(@NonNull CameraCaptureSession s) {
@@ -1118,7 +1137,9 @@ public class Camera2Strategy extends BaseCameraStrategy {
                                         public void onConfigureFailed(@NonNull CameraCaptureSession s) {
                                             notifyError("Preview configuration failed");
                                         }
-                                    }, backgroundHandler);
+                                    };
+                            createRegularCaptureSession(retryOutputs, retryStateCallback,
+                                    hdrPhotoPipeline);
                             return;
                         } catch (Exception retryError) {
                             logError("PHOTO session retry failed", retryError);
@@ -1126,7 +1147,8 @@ public class Camera2Strategy extends BaseCameraStrategy {
                     }
                     notifyError("Preview configuration failed");
                 }
-            }, backgroundHandler);
+            };
+            createRegularCaptureSession(outputs, previewStateCallback, hdrPhotoPipeline);
         } catch (CameraAccessException | IllegalArgumentException | IllegalStateException e) {
             logError("Failed to create preview session", e);
             notifyError("Failed to create preview session: " + e.getMessage());
@@ -1136,6 +1158,44 @@ public class Camera2Strategy extends BaseCameraStrategy {
     private boolean isVideoCaptureMode() {
         return currentConfig != null
                 && CaptureMode.normalize(currentConfig.getCaptureMode()).isVideo();
+    }
+
+    private boolean isPhotoHdrActive() {
+        if (currentConfig == null || isVideoCaptureMode()
+                || !currentConfig.isPhotoHdrEnabled()
+                || !"0".equals(currentConfig.getCameraId())) {
+            return false;
+        }
+        PhotoResolution still = PhotoResolution.normalize(
+                currentConfig.getPhotoResolution(), currentConfig.getCameraId());
+        return still == PhotoResolution.MP_12;
+    }
+
+    private void createRegularCaptureSession(List<Surface> outputs,
+                                             CameraCaptureSession.StateCallback callback,
+                                             boolean photoHdr)
+            throws CameraAccessException {
+        if (!photoHdr) {
+            cameraDevice.createCaptureSession(outputs, callback, backgroundHandler);
+            return;
+        }
+
+        List<OutputConfiguration> outputConfigurations = new ArrayList<>();
+        for (Surface output : outputs) {
+            outputConfigurations.add(new OutputConfiguration(output));
+        }
+        CaptureRequest.Builder sessionParamsBuilder =
+                cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+        applyMtkPhotoHdrMode(sessionParamsBuilder);
+        SessionConfiguration sessionConfiguration = new SessionConfiguration(
+                SessionConfiguration.SESSION_REGULAR,
+                outputConfigurations,
+                context.getMainExecutor(),
+                callback);
+        sessionConfiguration.setSessionParameters(sessionParamsBuilder.build());
+        Log.i(TAG, "createRegularCaptureSession: MTK hardware HDR session, outputs="
+                + outputs.size());
+        cameraDevice.createCaptureSession(sessionConfiguration);
     }
 
     private void ensurePhotoImageReader(int width, int height) {
@@ -1538,6 +1598,21 @@ public class Camera2Strategy extends BaseCameraStrategy {
                     + ", requestedFps=" + currentConfig.getFrameRate());
         } catch (IllegalArgumentException e) {
             logError("Failed to configure MTK HFPS mode", e);
+        }
+    }
+
+    private void applyMtkPhotoHdrMode(CaptureRequest.Builder builder) {
+        if (builder == null) {
+            return;
+        }
+        int mode = isPhotoHdrActive() ? MTK_HDR_MODE_VIDEO_ON : MTK_HDR_MODE_OFF;
+        try {
+            CaptureRequest.Key<Integer> hdrModeKey =
+                    new CaptureRequest.Key<>(MTK_HDR_MODE_KEY, Integer.class);
+            builder.set(hdrModeKey, mode);
+            Log.d(TAG, "applyMtkPhotoHdrMode=" + mode);
+        } catch (IllegalArgumentException e) {
+            logError("Failed to configure MTK hardware HDR mode", e);
         }
     }
 

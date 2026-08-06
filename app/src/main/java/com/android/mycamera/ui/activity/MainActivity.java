@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.Insets;
+import android.graphics.Rect;
 import android.hardware.camera2.CameraAccessException;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
@@ -19,6 +20,7 @@ import android.util.Range;
 import android.view.MotionEvent;
 import android.view.KeyEvent;
 import android.view.TextureView;
+import android.view.TouchDelegate;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowInsets;
@@ -48,6 +50,7 @@ import com.android.mycamera.focus.GeminiFocusView;
 import com.android.mycamera.model.CameraApiType;
 import com.android.mycamera.model.CameraState;
 import com.android.mycamera.model.CaptureMode;
+import com.android.mycamera.model.PhotoResolution;
 import com.android.mycamera.model.Quality;
 import com.android.mycamera.model.Resolution;
 import com.android.mycamera.ui.view.ZoomDialView;
@@ -73,7 +76,8 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     private static final String PROP_YUV_DUMP_CONTINUE = "vendor.debug.camera.continue.dump";
     // This product's camera HAL advertises flash support, but no torch is wired.
     private static final boolean FLASH_UI_ENABLED = false;
-    private static final String OIS_AF_NODE_PATH = "/sys/class/sensordrv/kd_camera_hw/imx563_ois_vldo28";
+    private static final String OIS_REGISTER_NODE_PATH = "/sys/class/leds/alermled/ois";
+    private static final String OIS_AF_POWER_NODE_PATH = "/sys/class/sensordrv/kd_camera_hw/imx563_ois_vldo28";
     private static final String DENOISE_NODE_PATH = "/sys/class/leds/alermled/denoise";
 
     public static final String TAG = "MainActivity";
@@ -93,11 +97,12 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     private ImageButton captureButton;
     private ImageButton settingsButton;
     private ImageButton switchCameraButton;
-    private ImageButton focusAfButton;
+    private ImageButton oisButton;
     private ImageButton exposureButton;
     private ImageButton flashButton;
     private ImageButton galleryButton;
     private ImageButton denoiseButton;
+    private TextView photoHdrButton;
     private ImageButton photoModeButton;
     private ImageButton videoModeButton;
     private ProgressBar loadingIndicator;
@@ -130,7 +135,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
 
     private boolean isVideoMode = false;
     private boolean isRecording = false;
-    private boolean isFocusAfEnabled = false;
+    private boolean isOisEnabled = false;
     private boolean isDenoiseEnabled = false;
     private boolean isSyncingApiSelection = false;
     private SettingsManager settingsManager;
@@ -190,12 +195,13 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         focusView = findViewById(R.id.focusView);
         captureButton = findViewById(R.id.captureButton);
         settingsButton = findViewById(R.id.settingsButton);
-        focusAfButton = findViewById(R.id.focusAfButton);
+        oisButton = findViewById(R.id.focusAfButton);
         switchCameraButton = findViewById(R.id.switchCameraButton);
         exposureButton = findViewById(R.id.exposureButton);
         flashButton = findViewById(R.id.flashButton);
         galleryButton = findViewById(R.id.galleryButton);
         denoiseButton = findViewById(R.id.denoiseButton);
+        photoHdrButton = findViewById(R.id.photoHdrButton);
         photoModeButton = findViewById(R.id.photoModeButton);
         videoModeButton = findViewById(R.id.videoModeButton);
         loadingIndicator = findViewById(R.id.loadingIndicator);
@@ -230,8 +236,35 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         applyTopControlsSafeArea();
         updateModeButtons();
         updateApiSwitcherVisibility();
-        refreshFocusAfStateFromNode();
+        refreshOisStateFromNode();
         setDenoiseEnabled(false, false);
+        expandCaptureButtonTouchTarget();
+    }
+
+    private void expandCaptureButtonTouchTarget() {
+        View delegateParent = findViewById(R.id.bottomControls);
+        if (delegateParent == null || captureButton == null) {
+            return;
+        }
+        delegateParent.post(() -> {
+            int[] parentLocation = new int[2];
+            int[] buttonLocation = new int[2];
+            delegateParent.getLocationInWindow(parentLocation);
+            captureButton.getLocationInWindow(buttonLocation);
+
+            Rect touchBounds = new Rect(
+                    buttonLocation[0] - parentLocation[0],
+                    buttonLocation[1] - parentLocation[1],
+                    buttonLocation[0] - parentLocation[0] + captureButton.getWidth(),
+                    buttonLocation[1] - parentLocation[1] + captureButton.getHeight());
+            int horizontalExpansion = Math.round(24 * getResources().getDisplayMetrics().density);
+            int verticalExpansion = Math.round(12 * getResources().getDisplayMetrics().density);
+            touchBounds.inset(-horizontalExpansion, -verticalExpansion);
+            touchBounds.intersect(0, 0, delegateParent.getWidth(), delegateParent.getHeight());
+            delegateParent.setTouchDelegate(new TouchDelegate(touchBounds, captureButton));
+            Log.d(TAG, "Capture touch target=" + touchBounds
+                    + ", visual=" + captureButton.getWidth() + "x" + captureButton.getHeight());
+        });
     }
 
     private void applyTopControlsSafeArea() {
@@ -268,11 +301,12 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             requestYuvDumpFrame();
             return true;
         });
-        focusAfButton.setOnClickListener(v -> toggleFocusAf());
+        oisButton.setOnClickListener(v -> toggleOis());
         switchCameraButton.setOnClickListener(v -> switchCamera());
         flashButton.setOnClickListener(v -> toggleFlash());
         galleryButton.setOnClickListener(v -> startActivity(new Intent(this, GalleryActivity.class)));
         denoiseButton.setOnClickListener(v -> toggleDenoise());
+        photoHdrButton.setOnClickListener(v -> togglePhotoHdr());
         photoModeButton.setOnClickListener(v -> setPhotoMode());
         videoModeButton.setOnClickListener(v -> setVideoMode());
         apiSwitcherButton.setOnClickListener(v -> {
@@ -491,7 +525,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
 
         if (shouldKeepCameraInBackground()) {
             updateApiSwitcherVisibility();
-            refreshFocusAfStateFromNode();
+            refreshOisStateFromNode();
             updateModeButtons();
             updateCaptureButton();
             updateSettingsDisplay();
@@ -513,7 +547,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         }
         isSyncingApiSelection = false;
         updateApiSwitcherVisibility();
-        refreshFocusAfStateFromNode();
+        refreshOisStateFromNode();
         updateModeButtons();
         updateCaptureButton();
     }
@@ -682,6 +716,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             }
             int nextIndex = (currentIndex + 1) % cameraIds.length;
             mCameraManager.switchCamera(cameraIds[nextIndex]);
+            updatePhotoHdrButton();
             cameraPreview.postDelayed(this::updateZoomUi, 500);
         } catch (CameraAccessException e) {
             e.printStackTrace();
@@ -805,6 +840,55 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         videoModeButton.setImageTintList(null);
         photoModeButton.setSelected(!videoSelected);
         videoModeButton.setSelected(videoSelected);
+        updatePhotoHdrButton();
+    }
+
+    private void togglePhotoHdr() {
+        if (mCameraManager == null) {
+            return;
+        }
+        CameraConfig current = mCameraManager.getCurrentConfig();
+        if (!isPhotoHdrAvailable(current)) {
+            return;
+        }
+
+        boolean enabled = !current.isPhotoHdrEnabled();
+        CameraConfig.Builder builder = new CameraConfig.Builder(current)
+                .setPhotoHdrEnabled(enabled);
+        if (enabled) {
+            // IMX563 ZVHDR is exposed only by the 4032x3024 full-readout mode.
+            builder.setPhotoResolution(PhotoResolution.MP_12);
+            mCameraManager.resetAutoExposure();
+        }
+
+        loadingIndicator.setVisibility(View.VISIBLE);
+        statusText.setText(enabled ? "Enabling HDR..." : "Disabling HDR...");
+        mCameraManager.updateConfiguration(builder.build());
+        updatePhotoHdrButton();
+        updateSettingsDisplay();
+        Toast.makeText(this,
+                enabled ? R.string.photo_hdr_enabled : R.string.photo_hdr_disabled,
+                Toast.LENGTH_SHORT).show();
+    }
+
+    private boolean isPhotoHdrAvailable(CameraConfig config) {
+        return config != null
+                && !isVideoMode
+                && config.getApiType() == CameraApiType.CAMERA2
+                && "0".equals(config.getCameraId());
+    }
+
+    private void updatePhotoHdrButton() {
+        if (photoHdrButton == null) {
+            return;
+        }
+        CameraConfig config = mCameraManager != null ? mCameraManager.getCurrentConfig() : null;
+        boolean available = isPhotoHdrAvailable(config);
+        boolean enabled = available && config.isPhotoHdrEnabled();
+        photoHdrButton.setVisibility(available ? View.VISIBLE : View.GONE);
+        photoHdrButton.setEnabled(available && !isRecording);
+        photoHdrButton.setTextColor(getColor(enabled ? R.color.zoom_active : R.color.white));
+        photoHdrButton.setSelected(enabled);
     }
 
     @Override
@@ -1045,18 +1129,24 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         }
     }
 
-    private void toggleFocusAf() {
-        boolean targetEnabled = !isFocusAfEnabled;
-        if (writeOisAfNode(targetEnabled ? "1" : "0")) {
-            isFocusAfEnabled = targetEnabled;
-            updateFocusAfButton();
+    private void toggleOis() {
+        if (mCameraManager == null || !mCameraManager.isCameraAvailable()) {
+            Log.w(TAG, "toggleOis ignored: camera is not open");
+            Toast.makeText(this, "Camera is not ready", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        boolean targetEnabled = !isOisEnabled;
+        if (setOisEnabled(targetEnabled)) {
+            isOisEnabled = targetEnabled;
+            updateOisButton();
             Toast.makeText(
                     this,
-                    isFocusAfEnabled ? R.string.af_ois_enabled : R.string.af_ois_disabled,
+                    isOisEnabled ? R.string.ois_enabled : R.string.ois_disabled,
                     Toast.LENGTH_SHORT
             ).show();
         } else {
-            Toast.makeText(this, R.string.af_ois_failed, Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.ois_failed, Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -1116,58 +1206,84 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         return false;
     }
 
-    private void refreshFocusAfStateFromNode() {
-        String value = readOisAfNode();
+    private void refreshOisStateFromNode() {
+        String value = readOisRegisterNode();
         if (value != null) {
-            isFocusAfEnabled = "1".equals(value.trim());
+            isOisEnabled = isOisRegisterEnabled(value);
         }
-        updateFocusAfButton();
+        updateOisButton();
     }
 
-    private void updateFocusAfButton() {
-        if (focusAfButton == null) {
+    private boolean isOisRegisterEnabled(String value) {
+        String normalizedValue = value.trim();
+        if ("1".equals(normalizedValue)) {
+            return true;
+        }
+        try {
+            return Long.decode(normalizedValue) != 0L;
+        } catch (NumberFormatException e) {
+            Log.w(TAG, "Unexpected OIS register value: " + value);
+            return false;
+        }
+    }
+
+    private void updateOisButton() {
+        if (oisButton == null) {
             return;
         }
-        int color = getColor(isFocusAfEnabled ? R.color.zoom_active : R.color.white);
-        focusAfButton.setImageTintList(ColorStateList.valueOf(color));
-        focusAfButton.setSelected(isFocusAfEnabled);
+        int color = getColor(isOisEnabled ? R.color.zoom_active : R.color.white);
+        oisButton.setImageTintList(ColorStateList.valueOf(color));
+        oisButton.setSelected(isOisEnabled);
     }
 
-    private String readOisAfNode() {
-        File node = new File(OIS_AF_NODE_PATH);
+    private String readOisRegisterNode() {
+        File node = new File(OIS_REGISTER_NODE_PATH);
         if (!node.exists()) {
-            Log.w(TAG, "OIS/AF node missing: " + OIS_AF_NODE_PATH);
+            Log.w(TAG, "OIS register node missing: " + OIS_REGISTER_NODE_PATH);
             return null;
         }
         try (BufferedReader reader = new BufferedReader(new FileReader(node))) {
             return reader.readLine();
         } catch (IOException e) {
-            Log.e(TAG, "Failed to read OIS/AF node", e);
+            Log.e(TAG, "Failed to read OIS register node", e);
             return null;
         }
     }
 
-    private boolean writeOisAfNode(String value) {
-        File node = new File(OIS_AF_NODE_PATH);
+    private boolean setOisEnabled(boolean enabled) {
+        String registerValue = enabled ? "1" : "0";
+        // AF and OIS share this rail. Change the OIS register first, then power-cycle
+        // the rail so the register takes effect without leaving AF powered off.
+        if (!writeSysfsNode(OIS_REGISTER_NODE_PATH, registerValue, "OIS register")) {
+            return false;
+        }
+        if (!writeSysfsNode(OIS_AF_POWER_NODE_PATH, "0", "OIS/AF power off")) {
+            return false;
+        }
+        return writeSysfsNode(OIS_AF_POWER_NODE_PATH, "1", "OIS/AF power on");
+    }
+
+    private boolean writeSysfsNode(String path, String value, String nodeDescription) {
+        File node = new File(path);
         try (FileOutputStream outputStream = new FileOutputStream(node)) {
             outputStream.write(value.getBytes(StandardCharsets.UTF_8));
             outputStream.flush();
             return true;
         } catch (IOException directWriteError) {
-            Log.w(TAG, "Direct OIS/AF node write failed, try shell", directWriteError);
+            Log.w(TAG, "Direct " + nodeDescription + " node write failed, try shell", directWriteError);
         }
 
         try {
             Process process = Runtime.getRuntime().exec(new String[]{
-                    "sh", "-c", "echo " + value + " > " + OIS_AF_NODE_PATH
+                    "sh", "-c", "echo " + value + " > " + path
             });
             int exitCode = process.waitFor();
             if (exitCode == 0) {
                 return true;
             }
-            Log.e(TAG, "Shell OIS/AF write failed, exit=" + exitCode);
+            Log.e(TAG, "Shell " + nodeDescription + " node write failed, exit=" + exitCode);
         } catch (Exception shellError) {
-            Log.e(TAG, "Shell OIS/AF node write failed", shellError);
+            Log.e(TAG, "Shell " + nodeDescription + " node write failed", shellError);
         }
         return false;
     }
@@ -1178,6 +1294,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         mCameraManager.switchCameraApi(apiType);
         // Effective API may differ (e.g. CameraX+2K forced Camera2, or CameraX demotes 2K->FHD).
         syncApiRadioFromConfig();
+        updatePhotoHdrButton();
         updateSettingsDisplay();
     }
 
@@ -1256,6 +1373,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
                     updateManualExposureUi();
                     updateSettingsDisplay();
                     updateSwitchCameraButtonIcon();
+                    updatePhotoHdrButton();
                     break;
                 case PREVIEW_STARTED:
                     statusText.setText("Ready");
@@ -1289,6 +1407,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             recordingTime.setVisibility(View.VISIBLE);
             startRecordingTimer();
             updateCaptureButton();
+            updatePhotoHdrButton();
             // Show video resolution (e.g. 1920x1080), not still 36M photo size.
             updateSettingsDisplay();
             playRecordBeep();
@@ -1306,6 +1425,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             stopRecordingTimer();
             updateModeButtons();
             updateCaptureButton();
+            updatePhotoHdrButton();
             updateSettingsDisplay();
             playRecordBeep();
         });
@@ -1333,6 +1453,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             updateFlashButton();
             updateZoomUi();
             updateManualExposureUi();
+            updatePhotoHdrButton();
         });
     }
 

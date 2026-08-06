@@ -30,6 +30,7 @@ public class CameraConfig {
     private final boolean backgroundRecordingEnabled;
     private final boolean backgroundReviewEnabled;
     private final boolean lowMemoryModeEnabled;
+    private final boolean photoHdrEnabled;
 
     private CameraConfig(Builder builder) {
         this.cameraId = builder.cameraId;
@@ -46,6 +47,7 @@ public class CameraConfig {
         this.backgroundRecordingEnabled = builder.backgroundRecordingEnabled;
         this.backgroundReviewEnabled = builder.backgroundReviewEnabled;
         this.lowMemoryModeEnabled = builder.lowMemoryModeEnabled;
+        this.photoHdrEnabled = builder.photoHdrEnabled;
     }
 
     public String getCameraId() {
@@ -104,6 +106,10 @@ public class CameraConfig {
         return lowMemoryModeEnabled;
     }
 
+    public boolean isPhotoHdrEnabled() {
+        return photoHdrEnabled;
+    }
+
     /**
      * Builder pattern for CameraConfig
      */
@@ -122,6 +128,7 @@ public class CameraConfig {
         private boolean backgroundRecordingEnabled = false;
         private boolean backgroundReviewEnabled = false;
         private boolean lowMemoryModeEnabled = true;
+        private boolean photoHdrEnabled = false;
 
         public Builder() {
         }
@@ -141,6 +148,7 @@ public class CameraConfig {
             this.backgroundRecordingEnabled = config.backgroundRecordingEnabled;
             this.backgroundReviewEnabled = config.backgroundReviewEnabled;
             this.lowMemoryModeEnabled = config.lowMemoryModeEnabled;
+            this.photoHdrEnabled = config.photoHdrEnabled;
         }
 
         public Builder setCameraId(String cameraId) {
@@ -213,6 +221,11 @@ public class CameraConfig {
             return this;
         }
 
+        public Builder setPhotoHdrEnabled(boolean photoHdrEnabled) {
+            this.photoHdrEnabled = photoHdrEnabled;
+            return this;
+        }
+
         public CameraConfig build() {
             return new CameraConfig(this);
         }
@@ -235,6 +248,7 @@ public class CameraConfig {
                 ", backgroundRecordingEnabled=" + backgroundRecordingEnabled +
                 ", backgroundReviewEnabled=" + backgroundReviewEnabled +
                 ", lowMemoryModeEnabled=" + lowMemoryModeEnabled +
+                ", photoHdrEnabled=" + photoHdrEnabled +
                 '}';
     }
 }

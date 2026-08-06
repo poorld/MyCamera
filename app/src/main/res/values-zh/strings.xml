@@ -6,9 +6,9 @@
     <string name="app_settings">应用设置</string>
     <string name="keep_screen_on">屏幕常亮</string>
     <string name="show_api_switcher">显示 Camera API 切换</string>
-    <string name="af_ois_enabled">防抖/对焦 开</string>
-    <string name="af_ois_disabled">防抖/对焦 关</string>
-    <string name="af_ois_failed">切换防抖/对焦失败</string>
+    <string name="ois_enabled">防抖 开</string>
+    <string name="ois_disabled">防抖 关</string>
+    <string name="ois_failed">切换防抖失败</string>
     <string name="language">语言</string>
     <string name="language_follow_system">跟随系统</string>
     <string name="language_chinese">中文</string>
@@ -78,4 +78,8 @@
     <string name="yuv_dump_detail_preview_conversion">预览转换：BT.709 limited range；原始 YUV 没有方向元数据。</string>
     <string name="yuv_dump_detail_preview_bitmap">预览 Bitmap：在内存中生成，不写入 BMP 文件。</string>
     <string name="yuv_dump_detail_source">源文件：%1$s</string>
+    <string name="photo_hdr">硬件 HDR</string>
+    <string name="photo_hdr_short">HDR</string>
+    <string name="photo_hdr_enabled">HDR 已开启（12M）</string>
+    <string name="photo_hdr_disabled">HDR 已关闭</string>
 </resources>

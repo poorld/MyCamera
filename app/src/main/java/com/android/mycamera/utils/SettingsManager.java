@@ -38,6 +38,7 @@ public class SettingsManager {
     private static final String PREF_APP_LANGUAGE = "app_language";
     private static final String PREF_CAMERA2_CUSTOM_RESOLUTION = "camera2_custom_resolution";
     private static final String PREF_SHOW_API_SWITCHER = "show_api_switcher";
+    private static final String PREF_PHOTO_HDR_ENABLED = "photo_hdr_enabled";
 
     public static final String LANGUAGE_SYSTEM = "system";
     public static final String LANGUAGE_CHINESE = "zh";
@@ -75,6 +76,7 @@ public class SettingsManager {
         editor.putBoolean(PREF_BACKGROUND_REVIEW, config.isBackgroundReviewEnabled());
         editor.putBoolean(PREF_BACKGROUND_RECORDING, config.isBackgroundRecordingEnabled());
         editor.putBoolean(PREF_LOW_MEMORY_MODE, config.isLowMemoryModeEnabled());
+        editor.putBoolean(PREF_PHOTO_HDR_ENABLED, config.isPhotoHdrEnabled());
 
         editor.apply();
     }
@@ -143,6 +145,7 @@ public class SettingsManager {
         boolean backgroundReviewEnabled = preferences.getBoolean(PREF_BACKGROUND_REVIEW, false);
         boolean backgroundRecordingEnabled = preferences.getBoolean(PREF_BACKGROUND_RECORDING, false);
         boolean lowMemoryModeEnabled = preferences.getBoolean(PREF_LOW_MEMORY_MODE, true);
+        boolean photoHdrEnabled = preferences.getBoolean(PREF_PHOTO_HDR_ENABLED, false);
 
         return new CameraConfig.Builder()
                 .setApiType(apiType)
@@ -158,6 +161,7 @@ public class SettingsManager {
                 .setBackgroundReviewEnabled(backgroundReviewEnabled)
                 .setBackgroundRecordingEnabled(backgroundRecordingEnabled)
                 .setLowMemoryModeEnabled(lowMemoryModeEnabled)
+                .setPhotoHdrEnabled(photoHdrEnabled)
                 .build();
     }
     

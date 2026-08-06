@@ -6,9 +6,9 @@
     <string name="app_settings">App Settings</string>
     <string name="keep_screen_on">Keep Screen On</string>
     <string name="show_api_switcher">Show Camera API Switcher</string>
-    <string name="af_ois_enabled">AF/OIS On</string>
-    <string name="af_ois_disabled">AF/OIS Off</string>
-    <string name="af_ois_failed">Failed to switch AF/OIS</string>
+    <string name="ois_enabled">OIS On</string>
+    <string name="ois_disabled">OIS Off</string>
+    <string name="ois_failed">Failed to switch OIS</string>
     <string name="microphone_denoise">Microphone denoise</string>
     <string name="denoise_enabled">Denoise On</string>
     <string name="denoise_disabled">Denoise Off</string>
@@ -97,4 +97,8 @@
     <string name="yuv_dump_detail_preview_conversion">Preview conversion: BT.709 limited range; raw YUV has no orientation metadata.</string>
     <string name="yuv_dump_detail_preview_bitmap">Preview bitmap: rendered in memory; no BMP file is written.</string>
     <string name="yuv_dump_detail_source">Source dump: %1$s</string>
+    <string name="photo_hdr">Hardware HDR</string>
+    <string name="photo_hdr_short">HDR</string>
+    <string name="photo_hdr_enabled">HDR enabled (12M)</string>
+    <string name="photo_hdr_disabled">HDR disabled</string>
 </resources>

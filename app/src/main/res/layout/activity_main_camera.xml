@@ -57,7 +57,7 @@
             android:src="@drawable/ic_focus_af"
             android:scaleType="fitCenter"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="AF / OIS"
+            android:contentDescription="OIS"
             android:tint="@color/white" />
 
         <ImageButton
@@ -128,6 +128,19 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/microphone_denoise"
                 android:tint="@color/white" />
+
+            <TextView
+                android:id="@+id/photoHdrButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/photo_hdr"
+                android:gravity="center"
+                android:text="@string/photo_hdr_short"
+                android:textColor="@color/white"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
         </LinearLayout>
         
         

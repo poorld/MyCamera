@@ -209,10 +209,10 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         }
         // Build target config BEFORE reopen so cam1 does not briefly use cam0 12M/36M still size.
         PhotoResolution photoForCam = settingsManager.getPhotoResolutionForCamera(cameraId);
-        currentConfig = new CameraConfig.Builder(currentConfig)
+        currentConfig = applyVideoCapabilityConstraints(new CameraConfig.Builder(currentConfig)
                 .setCameraId(cameraId)
                 .setPhotoResolution(photoForCam)
-                .build();
+                .build());
         settingsManager.setCameraId(cameraId);
         settingsManager.saveCameraConfig(currentConfig);
         Log.d(TAG, "switchCamera id=" + cameraId + ", photo=" + photoForCam);
@@ -512,6 +512,10 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         VideoCodec videoCodec = config.getVideoCodec() != null
                 ? config.getVideoCodec()
                 : VideoCodec.DEFAULT;
+        boolean photoHdrEnabled = config.isPhotoHdrEnabled()
+                && apiType == CameraApiType.CAMERA2
+                && "0".equals(config.getCameraId())
+                && config.getPhotoResolution() == PhotoResolution.MP_12;
 
         if (apiType == CameraApiType.CAMERAX) {
             // CameraX 1.4.2 uses the system Recorder codec and cannot select HEVC.
@@ -535,7 +539,8 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         if (apiType == config.getApiType()
                 && quality == config.getQuality()
                 && videoResolution.equals(config.getResolution())
-                && videoCodec == config.getVideoCodec()) {
+                && videoCodec == config.getVideoCodec()
+                && photoHdrEnabled == config.isPhotoHdrEnabled()) {
             return config;
         }
 
@@ -547,6 +552,7 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
                 .setQuality(quality)
                 .setResolution(videoResolution)
                 .setVideoCodec(videoCodec)
+                .setPhotoHdrEnabled(photoHdrEnabled)
                 .build();
     }
 
