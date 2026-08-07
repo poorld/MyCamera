@@ -802,11 +802,10 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         }
         CaptureMode captureMode = "video".equals(mode) ? CaptureMode.VIDEO : CaptureMode.PHOTO;
         CameraConfig.Builder configBuilder = new CameraConfig.Builder(config)
-                .setCaptureMode(captureMode);
-        if (captureMode == CaptureMode.PHOTO) {
-            // High-speed recording settings must not leak into the JPEG pipeline.
-            configBuilder.setFrameRate(30);
-        }
+                .setCaptureMode(captureMode)
+                // High-speed recording settings must not leak into the JPEG pipeline.
+                .setFrameRate(mCameraManager.getPreferredFrameRate(
+                        captureMode == CaptureMode.VIDEO ? config.getResolution() : null));
         config = configBuilder.build();
         Log.d(TAG, "reapplyCameraForModeSwitch mode=" + mode
                 + ", api=" + config.getApiType()
@@ -882,6 +881,13 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         if (photoHdrButton == null) {
             return;
         }
+
+        // todo
+        // if (true) {
+        //     photoHdrButton.setVisibility(View.GONE);
+        //     return;
+        // }
+
         CameraConfig config = mCameraManager != null ? mCameraManager.getCurrentConfig() : null;
         boolean available = isPhotoHdrAvailable(config);
         boolean enabled = available && config.isPhotoHdrEnabled();

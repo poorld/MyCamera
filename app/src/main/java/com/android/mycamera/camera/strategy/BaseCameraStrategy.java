@@ -222,6 +222,7 @@ public abstract class BaseCameraStrategy implements CameraStrategy {
         frameRates.add(24);
         frameRates.add(30);
         frameRates.add(60);
+        frameRates.add(120);
         return frameRates;
     }
     

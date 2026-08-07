@@ -25,6 +25,7 @@ public class CameraConfig {
     private final VideoBitrate videoBitrate;
     private final VideoCodec videoCodec;
     private final boolean audioEnabled;
+    private final boolean highSpeedPlaybackEnabled;
     private final File saveLocation;
     private final CameraApiType apiType;
     private final boolean backgroundRecordingEnabled;
@@ -42,6 +43,7 @@ public class CameraConfig {
         this.videoBitrate = builder.videoBitrate;
         this.videoCodec = builder.videoCodec;
         this.audioEnabled = builder.audioEnabled;
+        this.highSpeedPlaybackEnabled = builder.highSpeedPlaybackEnabled;
         this.saveLocation = builder.saveLocation;
         this.apiType = builder.apiType;
         this.backgroundRecordingEnabled = builder.backgroundRecordingEnabled;
@@ -86,6 +88,10 @@ public class CameraConfig {
         return audioEnabled;
     }
 
+    public boolean isHighSpeedPlaybackEnabled() {
+        return highSpeedPlaybackEnabled;
+    }
+
     public File getSaveLocation() {
         return saveLocation;
     }
@@ -118,11 +124,12 @@ public class CameraConfig {
         private Resolution resolution = Resolution.FULL_HD_1080P; // Camera2 default video 1920x1080
         private PhotoResolution photoResolution = PhotoResolution.MP_12; // product default still 12M
         private CaptureMode captureMode = CaptureMode.PHOTO;
-        private int frameRate = 30;
+        private int frameRate = 24;
         private Quality quality = Quality.DEFAULT; // CameraX default FHD
         private VideoBitrate videoBitrate = VideoBitrate.DEFAULT;
         private VideoCodec videoCodec = VideoCodec.DEFAULT;
         private boolean audioEnabled = true;
+        private boolean highSpeedPlaybackEnabled = true;
         private File saveLocation = new File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DCIM), "Camera");
         private CameraApiType apiType = CameraApiType.CAMERA2; // default Camera2 (CameraX resolution switching is unreliable)
         private boolean backgroundRecordingEnabled = false;
@@ -143,6 +150,7 @@ public class CameraConfig {
             this.videoBitrate = config.videoBitrate;
             this.videoCodec = config.videoCodec;
             this.audioEnabled = config.audioEnabled;
+            this.highSpeedPlaybackEnabled = config.highSpeedPlaybackEnabled;
             this.saveLocation = config.saveLocation;
             this.apiType = config.apiType;
             this.backgroundRecordingEnabled = config.backgroundRecordingEnabled;
@@ -196,6 +204,11 @@ public class CameraConfig {
             return this;
         }
 
+        public Builder setHighSpeedPlaybackEnabled(boolean highSpeedPlaybackEnabled) {
+            this.highSpeedPlaybackEnabled = highSpeedPlaybackEnabled;
+            return this;
+        }
+
         public Builder setSaveLocation(File saveLocation) {
             this.saveLocation = saveLocation;
             return this;
@@ -243,6 +256,7 @@ public class CameraConfig {
                 ", videoBitrate=" + videoBitrate +
                 ", videoCodec=" + videoCodec +
                 ", audioEnabled=" + audioEnabled +
+                ", highSpeedPlaybackEnabled=" + highSpeedPlaybackEnabled +
                 ", saveLocation=" + saveLocation +
                 ", apiType=" + apiType +
                 ", backgroundRecordingEnabled=" + backgroundRecordingEnabled +

@@ -23,6 +23,7 @@
     <string name="photo_resolution">拍照分辨率</string>
     <string name="recording">录制</string>
     <string name="enable_audio">启用音频</string>
+    <string name="high_speed_playback">720p 120 帧实时回放</string>
     <string name="background_review">后台预览</string>
     <string name="background_recording">后台录制</string>
     <string name="recording_storage_low">存储空间不足，录像需至少保留 2 GB 可用空间。</string>

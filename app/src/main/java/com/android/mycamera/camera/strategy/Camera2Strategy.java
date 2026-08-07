@@ -1286,8 +1286,8 @@ public class Camera2Strategy extends BaseCameraStrategy {
 
     private boolean setupMediaRecorder() {
         mediaRecorder = new MediaRecorder();
-        boolean slowMotion = isCurrentHighSpeedVideoConfiguration();
-        boolean useAudio = !slowMotion && currentConfig.isAudioEnabled()
+        boolean highSpeed = isCurrentHighSpeedVideoConfiguration();
+        boolean useAudio = !highSpeed && currentConfig.isAudioEnabled()
                 && ActivityCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO)
                 == PackageManager.PERMISSION_GRANTED;
         if (useAudio) {
@@ -1307,14 +1307,17 @@ public class Camera2Strategy extends BaseCameraStrategy {
 
         Resolution resolution = currentConfig.getResolution();
         int captureFps = currentConfig.getFrameRate();
-        int playbackFps = slowMotion ? SLOW_MOTION_PLAYBACK_FPS : captureFps;
-        configuredPlaybackFps = playbackFps;
+        boolean realTimeHighSpeedPlayback = !highSpeed
+                || currentConfig.isHighSpeedPlaybackEnabled();
+        int outputFps = realTimeHighSpeedPlayback
+                ? captureFps : SLOW_MOTION_PLAYBACK_FPS;
+        configuredPlaybackFps = outputFps;
         configuredAudio = useAudio;
         profileVideoBitrate = profile.videoBitRate;
-        activeHighSpeed = slowMotion;
+        activeHighSpeed = highSpeed;
         mediaRecorder.setVideoSize(resolution.getWidth(), resolution.getHeight());
-        mediaRecorder.setVideoFrameRate(playbackFps);
-        if (slowMotion) {
+        mediaRecorder.setVideoFrameRate(outputFps);
+        if (highSpeed && !realTimeHighSpeedPlayback) {
             mediaRecorder.setCaptureRate(captureFps);
         }
         int targetBitrate = currentConfig.getVideoBitrate().getBitsPerSecond();
@@ -1359,8 +1362,9 @@ public class Camera2Strategy extends BaseCameraStrategy {
         Log.d(TAG, "setupMediaRecorder outputFile=" + outputFile.getAbsolutePath()
                 + ", size=" + resolution.getWidth() + "x" + resolution.getHeight()
                 + ", captureFps=" + captureFps
-                + ", playbackFps=" + playbackFps
-                + ", slowMotion=" + slowMotion
+                + ", outputFps=" + outputFps
+                + ", highSpeed=" + highSpeed
+                + ", realTimePlayback=" + realTimeHighSpeedPlayback
                 + ", useAudio=" + useAudio);
         mediaRecorder.setOutputFile(outputFile.getAbsolutePath());
 

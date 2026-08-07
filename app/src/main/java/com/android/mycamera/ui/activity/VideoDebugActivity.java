@@ -974,6 +974,8 @@ public class VideoDebugActivity extends BaseAct implements CameraStateObserver {
     }
 
     private int frameRateFor(Resolution resolution) {
-        return Resolution.HD_720P.equals(resolution) ? 120 : 30;
+        return cameraManager != null
+                ? cameraManager.getPreferredFrameRate(resolution)
+                : (Resolution.HD_720P.equals(resolution) ? 120 : 24);
     }
 }

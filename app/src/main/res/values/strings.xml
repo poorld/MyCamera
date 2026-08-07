@@ -27,6 +27,7 @@
     <string name="photo_resolution">Photo Resolution</string>
     <string name="recording">Recording</string>
     <string name="enable_audio">Enable Audio</string>
+    <string name="high_speed_playback">720p 120 fps playback</string>
     <string name="background_review">Background Review</string>
     <string name="background_recording">Background Recording</string>
     <string name="recording_storage_low">Not enough storage to record. Keep at least 2 GB free.</string>

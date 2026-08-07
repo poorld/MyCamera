@@ -29,6 +29,7 @@ public class SettingsManager {
     /** One-time: enforce product default still size 12M. */
     private static final String PREF_PHOTO_DEFAULT_12M_APPLIED = "photo_default_12m_applied_v1";
     private static final String PREF_AUDIO_ENABLED = "audio_enabled";
+    private static final String PREF_HIGH_SPEED_PLAYBACK_ENABLED = "high_speed_playback_enabled";
     private static final String PREF_SAVE_LOCATION = "save_location";
     private static final String PREF_CAMERA_ID = "camera_id";
     private static final String PREF_BACKGROUND_REVIEW = "background_review";
@@ -71,6 +72,7 @@ public class SettingsManager {
                     config.getPhotoResolution().name());
         }
         editor.putBoolean(PREF_AUDIO_ENABLED, config.isAudioEnabled());
+        editor.putBoolean(PREF_HIGH_SPEED_PLAYBACK_ENABLED, config.isHighSpeedPlaybackEnabled());
         editor.putString(PREF_SAVE_LOCATION, config.getSaveLocation().getAbsolutePath());
         editor.putString(PREF_CAMERA_ID, config.getCameraId());
         editor.putBoolean(PREF_BACKGROUND_REVIEW, config.isBackgroundReviewEnabled());
@@ -96,7 +98,7 @@ public class SettingsManager {
             resolution = Resolution.FULL_HD_1080P;
         }
         
-        int frameRate = preferences.getInt(PREF_FRAME_RATE, 30);
+        int frameRate = preferences.getInt(PREF_FRAME_RATE, 24);
         
         Quality quality = Quality.normalizeSelectable(Quality.valueOf(preferences.getString(PREF_QUALITY, Quality.DEFAULT.name())));
         VideoBitrate videoBitrate = VideoBitrate.fromName(
@@ -105,6 +107,8 @@ public class SettingsManager {
                 preferences.getString(PREF_VIDEO_CODEC, VideoCodec.DEFAULT.name()));
 
         boolean audioEnabled = preferences.getBoolean(PREF_AUDIO_ENABLED, true);
+        boolean highSpeedPlaybackEnabled = preferences.getBoolean(
+                PREF_HIGH_SPEED_PLAYBACK_ENABLED, true);
         
         File defaultSaveLocation = CameraUtils.createCameraDirectory(context);
         String saveLocationPath = preferences.getString(PREF_SAVE_LOCATION, defaultSaveLocation.getAbsolutePath());
@@ -156,6 +160,7 @@ public class SettingsManager {
                 .setVideoCodec(videoCodec)
                 .setPhotoResolution(photoResolution)
                 .setAudioEnabled(audioEnabled)
+                .setHighSpeedPlaybackEnabled(highSpeedPlaybackEnabled)
                 .setSaveLocation(saveLocation)
                 .setCameraId(cameraId)
                 .setBackgroundReviewEnabled(backgroundReviewEnabled)
@@ -201,7 +206,7 @@ public class SettingsManager {
      * Get frame rate
      */
     public int getFrameRate() {
-        return preferences.getInt(PREF_FRAME_RATE, 30);
+        return preferences.getInt(PREF_FRAME_RATE, 24);
     }
     
     /**

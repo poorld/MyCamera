@@ -1,1 +1,0 @@
-package:mine -tag:CCodecConfig -tag:CameraStateRegistry -tag:DeferrableSurface -tag:MediaCodec -tag:CCodec -tag:CodecProperties -tag:ReflectedParamUpdater -tag:Recorder -tag:Choreographer -tag:libMEOW

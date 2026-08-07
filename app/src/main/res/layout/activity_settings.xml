@@ -188,6 +188,17 @@
             android:layout_marginBottom="16dp"/>
 
         <Switch
+            android:id="@+id/highSpeedPlaybackSwitch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:checked="true"
+            android:text="@string/high_speed_playback"
+            android:textColor="@color/white"
+            android:thumb="@drawable/settings_switch_thumb"
+            android:track="@drawable/settings_switch_track" />
+
+        <Switch
             android:id="@+id/backgroundReviewSwitch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

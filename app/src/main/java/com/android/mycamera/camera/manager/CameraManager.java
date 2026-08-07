@@ -2,9 +2,13 @@ package com.android.mycamera.camera.manager;
 
 import android.content.Context;
 import android.content.Intent;
+import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.params.StreamConfigurationMap;
 import android.os.Looper;
 import android.util.Log;
 import android.util.Range;
+import android.util.Size;
 
 import com.android.mycamera.camera.config.CameraConfig;
 import com.android.mycamera.camera.factory.CameraFactory;
@@ -26,9 +30,13 @@ import com.android.mycamera.utils.MemoryManager;
 import com.android.mycamera.utils.PerformanceUtils;
 import com.android.mycamera.utils.SettingsManager;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Singleton camera manager that manages camera operations using strategy pattern
@@ -36,6 +44,9 @@ import java.util.Map;
 public class CameraManager implements CameraStrategy.CameraStateListener {
     
     private static final String TAG = "CameraManager";
+    private static final int DEFAULT_VIDEO_FRAME_RATE = 24;
+    private static final int HIGH_SPEED_FRAME_RATE = 120;
+    private static final int[] FRAME_RATE_CANDIDATES = {15, 24, 30, 60, 120};
     
     private static volatile CameraManager instance;
     
@@ -90,6 +101,7 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         Log.d(TAG, "initializeCamera: ");
         stateManager.addObserver(observer);
         currentConfig = applyVideoCapabilityConstraints(currentConfig);
+        currentConfig = normalizeFrameRateForActiveMode(currentConfig);
         settingsManager.saveCameraConfig(currentConfig);
         configurationDirty = false;
         currentStrategy = getCameraStrategy(currentConfig.getApiType());
@@ -170,6 +182,7 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
                 configBuilder.setQuality(quality).setResolution(resolution);
             }
             currentConfig = applyVideoCapabilityConstraints(configBuilder.build());
+            currentConfig = normalizeFrameRateForActiveMode(currentConfig);
             // Strategy must follow constrained API (e.g. CameraX+2K -> Camera2).
             currentStrategy = getCameraStrategy(currentConfig.getApiType());
             Log.d(TAG, "switchCameraApi requested=" + newApiType
@@ -213,6 +226,7 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
                 .setCameraId(cameraId)
                 .setPhotoResolution(photoForCam)
                 .build());
+        currentConfig = normalizeFrameRateForActiveMode(currentConfig);
         settingsManager.setCameraId(cameraId);
         settingsManager.saveCameraConfig(currentConfig);
         Log.d(TAG, "switchCamera id=" + cameraId + ", photo=" + photoForCam);
@@ -626,6 +640,7 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         Log.d(TAG, "updateConfiguration: ");
         CameraApiType previousApi = currentConfig != null ? currentConfig.getApiType() : null;
         this.currentConfig = applyVideoCapabilityConstraints(newConfig);
+        this.currentConfig = normalizeFrameRateForActiveMode(this.currentConfig);
         settingsManager.saveCameraConfig(this.currentConfig);
         configurationDirty = false;
         Log.d(TAG, "updateConfiguration effective api=" + currentConfig.getApiType()
@@ -666,10 +681,136 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
      * Get supported frame rates
      */
     public List<Integer> getSupportedFrameRates() {
+        Resolution resolution = currentConfig != null ? currentConfig.getResolution() : null;
+        List<Integer> cameraRates = queryCameraFrameRates(resolution);
+        if (!cameraRates.isEmpty()) {
+            return cameraRates;
+        }
         if (currentStrategy != null) {
             return currentStrategy.getSupportedFrameRates();
         }
-        return java.util.Collections.emptyList();
+        return Collections.emptyList();
+    }
+
+    /**
+     * Select the preferred frame rate for the requested video resolution.
+     * The driver-reported ranges are authoritative; the constants are only
+     * fallbacks for devices that do not expose Camera2 FPS metadata.
+     */
+    public int getPreferredFrameRate(Resolution resolution) {
+        boolean highSpeedResolution = Resolution.HD_720P.equals(resolution);
+        int targetRate = highSpeedResolution ? HIGH_SPEED_FRAME_RATE : DEFAULT_VIDEO_FRAME_RATE;
+        List<Integer> supportedRates = queryCameraFrameRates(resolution);
+        if (supportedRates.isEmpty() && currentStrategy != null) {
+            supportedRates = currentStrategy.getSupportedFrameRates();
+        }
+        int bestRate = targetRate;
+        int bestDistance = Integer.MAX_VALUE;
+
+        for (Integer supportedRate : supportedRates) {
+            if (supportedRate == null || supportedRate <= 0) {
+                continue;
+            }
+            if (!highSpeedResolution && supportedRate >= HIGH_SPEED_FRAME_RATE) {
+                continue;
+            }
+            int distance = Math.abs(supportedRate - targetRate);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestRate = supportedRate;
+            }
+        }
+        return bestRate;
+    }
+
+    private List<Integer> queryCameraFrameRates(Resolution resolution) {
+        if (currentConfig == null || currentConfig.getCameraId() == null) {
+            return Collections.emptyList();
+        }
+        try {
+            android.hardware.camera2.CameraManager systemCameraManager =
+                    (android.hardware.camera2.CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            if (systemCameraManager == null) {
+                return Collections.emptyList();
+            }
+            CameraCharacteristics characteristics =
+                    systemCameraManager.getCameraCharacteristics(currentConfig.getCameraId());
+            Range<Integer>[] ranges = characteristics.get(
+                    CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
+
+            Set<Integer> rates = new TreeSet<>();
+            addFrameRatesFromRanges(rates, ranges);
+
+            // 120fps is exposed through the high-speed stream map on some
+            // Camera2 HALs instead of CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES.
+            if (Resolution.HD_720P.equals(resolution)) {
+                StreamConfigurationMap streamMap = characteristics.get(
+                        CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+                if (streamMap != null) {
+                    Size targetSize = new Size(resolution.getWidth(), resolution.getHeight());
+                    Size[] highSpeedSizes = streamMap.getHighSpeedVideoSizes();
+                    if (highSpeedSizes != null) {
+                        for (Size highSpeedSize : highSpeedSizes) {
+                            if (targetSize.equals(highSpeedSize)) {
+                                addFrameRatesFromRanges(rates,
+                                        streamMap.getHighSpeedVideoFpsRangesFor(targetSize));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            List<Integer> result = new ArrayList<>(rates);
+            Log.d(TAG, "Camera " + currentConfig.getCameraId()
+                    + " reported FPS ranges=" + java.util.Arrays.toString(ranges)
+                    + ", candidateRates=" + result);
+            return result;
+        } catch (CameraAccessException | SecurityException | IllegalArgumentException e) {
+            Log.w(TAG, "Failed to query Camera2 frame rates", e);
+            return Collections.emptyList();
+        }
+    }
+
+    private void addFrameRatesFromRanges(Set<Integer> rates, Range<Integer>[] ranges) {
+        if (ranges == null) {
+            return;
+        }
+        for (Range<Integer> range : ranges) {
+            if (range == null || range.getLower() == null || range.getUpper() == null) {
+                continue;
+            }
+            int lower = range.getLower();
+            int upper = range.getUpper();
+            if (lower > 0) {
+                rates.add(lower);
+            }
+            if (upper > 0) {
+                rates.add(upper);
+            }
+            for (int candidate : FRAME_RATE_CANDIDATES) {
+                if (candidate >= lower && candidate <= upper) {
+                    rates.add(candidate);
+                }
+            }
+        }
+    }
+
+    private CameraConfig normalizeFrameRateForActiveMode(CameraConfig config) {
+        if (config == null) {
+            return null;
+        }
+        Resolution targetResolution = CaptureMode.normalize(config.getCaptureMode()).isVideo()
+                ? config.getResolution() : null;
+        int preferredRate = getPreferredFrameRate(targetResolution);
+        if (config.getFrameRate() == preferredRate) {
+            return config;
+        }
+        Log.d(TAG, "Normalize frame rate " + config.getFrameRate()
+                + " -> " + preferredRate + ", mode=" + config.getCaptureMode()
+                + ", resolution=" + config.getResolution());
+        return new CameraConfig.Builder(config)
+                .setFrameRate(preferredRate)
+                .build();
     }
     
     /**

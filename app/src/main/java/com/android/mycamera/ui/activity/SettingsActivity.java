@@ -33,7 +33,7 @@ import java.util.List;
 
 public class SettingsActivity extends AppCompatActivity {
 
-    private static final int DEFAULT_VIDEO_FRAME_RATE = 30;
+    private static final int DEFAULT_VIDEO_FRAME_RATE = 24;
     private static final String[] LANGUAGE_VALUES = {
             SettingsManager.LANGUAGE_SYSTEM,
             SettingsManager.LANGUAGE_CHINESE,
@@ -50,6 +50,7 @@ public class SettingsActivity extends AppCompatActivity {
     private Spinner qualitySpinner;
     private Spinner photoResolutionSpinner;
     private Switch audioEnabledSwitch;
+    private Switch highSpeedPlaybackSwitch;
     private Switch backgroundReviewSwitch;
     private Switch backgroundRecordingSwitch;
     private Switch keepScreenOnSwitch;
@@ -87,6 +88,7 @@ public class SettingsActivity extends AppCompatActivity {
         qualitySpinner = findViewById(R.id.qualitySpinner);
         photoResolutionSpinner = findViewById(R.id.photoResolutionSpinner);
         audioEnabledSwitch = findViewById(R.id.audioEnabledSwitch);
+        highSpeedPlaybackSwitch = findViewById(R.id.highSpeedPlaybackSwitch);
         backgroundReviewSwitch = findViewById(R.id.backgroundReviewSwitch);
         backgroundRecordingSwitch = findViewById(R.id.backgroundRecordingSwitch);
         keepScreenOnSwitch = findViewById(R.id.keepScreenOnSwitch);
@@ -132,6 +134,7 @@ public class SettingsActivity extends AppCompatActivity {
         setupPhotoResolutionSpinner();
         
         audioEnabledSwitch.setChecked(currentConfig.isAudioEnabled());
+        highSpeedPlaybackSwitch.setChecked(currentConfig.isHighSpeedPlaybackEnabled());
         backgroundReviewSwitch.setChecked(currentConfig.isBackgroundReviewEnabled());
         backgroundRecordingSwitch.setChecked(currentConfig.isBackgroundRecordingEnabled());
         keepScreenOnSwitch.setChecked(settingsManager.isKeepScreenOnEnabled());
@@ -170,6 +173,12 @@ public class SettingsActivity extends AppCompatActivity {
         int codecVisibility = apiType == CameraApiType.CAMERAX ? View.GONE : View.VISIBLE;
         videoCodecLabel.setVisibility(codecVisibility);
         videoCodecSpinner.setVisibility(codecVisibility);
+
+        boolean showHighSpeedPlayback = apiType == CameraApiType.CAMERA2
+                && Resolution.HD_720P.equals(currentConfig.getResolution())
+                && currentConfig.getFrameRate() >= 120;
+        highSpeedPlaybackSwitch.setVisibility(
+                showHighSpeedPlayback ? View.VISIBLE : View.GONE);
     }
     
     private void setupResolutionSpinner() {
@@ -462,6 +471,15 @@ public class SettingsActivity extends AppCompatActivity {
             }
         });
 
+        highSpeedPlaybackSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked != currentConfig.isHighSpeedPlaybackEnabled()) {
+                currentConfig = new CameraConfig.Builder(currentConfig)
+                        .setHighSpeedPlaybackEnabled(isChecked)
+                        .build();
+                applyAndSaveChanges();
+            }
+        });
+
         backgroundReviewSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (isChecked != currentConfig.isBackgroundReviewEnabled()) {
                 currentConfig = new CameraConfig.Builder(currentConfig)
@@ -568,13 +586,16 @@ public class SettingsActivity extends AppCompatActivity {
     private List<ResolutionOption> getFixedResolutionOptions() {
         // Y1 recording presets. FPS is selected with the resolution and cannot be changed separately.
         List<ResolutionOption> options = new ArrayList<>();
-        options.add(new ResolutionOption(Resolution.QHD_2K, 30));
-        options.add(new ResolutionOption(Resolution.FULL_HD_1080P, 30));
-        options.add(new ResolutionOption(Resolution.HD_720P, 120));
+        options.add(new ResolutionOption(Resolution.QHD_2K, getFixedFrameRate(Resolution.QHD_2K)));
+        options.add(new ResolutionOption(Resolution.FULL_HD_1080P, getFixedFrameRate(Resolution.FULL_HD_1080P)));
+        options.add(new ResolutionOption(Resolution.HD_720P, getFixedFrameRate(Resolution.HD_720P)));
         return options;
     }
 
     private int getFixedFrameRate(Resolution resolution) {
+        if (cameraManager != null) {
+            return cameraManager.getPreferredFrameRate(resolution);
+        }
         return Resolution.HD_720P.equals(resolution) ? 120 : DEFAULT_VIDEO_FRAME_RATE;
     }
 
