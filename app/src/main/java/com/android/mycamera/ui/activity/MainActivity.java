@@ -78,6 +78,9 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     private static final boolean FLASH_UI_ENABLED = false;
     private static final String OIS_REGISTER_NODE_PATH = "/sys/class/leds/alermled/ois";
     private static final String OIS_AF_POWER_NODE_PATH = "/sys/class/sensordrv/kd_camera_hw/imx563_ois_vldo28";
+    private static final long OIS_POWER_CYCLE_DELAY_MS = 100;
+    private static final long OIS_STATE_SYNC_DELAY_MS = 3000;
+    private static final int OIS_STATE_SYNC_MAX_ATTEMPTS = 8;
     private static final String DENOISE_NODE_PATH = "/sys/class/leds/alermled/denoise";
 
     public static final String TAG = "MainActivity";
@@ -135,7 +138,10 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
 
     private boolean isVideoMode = false;
     private boolean isRecording = false;
-    private boolean isOisEnabled = false;
+    // Sensor initialization enables OIS, but register 0x0A can report a transient value.
+    // Default to that hardware state so a first tap never accidentally turns OIS on.
+    private boolean isOisEnabled = true;
+    private boolean isOisStateKnown = true;
     private boolean isDenoiseEnabled = false;
     private boolean isSyncingApiSelection = false;
     private SettingsManager settingsManager;
@@ -236,7 +242,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         applyTopControlsSafeArea();
         updateModeButtons();
         updateApiSwitcherVisibility();
-        refreshOisStateFromNode();
+        updateOisButton();
         setDenoiseEnabled(false, false);
         expandCaptureButtonTouchTarget();
     }
@@ -525,7 +531,6 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
 
         if (shouldKeepCameraInBackground()) {
             updateApiSwitcherVisibility();
-            refreshOisStateFromNode();
             updateModeButtons();
             updateCaptureButton();
             updateSettingsDisplay();
@@ -547,7 +552,6 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         }
         isSyncingApiSelection = false;
         updateApiSwitcherVisibility();
-        refreshOisStateFromNode();
         updateModeButtons();
         updateCaptureButton();
     }
@@ -1141,11 +1145,33 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             Toast.makeText(this, "Camera is not ready", Toast.LENGTH_SHORT).show();
             return;
         }
+        if (!isOisStateKnown) {
+            refreshOisStateFromNode();
+            if (!isOisStateKnown) {
+                Log.w(TAG, "toggleOis ignored: OIS register state is unavailable");
+                Toast.makeText(this, "OIS state is unavailable", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+        if (isRecording) {
+            Toast.makeText(this, "Stop recording before changing stabilization", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         boolean targetEnabled = !isOisEnabled;
+        Log.d(TAG, "toggleOis: " + isOisEnabled + " -> " + targetEnabled);
         if (setOisEnabled(targetEnabled)) {
             isOisEnabled = targetEnabled;
+            isOisStateKnown = true;
             updateOisButton();
+            // Only enable reopens the camera so the controller can enter its active mode.
+            // Disabling must not reopen because sensor initialization writes register 0x0A again.
+            scheduleOisStateRefresh(2);
+            if (targetEnabled && !mCameraManager.reopenCameraForOisEnable()) {
+                Log.e(TAG, "OIS enabled but camera reinitialization was not started");
+                Toast.makeText(this, R.string.ois_failed, Toast.LENGTH_SHORT).show();
+                return;
+            }
             Toast.makeText(
                     this,
                     isOisEnabled ? R.string.ois_enabled : R.string.ois_disabled,
@@ -1196,41 +1222,38 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         } catch (IOException directWriteError) {
             Log.w(TAG, "Direct denoise node write failed, try shell", directWriteError);
         }
-
-        try {
-            Process process = Runtime.getRuntime().exec(new String[]{
-                    "sh", "-c", "echo " + value + " > " + DENOISE_NODE_PATH
-            });
-            int exitCode = process.waitFor();
-            if (exitCode == 0) {
-                return true;
-            }
-            Log.e(TAG, "Shell denoise node write failed, exit=" + exitCode);
-        } catch (Exception shellError) {
-            Log.e(TAG, "Shell denoise node write failed", shellError);
-        }
         return false;
     }
 
     private void refreshOisStateFromNode() {
         String value = readOisRegisterNode();
-        if (value != null) {
-            isOisEnabled = isOisRegisterEnabled(value);
+        Boolean enabled = value == null ? null : parseOisRegisterState(value);
+        if (enabled != null) {
+            isOisEnabled = enabled;
+            isOisStateKnown = true;
         }
         updateOisButton();
     }
 
-    private boolean isOisRegisterEnabled(String value) {
+    private void scheduleOisStateRefresh(int attemptsRemaining) {
+        hardwareKeyHandler.postDelayed(() -> {
+            refreshOisStateFromNode();
+            if (!isOisStateKnown && attemptsRemaining > 1) {
+                scheduleOisStateRefresh(attemptsRemaining - 1);
+            }
+        }, OIS_STATE_SYNC_DELAY_MS);
+    }
+
+    private Boolean parseOisRegisterState(String value) {
         String normalizedValue = value.trim();
-        if ("1".equals(normalizedValue)) {
-            return true;
+        if ("1".equals(normalizedValue) || "0x0001".equalsIgnoreCase(normalizedValue)) {
+            return Boolean.TRUE;
         }
-        try {
-            return Long.decode(normalizedValue) != 0L;
-        } catch (NumberFormatException e) {
-            Log.w(TAG, "Unexpected OIS register value: " + value);
-            return false;
+        if ("0".equals(normalizedValue) || "0x0000".equalsIgnoreCase(normalizedValue)) {
+            return Boolean.FALSE;
         }
+        Log.w(TAG, "OIS register state is transient or invalid: " + value);
+        return null;
     }
 
     private void updateOisButton() {
@@ -1266,6 +1289,14 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         if (!writeSysfsNode(OIS_AF_POWER_NODE_PATH, "0", "OIS/AF power off")) {
             return false;
         }
+        // The regulator node has no built-in discharge delay. Keep it low long
+        // enough for the OIS controller to reload the register on power-up.
+        try {
+            Thread.sleep(OIS_POWER_CYCLE_DELAY_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
         return writeSysfsNode(OIS_AF_POWER_NODE_PATH, "1", "OIS/AF power on");
     }
 
@@ -1279,18 +1310,6 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             Log.w(TAG, "Direct " + nodeDescription + " node write failed, try shell", directWriteError);
         }
 
-        try {
-            Process process = Runtime.getRuntime().exec(new String[]{
-                    "sh", "-c", "echo " + value + " > " + path
-            });
-            int exitCode = process.waitFor();
-            if (exitCode == 0) {
-                return true;
-            }
-            Log.e(TAG, "Shell " + nodeDescription + " node write failed, exit=" + exitCode);
-        } catch (Exception shellError) {
-            Log.e(TAG, "Shell " + nodeDescription + " node write failed", shellError);
-        }
         return false;
     }
 
@@ -1383,6 +1402,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
                     break;
                 case PREVIEW_STARTED:
                     statusText.setText("Ready");
+                    scheduleOisStateRefresh(OIS_STATE_SYNC_MAX_ATTEMPTS);
                     break;
                 case RECORDING:
                     statusText.setText("Recording");

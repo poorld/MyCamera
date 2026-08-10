@@ -318,7 +318,7 @@ public class MultiCameraActivity extends AppCompatActivity {
                 
                 @Override
                 public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {
-                    // 不需要处理
+                    onCameraPreviewFrameUpdated(cameraId);
                 }
             });
             
@@ -328,6 +328,14 @@ public class MultiCameraActivity extends AppCompatActivity {
             Log.d(TAG, "创建预览视图: " + cameraInfo.name);
 
         }
+    }
+
+    /**
+     * Called on the main thread after a camera preview has produced a frame.
+     * Subclasses can use this without taking ownership of the camera session.
+     */
+    protected void onCameraPreviewFrameUpdated(@NonNull String cameraId) {
+        // The base activity has no per-frame work.
     }
 
     

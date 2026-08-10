@@ -328,6 +328,28 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         }
     }
 
+    /** Reinitialize the OIS controller after it has been enabled. */
+    public boolean reopenCameraForOisEnable() {
+        if (currentStrategy == null || currentConfig == null) {
+            Log.w(TAG, "reopenCameraForOisEnable ignored: camera is not initialized");
+            return false;
+        }
+
+        Log.d(TAG, "reopenCameraForOisEnable id=" + currentConfig.getCameraId());
+        if (isBackgroundRecordingEnabled() && isBackgroundRecordingServiceReady()) {
+            backgroundRecordingHelper.closeCamera();
+            new android.os.Handler(Looper.getMainLooper()).postDelayed(() -> {
+                if (currentConfig != null) {
+                    backgroundRecordingHelper.openCamera(currentConfig);
+                }
+            }, 300);
+        } else {
+            currentStrategy.closeCamera();
+            currentStrategy.openCamera(currentConfig);
+        }
+        return true;
+    }
+
     /**
      * Release all resources
      */

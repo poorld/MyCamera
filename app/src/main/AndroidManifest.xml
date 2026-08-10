@@ -145,6 +145,11 @@
         <activity
             android:name=".multicamera.MultiCameraActivity"
             android:exported="true" />
+        <activity
+            android:name=".multicamera.AutoMultiCameraActivity"
+            android:exported="true"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize" />
         <activity android:name="com.android.mycamera.camera.MultipleCam2ApiActivity" />
         <activity android:name="com.android.mycamera.ui.activity.GoogleMediaCodecTestActivity"
             android:exported="true"/>

@@ -24,6 +24,7 @@ import com.android.mycamera.camera.CamSizeActivity;
 import com.android.mycamera.camera.CamXApiActivity;
 import com.android.mycamera.camera.MultipleCam2ApiActivity;
 import com.android.mycamera.focus.FocusCameraActivity;
+import com.android.mycamera.multicamera.AutoMultiCameraActivity;
 import com.android.mycamera.multicamera.MultiCameraActivity;
 import com.android.mycamera.record.VideoRecordActivity;
 
@@ -38,6 +39,7 @@ public class MainAct extends BaseAct {
     private Button background_record_test;
     private Button focus_camera_button;
     private Button multi_camera_button;
+    private Button auto_multi_camera_button;
     private TextView titleTextView;
 
     private static final String[] REQUIRED_PERMISSIONS = {
@@ -64,6 +66,7 @@ public class MainAct extends BaseAct {
         background_record_test = findViewById(R.id.background_record_test);
         focus_camera_button = findViewById(R.id.focus_camera_button);
         multi_camera_button = findViewById(R.id.multi_camera_button);
+        auto_multi_camera_button = findViewById(R.id.auto_multi_camera_button);
 
         camera_size.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -125,6 +128,12 @@ public class MainAct extends BaseAct {
             @Override
             public void onClick(View v) {
                 startActivity(new Intent(MainAct.this, MultiCameraActivity.class));
+            }
+        });
+        auto_multi_camera_button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(MainAct.this, AutoMultiCameraActivity.class));
             }
         });
         findViewById(R.id.multi_camera2_button)

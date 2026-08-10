@@ -122,6 +122,13 @@
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
 
             <Button
+                android:id="@+id/auto_multi_camera_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="自动预览循环"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+            <Button
                 android:id="@+id/multi_camera2_button"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
