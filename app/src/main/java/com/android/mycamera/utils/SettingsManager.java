@@ -40,6 +40,7 @@ public class SettingsManager {
     private static final String PREF_CAMERA2_CUSTOM_RESOLUTION = "camera2_custom_resolution";
     private static final String PREF_SHOW_API_SWITCHER = "show_api_switcher";
     private static final String PREF_PHOTO_HDR_ENABLED = "photo_hdr_enabled";
+    private static final String PREF_OIS_ENABLED = "ois_enabled";
 
     public static final String LANGUAGE_SYSTEM = "system";
     public static final String LANGUAGE_CHINESE = "zh";
@@ -296,6 +297,14 @@ public class SettingsManager {
 
     public void setShowApiSwitcherEnabled(boolean enabled) {
         preferences.edit().putBoolean(PREF_SHOW_API_SWITCHER, enabled).apply();
+    }
+
+    public boolean isOisEnabled() {
+        return preferences.getBoolean(PREF_OIS_ENABLED, true);
+    }
+
+    public void setOisEnabled(boolean enabled) {
+        preferences.edit().putBoolean(PREF_OIS_ENABLED, enabled).apply();
     }
 
     public String getAppLanguage() {

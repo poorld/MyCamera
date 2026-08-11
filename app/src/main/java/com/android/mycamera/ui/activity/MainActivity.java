@@ -142,6 +142,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     // Default to that hardware state so a first tap never accidentally turns OIS on.
     private boolean isOisEnabled = true;
     private boolean isOisStateKnown = true;
+    private boolean hasRestoredOisForCurrentSession;
     private boolean isDenoiseEnabled = false;
     private boolean isSyncingApiSelection = false;
     private SettingsManager settingsManager;
@@ -239,6 +240,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         shutterValueText = findViewById(R.id.shutterValueText);
 
         settingsManager = new SettingsManager(this);
+        isOisEnabled = settingsManager.isOisEnabled();
         applyTopControlsSafeArea();
         updateModeButtons();
         updateApiSwitcherVisibility();
@@ -470,6 +472,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
 
     @Override
     protected void onDestroy() {
+        disableOisForAppExit();
         super.onDestroy();
 
         unregisterReceiver(myBr);
@@ -522,6 +525,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             }
             mCameraManager = null;
         }
+        hasRestoredOisForCurrentSession = false;
     }
     
     private void startCameraSessionIfNeeded() {
@@ -1163,6 +1167,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         if (setOisEnabled(targetEnabled)) {
             isOisEnabled = targetEnabled;
             isOisStateKnown = true;
+            settingsManager.setOisEnabled(targetEnabled);
             updateOisButton();
             // Only enable reopens the camera so the controller can enter its active mode.
             // Disabling must not reopen because sensor initialization writes register 0x0A again.
@@ -1300,6 +1305,42 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         return writeSysfsNode(OIS_AF_POWER_NODE_PATH, "1", "OIS/AF power on");
     }
 
+    private void disableOisForAppExit() {
+        if (settingsManager == null) {
+            return;
+        }
+
+        settingsManager.setOisEnabled(isOisEnabled);
+        if (!setOisEnabled(false)) {
+            Log.w(TAG, "Failed to disable OIS while exiting app");
+            return;
+        }
+        isOisEnabled = false;
+        isOisStateKnown = true;
+    }
+
+    private void restoreOisForCurrentSession() {
+        if (hasRestoredOisForCurrentSession || settingsManager == null) {
+            return;
+        }
+        hasRestoredOisForCurrentSession = true;
+
+        boolean shouldEnableOis = settingsManager.isOisEnabled();
+        Log.d(TAG, "restoreOisForCurrentSession: " + shouldEnableOis);
+        if (!setOisEnabled(shouldEnableOis)) {
+            Log.w(TAG, "Failed to restore OIS state: " + shouldEnableOis);
+            return;
+        }
+
+        isOisEnabled = shouldEnableOis;
+        isOisStateKnown = true;
+        updateOisButton();
+        if (shouldEnableOis && mCameraManager != null
+                && !mCameraManager.reopenCameraForOisEnable()) {
+            Log.e(TAG, "OIS restored but camera reinitialization was not started");
+        }
+    }
+
     private boolean writeSysfsNode(String path, String value, String nodeDescription) {
         File node = new File(path);
         try (FileOutputStream outputStream = new FileOutputStream(node)) {
@@ -1402,6 +1443,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
                     break;
                 case PREVIEW_STARTED:
                     statusText.setText("Ready");
+                    restoreOisForCurrentSession();
                     scheduleOisStateRefresh(OIS_STATE_SYNC_MAX_ATTEMPTS);
                     break;
                 case RECORDING:
