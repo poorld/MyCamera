@@ -241,6 +241,9 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
 
         settingsManager = new SettingsManager(this);
         isOisEnabled = settingsManager.isOisEnabled();
+        if (isOisEnabled) {
+            setOisEnabled(true);
+        }
         applyTopControlsSafeArea();
         updateModeButtons();
         updateApiSwitcherVisibility();
