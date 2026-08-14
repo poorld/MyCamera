@@ -129,12 +129,32 @@
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
 
             <Button
+                android:id="@+id/crop_capture_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="拍照/录像（自定义裁剪）"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+            <Button
+                android:id="@+id/async_crop_capture_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="拍照/录像（实时裁剪实验）"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+            <Button
                 android:id="@+id/multi_camera2_button"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Multi-Camera2"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
-            
+
+            <Button
+                android:id="@+id/multi_camera3_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Multi-Camera3"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </androidx.constraintlayout.widget.ConstraintLayout>

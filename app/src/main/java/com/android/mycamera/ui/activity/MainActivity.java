@@ -58,10 +58,8 @@ import com.android.mycamera.utils.CameraUtils;
 import com.android.mycamera.utils.SettingsManager;
 import com.android.mycamera.utils.SystemPropertyUtils;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
@@ -77,10 +75,10 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     // This product's camera HAL advertises flash support, but no torch is wired.
     private static final boolean FLASH_UI_ENABLED = false;
     private static final String OIS_REGISTER_NODE_PATH = "/sys/class/leds/alermled/ois";
-    private static final String OIS_AF_POWER_NODE_PATH = "/sys/class/sensordrv/kd_camera_hw/imx563_ois_vldo28";
-    private static final long OIS_POWER_CYCLE_DELAY_MS = 100;
-    private static final long OIS_STATE_SYNC_DELAY_MS = 3000;
-    private static final int OIS_STATE_SYNC_MAX_ATTEMPTS = 8;
+    private static final String OIS_COMMAND_DISABLE = "0";
+    private static final String OIS_COMMAND_ENABLE = "1";
+    private static final String OIS_COMMAND_MOTOR_SLEEP = "2";
+    private static final String OIS_COMMAND_MOTOR_WAKE = "3";
     private static final String DENOISE_NODE_PATH = "/sys/class/leds/alermled/denoise";
 
     public static final String TAG = "MainActivity";
@@ -138,11 +136,10 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
 
     private boolean isVideoMode = false;
     private boolean isRecording = false;
-    // Sensor initialization enables OIS, but register 0x0A can report a transient value.
-    // Default to that hardware state so a first tap never accidentally turns OIS on.
-    private boolean isOisEnabled = true;
-    private boolean isOisStateKnown = true;
-    private boolean hasRestoredOisForCurrentSession;
+    // The sysfs readback is the last addressed OIS register, not an OIS state query.
+    // Keep the state that this activity successfully requested instead.
+    private boolean isOisEnabled = false;
+    private boolean isOisAppliedForCurrentSession;
     private boolean isDenoiseEnabled = false;
     private boolean isSyncingApiSelection = false;
     private SettingsManager settingsManager;
@@ -241,9 +238,6 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
 
         settingsManager = new SettingsManager(this);
         isOisEnabled = settingsManager.isOisEnabled();
-        if (isOisEnabled) {
-            setOisEnabled(true);
-        }
         applyTopControlsSafeArea();
         updateModeButtons();
         updateApiSwitcherVisibility();
@@ -475,7 +469,6 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
 
     @Override
     protected void onDestroy() {
-        disableOisForAppExit();
         super.onDestroy();
 
         unregisterReceiver(myBr);
@@ -497,6 +490,10 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
 
     private void release() {
         Log.d(TAG, "release: ");
+        if (isOisAppliedForCurrentSession && !setOisEnabled(false)) {
+            Log.w(TAG, "Failed to sleep OIS motor during release");
+        }
+        isOisAppliedForCurrentSession = false;
         if (mCameraManager != null) {
             mCameraManager.removeStateObserver(this);
         }
@@ -528,7 +525,6 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             }
             mCameraManager = null;
         }
-        hasRestoredOisForCurrentSession = false;
     }
     
     private void startCameraSessionIfNeeded() {
@@ -1152,14 +1148,6 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             Toast.makeText(this, "Camera is not ready", Toast.LENGTH_SHORT).show();
             return;
         }
-        if (!isOisStateKnown) {
-            refreshOisStateFromNode();
-            if (!isOisStateKnown) {
-                Log.w(TAG, "toggleOis ignored: OIS register state is unavailable");
-                Toast.makeText(this, "OIS state is unavailable", Toast.LENGTH_SHORT).show();
-                return;
-            }
-        }
         if (isRecording) {
             Toast.makeText(this, "Stop recording before changing stabilization", Toast.LENGTH_SHORT).show();
             return;
@@ -1169,17 +1157,9 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         Log.d(TAG, "toggleOis: " + isOisEnabled + " -> " + targetEnabled);
         if (setOisEnabled(targetEnabled)) {
             isOisEnabled = targetEnabled;
-            isOisStateKnown = true;
+            isOisAppliedForCurrentSession = true;
             settingsManager.setOisEnabled(targetEnabled);
             updateOisButton();
-            // Only enable reopens the camera so the controller can enter its active mode.
-            // Disabling must not reopen because sensor initialization writes register 0x0A again.
-            scheduleOisStateRefresh(2);
-            if (targetEnabled && !mCameraManager.reopenCameraForOisEnable()) {
-                Log.e(TAG, "OIS enabled but camera reinitialization was not started");
-                Toast.makeText(this, R.string.ois_failed, Toast.LENGTH_SHORT).show();
-                return;
-            }
             Toast.makeText(
                     this,
                     isOisEnabled ? R.string.ois_enabled : R.string.ois_disabled,
@@ -1233,37 +1213,6 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         return false;
     }
 
-    private void refreshOisStateFromNode() {
-        String value = readOisRegisterNode();
-        Boolean enabled = value == null ? null : parseOisRegisterState(value);
-        if (enabled != null) {
-            isOisEnabled = enabled;
-            isOisStateKnown = true;
-        }
-        updateOisButton();
-    }
-
-    private void scheduleOisStateRefresh(int attemptsRemaining) {
-        hardwareKeyHandler.postDelayed(() -> {
-            refreshOisStateFromNode();
-            if (!isOisStateKnown && attemptsRemaining > 1) {
-                scheduleOisStateRefresh(attemptsRemaining - 1);
-            }
-        }, OIS_STATE_SYNC_DELAY_MS);
-    }
-
-    private Boolean parseOisRegisterState(String value) {
-        String normalizedValue = value.trim();
-        if ("1".equals(normalizedValue) || "0x0001".equalsIgnoreCase(normalizedValue)) {
-            return Boolean.TRUE;
-        }
-        if ("0".equals(normalizedValue) || "0x0000".equalsIgnoreCase(normalizedValue)) {
-            return Boolean.FALSE;
-        }
-        Log.w(TAG, "OIS register state is transient or invalid: " + value);
-        return null;
-    }
-
     private void updateOisButton() {
         if (oisButton == null) {
             return;
@@ -1273,75 +1222,15 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         oisButton.setSelected(isOisEnabled);
     }
 
-    private String readOisRegisterNode() {
-        File node = new File(OIS_REGISTER_NODE_PATH);
-        if (!node.exists()) {
-            Log.w(TAG, "OIS register node missing: " + OIS_REGISTER_NODE_PATH);
-            return null;
-        }
-        try (BufferedReader reader = new BufferedReader(new FileReader(node))) {
-            return reader.readLine();
-        } catch (IOException e) {
-            Log.e(TAG, "Failed to read OIS register node", e);
-            return null;
-        }
-    }
-
     private boolean setOisEnabled(boolean enabled) {
-        String registerValue = enabled ? "1" : "0";
-        // AF and OIS share this rail. Change the OIS register first, then power-cycle
-        // the rail so the register takes effect without leaving AF powered off.
-        if (!writeSysfsNode(OIS_REGISTER_NODE_PATH, registerValue, "OIS register")) {
-            return false;
-        }
-        if (!writeSysfsNode(OIS_AF_POWER_NODE_PATH, "0", "OIS/AF power off")) {
-            return false;
-        }
-        // The regulator node has no built-in discharge delay. Keep it low long
-        // enough for the OIS controller to reload the register on power-up.
-        try {
-            Thread.sleep(OIS_POWER_CYCLE_DELAY_MS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return false;
-        }
-        return writeSysfsNode(OIS_AF_POWER_NODE_PATH, "1", "OIS/AF power on");
-    }
-
-    private void disableOisForAppExit() {
-        if (settingsManager == null) {
-            return;
+        if (enabled) {
+            // The MCU restores the motor internally; no power cycle or camera reopen is needed.
+            return writeSysfsNode(OIS_REGISTER_NODE_PATH, OIS_COMMAND_MOTOR_WAKE, "OIS motor wake")
+                    && writeSysfsNode(OIS_REGISTER_NODE_PATH, OIS_COMMAND_ENABLE, "OIS enable");
         }
 
-        settingsManager.setOisEnabled(isOisEnabled);
-        if (!setOisEnabled(false)) {
-            Log.w(TAG, "Failed to disable OIS while exiting app");
-            return;
-        }
-        isOisEnabled = false;
-        isOisStateKnown = true;
-    }
-
-    private void restoreOisForCurrentSession() {
-        if (hasRestoredOisForCurrentSession || settingsManager == null) {
-            return;
-        }
-        hasRestoredOisForCurrentSession = true;
-
-        boolean shouldEnableOis = settingsManager.isOisEnabled();
-        Log.d(TAG, "restoreOisForCurrentSession: " + shouldEnableOis);
-        if (!setOisEnabled(shouldEnableOis)) {
-            Log.w(TAG, "Failed to restore OIS state: " + shouldEnableOis);
-            return;
-        }
-
-        isOisEnabled = shouldEnableOis;
-        isOisStateKnown = true;
-        updateOisButton();
-        if (shouldEnableOis && mCameraManager != null
-                && !mCameraManager.reopenCameraForOisEnable()) {
-            Log.e(TAG, "OIS restored but camera reinitialization was not started");
-        }
+        return writeSysfsNode(OIS_REGISTER_NODE_PATH, OIS_COMMAND_DISABLE, "OIS disable")
+                && writeSysfsNode(OIS_REGISTER_NODE_PATH, OIS_COMMAND_MOTOR_SLEEP, "OIS motor sleep");
     }
 
     private boolean writeSysfsNode(String path, String value, String nodeDescription) {
@@ -1446,8 +1335,13 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
                     break;
                 case PREVIEW_STARTED:
                     statusText.setText("Ready");
-                    restoreOisForCurrentSession();
-                    scheduleOisStateRefresh(OIS_STATE_SYNC_MAX_ATTEMPTS);
+                    if (!isOisAppliedForCurrentSession) {
+                        if (setOisEnabled(isOisEnabled)) {
+                            isOisAppliedForCurrentSession = true;
+                        } else {
+                            Log.w(TAG, "Failed to apply OIS state after preview start: " + isOisEnabled);
+                        }
+                    }
                     break;
                 case RECORDING:
                     statusText.setText("Recording");

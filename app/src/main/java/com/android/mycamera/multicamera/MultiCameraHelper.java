@@ -3,6 +3,7 @@ package com.android.mycamera.multicamera;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.SurfaceTexture;
+import android.graphics.ImageFormat;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -11,6 +12,8 @@ import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.MediaRecorder;
+import android.media.Image;
+import android.media.ImageReader;
 import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -22,6 +25,8 @@ import android.view.TextureView;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -52,8 +57,18 @@ public class MultiCameraHelper {
     private Map<String, TextureView> textureViews = new ConcurrentHashMap<>();
     private Map<String, Size> videoSizes = new ConcurrentHashMap<>();
     private Map<String, String> videoPaths = new ConcurrentHashMap<>();
+    private Map<String, Size> configuredVideoSizes = new ConcurrentHashMap<>();
+    private Map<String, Size> configuredPhotoSizes = new ConcurrentHashMap<>();
+    private Map<String, ImageReader> imageReaders = new ConcurrentHashMap<>();
+    private Map<String, String> photoPaths = new ConcurrentHashMap<>();
+    private CaptureMode captureMode = CaptureMode.VIDEO;
     
     private boolean isRecording = false;
+
+    public enum CaptureMode {
+        PHOTO,
+        VIDEO
+    }
 
     public MultiCameraHelper(Context context) {
         this.context = context;
@@ -90,6 +105,26 @@ public class MultiCameraHelper {
     
     public void addTextureView(String physicalCameraId, TextureView textureView) {
         textureViews.put(physicalCameraId, textureView);
+    }
+
+    /** Call only while cameras are closed; the active session owns its output surfaces. */
+    public void setCaptureMode(CaptureMode captureMode) {
+        this.captureMode = captureMode;
+    }
+
+    public void setVideoSize(String cameraId, Size size) {
+        if (size != null) {
+            configuredVideoSizes.put(cameraId, size);
+            // Recording may be started after the user changes the spinner while preview is open.
+            // Keep the next recording session in sync with that latest selection.
+            videoSizes.put(cameraId, size);
+        }
+    }
+
+    public void setPhotoSize(String cameraId, Size size) {
+        if (size != null) {
+            configuredPhotoSizes.put(cameraId, size);
+        }
     }
     
     @SuppressLint("MissingPermission")
@@ -213,6 +248,27 @@ public class MultiCameraHelper {
             
             texture.setDefaultBufferSize(videoSize.getWidth(), videoSize.getHeight());
             Surface previewSurface = new Surface(texture);
+            List<Surface> outputSurfaces = new ArrayList<>();
+            outputSurfaces.add(previewSurface);
+            if (captureMode == CaptureMode.PHOTO) {
+                ImageReader oldReader = imageReaders.remove(physicalCameraId);
+                if (oldReader != null) {
+                    oldReader.close();
+                }
+                Size photoSize = configuredPhotoSizes.get(physicalCameraId);
+                if (photoSize == null) {
+                    photoSize = chooseJpegSize(mapFor(physicalCameraId));
+                }
+                if (photoSize == null) {
+                    Log.e(TAG, "Cannot choose JPEG size for camera: " + physicalCameraId);
+                    return;
+                }
+                ImageReader imageReader = ImageReader.newInstance(photoSize.getWidth(), photoSize.getHeight(),
+                        ImageFormat.JPEG, 2);
+                imageReader.setOnImageAvailableListener(reader -> saveJpegImage(physicalCameraId, reader), backgroundHandler);
+                imageReaders.put(physicalCameraId, imageReader);
+                outputSurfaces.add(imageReader.getSurface());
+            }
             
             CaptureRequest.Builder previewBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             previewBuilder.addTarget(previewSurface);
@@ -222,7 +278,7 @@ public class MultiCameraHelper {
                 previewBuilder.set(CaptureRequest.SENSOR_FRAME_DURATION, (long) (1000000000.0 / 30.0));
             }
             
-            cameraDevice.createCaptureSession(Arrays.asList(previewSurface), new CameraCaptureSession.StateCallback() {
+            cameraDevice.createCaptureSession(outputSurfaces, new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
                     captureSessions.put(physicalCameraId, session);
@@ -248,6 +304,10 @@ public class MultiCameraHelper {
     }
     
     public void startRecording() {
+        if (captureMode != CaptureMode.VIDEO) {
+            Log.w(TAG, "Recording is unavailable in photo mode");
+            return;
+        }
         if (isRecording) {
             Log.w(TAG, "Already recording");
             return;
@@ -396,8 +456,13 @@ public class MultiCameraHelper {
         captureSessions.clear();
         previewRequestBuilders.clear();
         mediaRecorders.clear();
+        for (ImageReader imageReader : imageReaders.values()) {
+            imageReader.close();
+        }
+        imageReaders.clear();
         videoSizes.clear();
         videoPaths.clear();
+        photoPaths.clear();
         textureViews.clear();
         openingCameraIds.clear();
     }
@@ -408,6 +473,12 @@ public class MultiCameraHelper {
     }
     
     private Size choosePreviewSize(String cameraId, StreamConfigurationMap map) {
+        if (captureMode == CaptureMode.VIDEO) {
+            Size configuredSize = configuredVideoSizes.get(cameraId);
+            if (configuredSize != null && containsSize(map.getOutputSizes(MediaRecorder.class), configuredSize)) {
+                return configuredSize;
+            }
+        }
         if (isTiny2cCamera(cameraId)) {
             Size tiny2cSize = chooseTiny2cPreviewSize(map);
             if (tiny2cSize != null) {
@@ -477,6 +548,88 @@ public class MultiCameraHelper {
         }
         return choices.length > 0 ? choices[choices.length - 1] : new Size(1280, 720);
     }
+
+    private StreamConfigurationMap mapFor(String cameraId) {
+        try {
+            CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraId);
+            return characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+        } catch (CameraAccessException exception) {
+            Log.e(TAG, "Cannot get stream map for camera: " + cameraId, exception);
+            return null;
+        }
+    }
+
+    private static boolean containsSize(Size[] choices, Size expected) {
+        if (choices == null) {
+            return false;
+        }
+        for (Size size : choices) {
+            if (size.equals(expected)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Size chooseJpegSize(StreamConfigurationMap map) {
+        if (map == null) {
+            return null;
+        }
+        Size[] sizes = map.getOutputSizes(ImageFormat.JPEG);
+        return sizes != null && sizes.length > 0 ? sizes[0] : null;
+    }
+
+    public void takePictures() {
+        if (captureMode != CaptureMode.PHOTO) {
+            Log.w(TAG, "Picture capture is unavailable in video mode");
+            return;
+        }
+        for (String cameraId : cameraDevices.keySet()) {
+            takePicture(cameraId);
+        }
+    }
+
+    private void takePicture(String cameraId) {
+        CameraDevice device = cameraDevices.get(cameraId);
+        CameraCaptureSession session = captureSessions.get(cameraId);
+        ImageReader imageReader = imageReaders.get(cameraId);
+        if (device == null || session == null || imageReader == null) {
+            Log.w(TAG, "Camera is not ready for picture: " + cameraId);
+            return;
+        }
+        try {
+            CaptureRequest.Builder builder = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+            builder.addTarget(imageReader.getSurface());
+            session.capture(builder.build(), null, backgroundHandler);
+        } catch (CameraAccessException exception) {
+            Log.e(TAG, "Cannot capture picture for camera: " + cameraId, exception);
+        }
+    }
+
+    private void saveJpegImage(String cameraId, ImageReader reader) {
+        Image image = null;
+        try {
+            image = reader.acquireLatestImage();
+            if (image == null) {
+                return;
+            }
+            File output = new File(context.getExternalFilesDir(null), "camera_" + cameraId + "_"
+                    + new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS").format(new Date()) + ".jpg");
+            try (FileOutputStream stream = new FileOutputStream(output)) {
+                byte[] bytes = new byte[image.getPlanes()[0].getBuffer().remaining()];
+                image.getPlanes()[0].getBuffer().get(bytes);
+                stream.write(bytes);
+            }
+            photoPaths.put(cameraId, output.getAbsolutePath());
+            Log.d(TAG, "Picture saved for camera " + cameraId + ": " + output);
+        } catch (IOException exception) {
+            Log.e(TAG, "Cannot save picture for camera: " + cameraId, exception);
+        } finally {
+            if (image != null) {
+                image.close();
+            }
+        }
+    }
     
     public boolean isRecording() {
         return isRecording;
@@ -484,5 +637,9 @@ public class MultiCameraHelper {
     
     public Map<String, String> getRecordedVideoPaths() {
         return new ConcurrentHashMap<>(videoPaths);
+    }
+
+    public Map<String, String> getCapturedPhotoPaths() {
+        return new ConcurrentHashMap<>(photoPaths);
     }
 }

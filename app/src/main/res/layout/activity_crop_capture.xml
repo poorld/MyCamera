@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/crop_capture_scroll_view"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextureView
+            android:id="@+id/preview_view"
+            android:layout_width="match_parent"
+            android:layout_height="300dp" />
+
+        <RadioGroup
+            android:id="@+id/capture_mode_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/photo_mode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="拍照" />
+
+            <RadioButton
+                android:id="@+id/video_mode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="录像" />
+        </RadioGroup>
+
+        <TextView
+            android:id="@+id/camera_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="8dp"
+            android:text="摄像头" />
+
+        <Button
+            android:id="@+id/switch_camera_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="切换摄像头" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="原生分辨率" />
+
+        <Spinner
+            android:id="@+id/resolution_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/output_width"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="裁剪输出宽度（可空）"
+                android:inputType="number" />
+
+            <EditText
+                android:id="@+id/output_height"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="裁剪输出高度（可空）"
+                android:inputType="number" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="上方下拉框选择原生采集分辨率。裁剪宽高都留空：原样保存；填写宽高：按中心裁剪为指定画幅。" />
+
+        <Button
+            android:id="@+id/capture_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:enabled="false"
+            android:text="拍照" />
+    </LinearLayout>
+</ScrollView>

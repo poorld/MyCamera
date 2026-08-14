@@ -300,7 +300,7 @@ public class SettingsManager {
     }
 
     public boolean isOisEnabled() {
-        return preferences.getBoolean(PREF_OIS_ENABLED, true);
+        return preferences.getBoolean(PREF_OIS_ENABLED, false);
     }
 
     public void setOisEnabled(boolean enabled) {
