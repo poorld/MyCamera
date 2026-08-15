@@ -14,6 +14,7 @@ import android.media.AudioManager;
 import android.media.ToneGenerator;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.util.Log;
 import android.util.Range;
@@ -79,6 +80,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     private static final String OIS_COMMAND_ENABLE = "1";
     private static final String OIS_COMMAND_MOTOR_SLEEP = "2";
     private static final String OIS_COMMAND_MOTOR_WAKE = "3";
+    private static final long OIS_POST_PREVIEW_SETTLE_DELAY_MS = 1_000;
     private static final String DENOISE_NODE_PATH = "/sys/class/leds/alermled/denoise";
 
     public static final String TAG = "MainActivity";
@@ -145,6 +147,10 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     private SettingsManager settingsManager;
     private boolean isSyncingExposureControls = false;
     private Handler recordingTimerHandler;
+    private HandlerThread cameraReleaseThread;
+    private Handler cameraReleaseHandler;
+    private boolean isCameraReleaseInProgress;
+    private boolean isActivityResumed;
     private final Handler hardwareKeyHandler = new Handler(Looper.getMainLooper());
     private long recordingStartTime = 0;
     private boolean recordKeyLongPressHandled;
@@ -164,6 +170,17 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
             exposureControlsPanel.setVisibility(View.GONE);
         }
     };
+    private final Runnable applyOisStateAfterPreviewRunnable = () -> {
+        if (mCameraManager == null || !mCameraManager.isCameraAvailable()) {
+            return;
+        }
+
+        if (setOisEnabled(isOisEnabled)) {
+            isOisAppliedForCurrentSession = true;
+        } else {
+            Log.w(TAG, "Failed to apply OIS state after preview settled: " + isOisEnabled);
+        }
+    };
     private final Runnable hideZoomDialRunnable = () -> {
         if (zoomDial != null) zoomDial.setVisibility(View.GONE);
     };
@@ -178,6 +195,9 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         setupClickListeners();
         
         recordingTimerHandler = new Handler(Looper.getMainLooper());
+        cameraReleaseThread = new HandlerThread("CameraRelease");
+        cameraReleaseThread.start();
+        cameraReleaseHandler = new Handler(cameraReleaseThread.getLooper());
 
         CameraUtils.createCameraDirectory(this);
 
@@ -430,6 +450,7 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
     @Override
     protected void onResume() {
         super.onResume();
+        isActivityResumed = true;
         if (!hasAllPermissions()) {
             ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS);
             return;
@@ -455,6 +476,8 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         hardwareKeyHandler.removeCallbacks(recordKeyLongPressRunnable);
         hardwareKeyHandler.removeCallbacks(powerKeyLongPressRunnable);
         hardwareKeyHandler.removeCallbacks(hideExposureControlsRunnable);
+        hardwareKeyHandler.removeCallbacks(applyOisStateAfterPreviewRunnable);
+        isActivityResumed = false;
         super.onPause();
         Log.d(TAG, "onPause: ");
 
@@ -472,6 +495,11 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
         super.onDestroy();
 
         unregisterReceiver(myBr);
+        if (cameraReleaseThread != null) {
+            cameraReleaseThread.quitSafely();
+            cameraReleaseThread = null;
+            cameraReleaseHandler = null;
+        }
     }
 
     private boolean shouldKeepCameraInBackground() {
@@ -490,45 +518,70 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
 
     private void release() {
         Log.d(TAG, "release: ");
-        if (isOisAppliedForCurrentSession && !setOisEnabled(false)) {
-            Log.w(TAG, "Failed to sleep OIS motor during release");
+        hardwareKeyHandler.removeCallbacks(applyOisStateAfterPreviewRunnable);
+        CameraManager cameraManager = mCameraManager;
+        if (cameraManager == null || isCameraReleaseInProgress) {
+            return;
         }
+
+        final boolean shouldSleepOis = isOisAppliedForCurrentSession;
+        final boolean wasRecording = isRecording;
         isOisAppliedForCurrentSession = false;
-        if (mCameraManager != null) {
-            mCameraManager.removeStateObserver(this);
-        }
-        if (isRecording && mCameraManager != null) {
-            try {
-                mCameraManager.stopRecording();
-            } catch (RuntimeException e) {
-                Log.w(TAG, "stopRecording during release failed", e);
-            }
-        }
+        isCameraReleaseInProgress = true;
+        mCameraManager = null;
+        cameraManager.removeStateObserver(this);
         resetRecordingUiState();
         updateModeButtons();
         updateCaptureButton();
-        if (mCameraManager != null) {
+
+        Handler releaseHandler = cameraReleaseHandler;
+        if (releaseHandler == null) {
+            Log.w(TAG, "Camera release thread is unavailable");
+            isCameraReleaseInProgress = false;
+            return;
+        }
+        releaseHandler.post(() -> {
+            if (shouldSleepOis && !setOisEnabled(false)) {
+                Log.w(TAG, "Failed to sleep OIS motor during release");
+            }
+            if (wasRecording) {
+                try {
+                    cameraManager.stopRecording();
+                } catch (RuntimeException e) {
+                    Log.w(TAG, "stopRecording during release failed", e);
+                }
+            }
             try {
-                mCameraManager.stopPreview();
+                cameraManager.stopPreview();
             } catch (RuntimeException e) {
                 Log.w(TAG, "stopPreview during release failed", e);
             }
             try {
-                mCameraManager.closeCamera();
+                cameraManager.closeCamera();
             } catch (RuntimeException e) {
                 Log.w(TAG, "closeCamera during release failed", e);
             }
             try {
-                mCameraManager.release();
+                cameraManager.release();
             } catch (RuntimeException e) {
                 Log.w(TAG, "release camera manager failed", e);
             }
-            mCameraManager = null;
-        }
+            hardwareKeyHandler.post(() -> {
+                isCameraReleaseInProgress = false;
+                if (isActivityResumed) {
+                    startCameraSessionIfNeeded();
+                }
+            });
+        });
     }
     
     private void startCameraSessionIfNeeded() {
         if (!hasAllPermissions()) {
+            return;
+        }
+
+        if (isCameraReleaseInProgress) {
+            Log.d(TAG, "Camera release is still in progress; defer open");
             return;
         }
 
@@ -1335,13 +1388,10 @@ public class MainActivity extends BaseAct implements CameraStateObserver {
                     break;
                 case PREVIEW_STARTED:
                     statusText.setText("Ready");
-                    if (!isOisAppliedForCurrentSession) {
-                        if (setOisEnabled(isOisEnabled)) {
-                            isOisAppliedForCurrentSession = true;
-                        } else {
-                            Log.w(TAG, "Failed to apply OIS state after preview start: " + isOisEnabled);
-                        }
-                    }
+                    hardwareKeyHandler.removeCallbacks(applyOisStateAfterPreviewRunnable);
+                    hardwareKeyHandler.postDelayed(
+                            applyOisStateAfterPreviewRunnable,
+                            OIS_POST_PREVIEW_SETTLE_DELAY_MS);
                     break;
                 case RECORDING:
                     statusText.setText("Recording");
