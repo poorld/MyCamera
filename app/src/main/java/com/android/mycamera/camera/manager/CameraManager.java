@@ -44,7 +44,7 @@ import java.util.TreeSet;
 public class CameraManager implements CameraStrategy.CameraStateListener {
     
     private static final String TAG = "CameraManager";
-    private static final int DEFAULT_VIDEO_FRAME_RATE = 24;
+    private static final int DEFAULT_VIDEO_FRAME_RATE = 30;
     private static final int HIGH_SPEED_FRAME_RATE = 120;
     private static final int[] FRAME_RATE_CANDIDATES = {15, 24, 30, 60, 120};
     

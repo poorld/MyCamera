@@ -33,7 +33,7 @@ import java.util.List;
 
 public class SettingsActivity extends AppCompatActivity {
 
-    private static final int DEFAULT_VIDEO_FRAME_RATE = 24;
+    private static final int DEFAULT_VIDEO_FRAME_RATE = 30;
     private static final String[] LANGUAGE_VALUES = {
             SettingsManager.LANGUAGE_SYSTEM,
             SettingsManager.LANGUAGE_CHINESE,

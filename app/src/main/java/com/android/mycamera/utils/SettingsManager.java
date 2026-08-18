@@ -99,7 +99,7 @@ public class SettingsManager {
             resolution = Resolution.FULL_HD_1080P;
         }
         
-        int frameRate = preferences.getInt(PREF_FRAME_RATE, 24);
+        int frameRate = preferences.getInt(PREF_FRAME_RATE, 30);
         
         Quality quality = Quality.normalizeSelectable(Quality.valueOf(preferences.getString(PREF_QUALITY, Quality.DEFAULT.name())));
         VideoBitrate videoBitrate = VideoBitrate.fromName(
@@ -207,7 +207,7 @@ public class SettingsManager {
      * Get frame rate
      */
     public int getFrameRate() {
-        return preferences.getInt(PREF_FRAME_RATE, 24);
+        return preferences.getInt(PREF_FRAME_RATE, 30);
     }
     
     /**
