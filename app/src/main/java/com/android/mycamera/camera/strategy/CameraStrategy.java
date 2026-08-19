@@ -8,6 +8,7 @@ import com.android.mycamera.camera.config.CameraConfig;
 import com.android.mycamera.model.CameraState;
 import com.android.mycamera.model.Resolution;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -54,6 +55,11 @@ public interface CameraStrategy {
      * Get supported resolutions
      */
     List<Resolution> getSupportedResolutions();
+
+    /** Return the camera-reported JPEG sizes available for still capture. */
+    default List<Resolution> getSupportedPhotoResolutions() {
+        return Collections.emptyList();
+    }
     
     /**
      * Get supported frame rates

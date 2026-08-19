@@ -1,0 +1,48 @@
+diff --git a/app/src/main/java/com/android/mycamera/camera/manager/CameraManager.java b/app/src/main/java/com/android/mycamera/camera/manager/CameraManager.java
+index a34d19f..bc7f25b 100644
+--- a/app/src/main/java/com/android/mycamera/camera/manager/CameraManager.java
++++ b/app/src/main/java/com/android/mycamera/camera/manager/CameraManager.java
+@@ -44,7 +44,7 @@ import java.util.TreeSet;
+ public class CameraManager implements CameraStrategy.CameraStateListener {
+     
+     private static final String TAG = "CameraManager";
+-    private static final int DEFAULT_VIDEO_FRAME_RATE = 24;
++    private static final int DEFAULT_VIDEO_FRAME_RATE = 30;
+     private static final int HIGH_SPEED_FRAME_RATE = 120;
+     private static final int[] FRAME_RATE_CANDIDATES = {15, 24, 30, 60, 120};
+     
+diff --git a/app/src/main/java/com/android/mycamera/ui/activity/SettingsActivity.java b/app/src/main/java/com/android/mycamera/ui/activity/SettingsActivity.java
+index 5e3087f..f2f0466 100644
+--- a/app/src/main/java/com/android/mycamera/ui/activity/SettingsActivity.java
++++ b/app/src/main/java/com/android/mycamera/ui/activity/SettingsActivity.java
+@@ -33,7 +33,7 @@ import java.util.List;
+ 
+ public class SettingsActivity extends AppCompatActivity {
+ 
+-    private static final int DEFAULT_VIDEO_FRAME_RATE = 24;
++    private static final int DEFAULT_VIDEO_FRAME_RATE = 30;
+     private static final String[] LANGUAGE_VALUES = {
+             SettingsManager.LANGUAGE_SYSTEM,
+             SettingsManager.LANGUAGE_CHINESE,
+diff --git a/app/src/main/java/com/android/mycamera/utils/SettingsManager.java b/app/src/main/java/com/android/mycamera/utils/SettingsManager.java
+index 9caf0fb..ed37130 100644
+--- a/app/src/main/java/com/android/mycamera/utils/SettingsManager.java
++++ b/app/src/main/java/com/android/mycamera/utils/SettingsManager.java
+@@ -99,7 +99,7 @@ public class SettingsManager {
+             resolution = Resolution.FULL_HD_1080P;
+         }
+         
+-        int frameRate = preferences.getInt(PREF_FRAME_RATE, 24);
++        int frameRate = preferences.getInt(PREF_FRAME_RATE, 30);
+         
+         Quality quality = Quality.normalizeSelectable(Quality.valueOf(preferences.getString(PREF_QUALITY, Quality.DEFAULT.name())));
+         VideoBitrate videoBitrate = VideoBitrate.fromName(
+@@ -207,7 +207,7 @@ public class SettingsManager {
+      * Get frame rate
+      */
+     public int getFrameRate() {
+-        return preferences.getInt(PREF_FRAME_RATE, 24);
++        return preferences.getInt(PREF_FRAME_RATE, 30);
+     }
+     
+     /**

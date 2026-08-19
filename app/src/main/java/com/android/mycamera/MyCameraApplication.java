@@ -16,14 +16,11 @@ import java.util.ArrayList;
 
 public class MyCameraApplication extends Application implements CameraXConfig.Provider {
 
-    private static final String PROP_POWER_GLOBAL_ACTION = "persist.sys.power_global_action";
-
     private int startedActivityCount = 0;
 
     @Override
     public void onCreate() {
         super.onCreate();
-        setPowerGlobalActionEnabled(false);
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             @Override
             public void onActivityCreated(@NonNull Activity activity, @Nullable Bundle savedInstanceState) {
@@ -32,7 +29,6 @@ public class MyCameraApplication extends Application implements CameraXConfig.Pr
             @Override
             public void onActivityStarted(@NonNull Activity activity) {
                 if (startedActivityCount == 0) {
-                    setPowerGlobalActionEnabled(false);
                 }
                 startedActivityCount++;
             }
@@ -49,7 +45,6 @@ public class MyCameraApplication extends Application implements CameraXConfig.Pr
             public void onActivityStopped(@NonNull Activity activity) {
                 startedActivityCount = Math.max(0, startedActivityCount - 1);
                 if (startedActivityCount == 0) {
-                    setPowerGlobalActionEnabled(true);
                 }
             }
 
@@ -63,9 +58,6 @@ public class MyCameraApplication extends Application implements CameraXConfig.Pr
         });
     }
 
-    private void setPowerGlobalActionEnabled(boolean enabled) {
-        SystemPropertyUtils.set(PROP_POWER_GLOBAL_ACTION, enabled ? "true" : "false");
-    }
 
     @NonNull
     @Override

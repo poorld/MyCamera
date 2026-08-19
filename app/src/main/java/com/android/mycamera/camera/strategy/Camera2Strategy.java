@@ -43,7 +43,6 @@ import com.android.mycamera.R;
 import com.android.mycamera.camera.config.CameraConfig;
 import com.android.mycamera.model.CameraState;
 import com.android.mycamera.model.CaptureMode;
-import com.android.mycamera.model.PhotoResolution;
 import com.android.mycamera.model.Resolution;
 import com.android.mycamera.model.VideoCodec;
 import com.android.mycamera.utils.CameraUtils;
@@ -198,7 +197,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
                 || !currentConfig.getResolution().equals(config.getResolution())
                 || currentConfig.getFrameRate() != config.getFrameRate()
                 || currentConfig.getCaptureMode() != config.getCaptureMode()
-                || currentConfig.getPhotoResolution() != config.getPhotoResolution()
+                || !sameResolution(currentConfig.getPhotoResolution(), config.getPhotoResolution())
                 || currentConfig.isPhotoHdrEnabled() != config.isPhotoHdrEnabled()
                 || currentConfig.isLowMemoryModeEnabled() != config.isLowMemoryModeEnabled()
                 || !TextUtilsEquals(currentConfig.getCameraId(), config.getCameraId());
@@ -287,6 +286,10 @@ public class Camera2Strategy extends BaseCameraStrategy {
 
     private static boolean TextUtilsEquals(String a, String b) {
         return a == null ? b == null : a.equals(b);
+    }
+
+    private static boolean sameResolution(Resolution first, Resolution second) {
+        return first == null ? second == null : first.equals(second);
     }
 
     @Override
@@ -1016,10 +1019,11 @@ public class Camera2Strategy extends BaseCameraStrategy {
                         + resolution.getWidth() + "x" + resolution.getHeight());
             } else {
                 // Same as MTK PhotoDevice2Controller.setPictureSize -> CaptureSurface.updatePictureInfo:
-                // ImageReader is ALWAYS the selected still size (e.g. 6912x5184), never preview size.
-                PhotoResolution still = PhotoResolution.normalize(
-                        currentConfig.getPhotoResolution(), currentConfig.getCameraId());
-                photoSize = new Size(still.getWidth(), still.getHeight());
+                // ImageReader is always the selected still size, never the preview size.
+                photoSize = requirePhotoCaptureSize();
+                if (photoSize == null) {
+                    throw new IllegalStateException("No JPEG output size reported by camera");
+                }
                 ensurePhotoImageReader(photoSize.getWidth(), photoSize.getHeight());
                 if (imageReader == null
                         || imageReader.getWidth() != photoSize.getWidth()
@@ -1038,7 +1042,7 @@ public class Camera2Strategy extends BaseCameraStrategy {
                 Log.i(TAG, "createPreviewSession: PHOTO pipeline jpegReader="
                         + imageReader.getWidth() + "x" + imageReader.getHeight()
                         + ", preview=" + previewBufferSize.getWidth() + "x" + previewBufferSize.getHeight()
-                        + ", configPhoto=" + still.getDisplayName()
+                        + ", configPhoto=" + currentConfig.getPhotoResolution()
                         + ", hdr=" + photoHdr
                         + ", outputs=" + outputs.size());
             }
@@ -1166,9 +1170,30 @@ public class Camera2Strategy extends BaseCameraStrategy {
                 || !"0".equals(currentConfig.getCameraId())) {
             return false;
         }
-        PhotoResolution still = PhotoResolution.normalize(
-                currentConfig.getPhotoResolution(), currentConfig.getCameraId());
-        return still == PhotoResolution.MP_12;
+        Resolution still = currentConfig.getPhotoResolution();
+        Resolution hdrResolution = getHdrPhotoResolution();
+        return still != null && hdrResolution != null && still.equals(hdrResolution);
+    }
+
+    private Resolution getHdrPhotoResolution() {
+        try {
+            CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            if (manager == null || currentConfig == null) {
+                return null;
+            }
+            CameraCharacteristics characteristics = manager.getCameraCharacteristics(
+                    currentConfig.getCameraId());
+            Size sensorSize = characteristics.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE);
+            if (sensorSize == null) {
+                return null;
+            }
+            Resolution sensorResolution = Resolution.of(sensorSize.getWidth(), sensorSize.getHeight());
+            return getSupportedPhotoResolutions().contains(sensorResolution)
+                    ? sensorResolution : null;
+        } catch (CameraAccessException | IllegalArgumentException | SecurityException e) {
+            Log.w(TAG, "Failed to query HDR photo resolution", e);
+            return null;
+        }
     }
 
     private void createRegularCaptureSession(List<Surface> outputs,
@@ -1987,6 +2012,63 @@ public class Camera2Strategy extends BaseCameraStrategy {
         return resolutions.isEmpty() ? super.getSupportedResolutions() : resolutions;
     }
 
+    @Override
+    public List<Resolution> getSupportedPhotoResolutions() {
+        if (currentConfig == null) {
+            return Collections.emptyList();
+        }
+        try {
+            CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            if (manager == null) {
+                return Collections.emptyList();
+            }
+            CameraCharacteristics characteristics = manager.getCameraCharacteristics(currentConfig.getCameraId());
+            StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+            if (map == null) {
+                return Collections.emptyList();
+            }
+
+            List<Resolution> resolutions = new ArrayList<>();
+            addPhotoResolutions(resolutions, map.getOutputSizes(ImageFormat.JPEG));
+            addPhotoResolutions(resolutions, map.getHighResolutionOutputSizes(ImageFormat.JPEG));
+            sortResolutionsByArea(resolutions);
+            return resolutions;
+        } catch (CameraAccessException | IllegalArgumentException | SecurityException e) {
+            logError("Failed to query Camera2 supported photo resolutions", e);
+            return Collections.emptyList();
+        }
+    }
+
+    private void addPhotoResolutions(List<Resolution> output, Size[] sizes) {
+        if (sizes == null) {
+            return;
+        }
+        for (Size size : sizes) {
+            if (size == null) {
+                continue;
+            }
+            Resolution resolution = Resolution.of(size.getWidth(), size.getHeight());
+            if (!output.contains(resolution)) {
+                output.add(resolution);
+            }
+        }
+    }
+
+    private void sortResolutionsByArea(List<Resolution> resolutions) {
+        Collections.sort(resolutions, new Comparator<Resolution>() {
+            @Override
+            public int compare(Resolution left, Resolution right) {
+                long rightArea = (long) right.getWidth() * right.getHeight();
+                long leftArea = (long) left.getWidth() * left.getHeight();
+                int areaCompare = Long.compare(rightArea, leftArea);
+                if (areaCompare != 0) {
+                    return areaCompare;
+                }
+                return Integer.compare(right.getWidth(), left.getWidth());
+            }
+        });
+    }
+
     private Set<String> toSizeKeys(Size[] sizes) {
         Set<String> keys = new HashSet<>();
         if (sizes == null) {
@@ -2107,34 +2189,59 @@ public class Camera2Strategy extends BaseCameraStrategy {
 
     
     private Size getPhotoCaptureSize(StreamConfigurationMap map) {
-        PhotoResolution photoResolution = currentConfig != null
-                ? PhotoResolution.normalize(currentConfig.getPhotoResolution(), currentConfig.getCameraId())
-                : PhotoResolution.DEFAULT;
-        // System camera (MTK Camera2 PhotoDevice2Controller#setPictureSize) always creates
-        // ImageReader with the exact selected picture size. Never downscale to a "closest"
-        // recording size such as 1920x1440 — that made HAL maxImageSize ignore still size.
-        Size desired = new Size(photoResolution.getWidth(), photoResolution.getHeight());
-        boolean advertised = false;
+        Resolution photoResolution = currentConfig != null
+                ? currentConfig.getPhotoResolution() : null;
+        Size desired = photoResolution == null ? null
+                : new Size(photoResolution.getWidth(), photoResolution.getHeight());
+        Size selected = null;
         int candidateCount = 0;
         if (map != null) {
             List<Size> jpegSizes = new ArrayList<>();
             addUniqueSizes(jpegSizes, map.getOutputSizes(ImageFormat.JPEG));
             addUniqueSizes(jpegSizes, map.getHighResolutionOutputSizes(ImageFormat.JPEG));
             candidateCount = jpegSizes.size();
-            for (Size size : jpegSizes) {
-                if (size != null
-                        && size.getWidth() == desired.getWidth()
-                        && size.getHeight() == desired.getHeight()) {
-                    advertised = true;
-                    break;
+            selected = chooseBestPhotoSize(jpegSizes, desired);
+        }
+        Log.i(TAG, "getPhotoCaptureSize requested=" + desired
+                + " selected=" + selected
+                + " candidates=" + candidateCount
+                + " configured=" + photoResolution);
+        return selected != null ? selected : desired;
+    }
+
+    private Size chooseBestPhotoSize(List<Size> candidates, Size desired) {
+        if (candidates == null || candidates.isEmpty()) {
+            return null;
+        }
+        Size largest = null;
+        Size closest = null;
+        long bestAreaDiff = Long.MAX_VALUE;
+        long desiredArea = desired == null ? 0L
+                : (long) desired.getWidth() * desired.getHeight();
+        for (Size candidate : candidates) {
+            if (candidate == null) {
+                continue;
+            }
+            if (largest == null
+                    || (long) candidate.getWidth() * candidate.getHeight()
+                    > (long) largest.getWidth() * largest.getHeight()) {
+                largest = candidate;
+            }
+            if (desired != null
+                    && candidate.getWidth() == desired.getWidth()
+                    && candidate.getHeight() == desired.getHeight()) {
+                return candidate;
+            }
+            if (desired != null) {
+                long areaDiff = Math.abs(
+                        (long) candidate.getWidth() * candidate.getHeight() - desiredArea);
+                if (areaDiff < bestAreaDiff) {
+                    bestAreaDiff = areaDiff;
+                    closest = candidate;
                 }
             }
         }
-        Log.i(TAG, "getPhotoCaptureSize useExact=" + desired
-                + " advertised=" + advertised
-                + " candidates=" + candidateCount
-                + " from=" + photoResolution.getDisplayName());
-        return desired;
+        return desired == null ? largest : closest;
     }
 
     private void addUniqueSizes(List<Size> out, Size[] sizes) {
@@ -2216,10 +2323,10 @@ public class Camera2Strategy extends BaseCameraStrategy {
             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
             return getPhotoCaptureSize(map);
         } catch (Exception e) {
-            PhotoResolution photoResolution = PhotoResolution.normalize(
-                    currentConfig.getPhotoResolution(), currentConfig.getCameraId());
+            Resolution photoResolution = currentConfig.getPhotoResolution();
             Log.w(TAG, "requirePhotoCaptureSize fallback to config " + photoResolution, e);
-            return new Size(photoResolution.getWidth(), photoResolution.getHeight());
+            return photoResolution == null ? null
+                    : new Size(photoResolution.getWidth(), photoResolution.getHeight());
         }
     }
 

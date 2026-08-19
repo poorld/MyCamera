@@ -6,9 +6,6 @@
     <string name="app_settings">应用设置</string>
     <string name="keep_screen_on">屏幕常亮</string>
     <string name="show_api_switcher">显示 Camera API 切换</string>
-    <string name="ois_enabled">防抖 开</string>
-    <string name="ois_disabled">防抖 关</string>
-    <string name="ois_failed">切换防抖失败</string>
     <string name="language">语言</string>
     <string name="language_follow_system">跟随系统</string>
     <string name="language_chinese">中文</string>
@@ -23,7 +20,7 @@
     <string name="photo_resolution">拍照分辨率</string>
     <string name="recording">录制</string>
     <string name="enable_audio">启用音频</string>
-    <string name="high_speed_playback">720p 120 帧实时回放</string>
+    <string name="high_speed_playback">高速回放</string>
     <string name="background_review">后台预览</string>
     <string name="background_recording">后台录制</string>
     <string name="recording_storage_low">存储空间不足，录像需至少保留 2 GB 可用空间。</string>

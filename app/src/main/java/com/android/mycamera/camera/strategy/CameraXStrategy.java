@@ -62,7 +62,6 @@ import androidx.lifecycle.LifecycleOwner;
 import com.android.mycamera.R;
 import com.android.mycamera.camera.config.CameraConfig;
 import com.android.mycamera.model.CameraState;
-import com.android.mycamera.model.PhotoResolution;
 import com.android.mycamera.model.Resolution;
 import com.android.mycamera.utils.CameraUtils;
 
@@ -203,8 +202,11 @@ public class CameraXStrategy extends BaseCameraStrategy {
                 appliedVideoQuality = finalQuality;
                 ImageCapture.Builder imageCaptureBuilder = new ImageCapture.Builder()
                         .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                        .setTargetRotation(targetRotation)
-                        .setTargetResolution(getPhotoTargetSize(targetRotation));
+                        .setTargetRotation(targetRotation);
+                Size photoTargetSize = getPhotoTargetSize(targetRotation);
+                if (photoTargetSize != null) {
+                    imageCaptureBuilder.setTargetResolution(photoTargetSize);
+                }
                 Camera2Interop.Extender imageCaptureExtender = new Camera2Interop.Extender(imageCaptureBuilder);
                 imageCaptureExtender.setCaptureRequestOption(
                         CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
@@ -452,9 +454,11 @@ public class CameraXStrategy extends BaseCameraStrategy {
     }
 
     private Size getPhotoTargetSize(int targetRotation) {
-        PhotoResolution photoResolution = currentConfig != null
-                ? PhotoResolution.normalize(currentConfig.getPhotoResolution(), currentConfig.getCameraId())
-                : PhotoResolution.DEFAULT;
+        Resolution photoResolution = currentConfig != null
+                ? currentConfig.getPhotoResolution() : null;
+        if (photoResolution == null) {
+            return null;
+        }
         boolean portrait = targetRotation == Surface.ROTATION_0
                 || targetRotation == Surface.ROTATION_180;
         // ImageCapture targetResolution is width x height in sensor-oriented space.

@@ -2,7 +2,6 @@ package com.android.mycamera.camera.config;
 
 import com.android.mycamera.model.CameraApiType;
 import com.android.mycamera.model.CaptureMode;
-import com.android.mycamera.model.PhotoResolution;
 import com.android.mycamera.model.Quality;
 import com.android.mycamera.model.Resolution;
 import com.android.mycamera.model.VideoBitrate;
@@ -18,7 +17,7 @@ import java.io.File;
 public class CameraConfig {
     private final String cameraId;
     private final Resolution resolution;
-    private final PhotoResolution photoResolution;
+    private final Resolution photoResolution;
     private final CaptureMode captureMode;
     private final int frameRate;
     private final Quality quality;
@@ -60,7 +59,7 @@ public class CameraConfig {
         return resolution;
     }
 
-    public PhotoResolution getPhotoResolution() {
+    public Resolution getPhotoResolution() {
         return photoResolution;
     }
 
@@ -122,9 +121,10 @@ public class CameraConfig {
     public static class Builder {
         private String cameraId = "0";
         private Resolution resolution = Resolution.FULL_HD_1080P; // Camera2 default video 1920x1080
-        private PhotoResolution photoResolution = PhotoResolution.MP_12; // product default still 12M
+        // Still size is selected from the active camera's reported JPEG sizes.
+        private Resolution photoResolution;
         private CaptureMode captureMode = CaptureMode.PHOTO;
-        private int frameRate = 24;
+        private int frameRate = 0; // Filled from the active camera capabilities.
         private Quality quality = Quality.DEFAULT; // CameraX default FHD
         private VideoBitrate videoBitrate = VideoBitrate.DEFAULT;
         private VideoCodec videoCodec = VideoCodec.DEFAULT;
@@ -169,8 +169,8 @@ public class CameraConfig {
             return this;
         }
 
-        public Builder setPhotoResolution(PhotoResolution photoResolution) {
-            this.photoResolution = photoResolution != null ? photoResolution : PhotoResolution.DEFAULT;
+        public Builder setPhotoResolution(Resolution photoResolution) {
+            this.photoResolution = photoResolution;
             return this;
         }
 

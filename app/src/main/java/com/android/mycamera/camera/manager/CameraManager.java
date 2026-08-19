@@ -2,9 +2,12 @@ package com.android.mycamera.camera.manager;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.ImageFormat;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.params.StreamConfigurationMap;
+import android.media.CamcorderProfile;
+import android.media.MediaRecorder;
 import android.os.Looper;
 import android.util.Log;
 import android.util.Range;
@@ -22,7 +25,6 @@ import com.android.mycamera.camera.strategy.RecordingStats;
 import com.android.mycamera.model.CameraApiType;
 import com.android.mycamera.model.CaptureMode;
 import com.android.mycamera.model.CameraState;
-import com.android.mycamera.model.PhotoResolution;
 import com.android.mycamera.model.Quality;
 import com.android.mycamera.model.Resolution;
 import com.android.mycamera.model.VideoCodec;
@@ -32,7 +34,9 @@ import com.android.mycamera.utils.SettingsManager;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -44,10 +48,6 @@ import java.util.TreeSet;
 public class CameraManager implements CameraStrategy.CameraStateListener {
     
     private static final String TAG = "CameraManager";
-    private static final int DEFAULT_VIDEO_FRAME_RATE = 30;
-    private static final int HIGH_SPEED_FRAME_RATE = 120;
-    private static final int[] FRAME_RATE_CANDIDATES = {15, 24, 30, 60, 120};
-    
     private static volatile CameraManager instance;
     
     private final Context context;
@@ -101,6 +101,10 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         Log.d(TAG, "initializeCamera: ");
         stateManager.addObserver(observer);
         currentConfig = applyVideoCapabilityConstraints(currentConfig);
+        if (currentConfig.getApiType() != CameraApiType.CAMERA1) {
+            currentConfig = normalizePhotoResolutionForActiveCamera(currentConfig);
+        }
+        currentConfig = normalizeVideoResolutionForActiveMode(currentConfig);
         currentConfig = normalizeFrameRateForActiveMode(currentConfig);
         settingsManager.saveCameraConfig(currentConfig);
         configurationDirty = false;
@@ -182,6 +186,10 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
                 configBuilder.setQuality(quality).setResolution(resolution);
             }
             currentConfig = applyVideoCapabilityConstraints(configBuilder.build());
+            if (newApiType != CameraApiType.CAMERA1) {
+                currentConfig = normalizePhotoResolutionForActiveCamera(currentConfig);
+            }
+            currentConfig = normalizeVideoResolutionForActiveMode(currentConfig);
             currentConfig = normalizeFrameRateForActiveMode(currentConfig);
             // Strategy must follow constrained API (e.g. CameraX+2K -> Camera2).
             currentStrategy = getCameraStrategy(currentConfig.getApiType());
@@ -220,12 +228,17 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         if (currentStrategy == null || currentConfig == null) {
             return false;
         }
-        // Build target config BEFORE reopen so cam1 does not briefly use cam0 12M/36M still size.
-        PhotoResolution photoForCam = settingsManager.getPhotoResolutionForCamera(cameraId);
+        // Build target config BEFORE reopen so the new camera does not briefly use
+        // the previous camera's still size.
+        Resolution photoForCam = settingsManager.getPhotoResolutionForCamera(cameraId);
         currentConfig = applyVideoCapabilityConstraints(new CameraConfig.Builder(currentConfig)
                 .setCameraId(cameraId)
                 .setPhotoResolution(photoForCam)
                 .build());
+        if (currentConfig.getApiType() != CameraApiType.CAMERA1) {
+            currentConfig = normalizePhotoResolutionForActiveCamera(currentConfig);
+        }
+        currentConfig = normalizeVideoResolutionForActiveMode(currentConfig);
         currentConfig = normalizeFrameRateForActiveMode(currentConfig);
         settingsManager.setCameraId(cameraId);
         settingsManager.saveCameraConfig(currentConfig);
@@ -326,28 +339,6 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         } else if (currentStrategy != null) {
             currentStrategy.closeCamera();
         }
-    }
-
-    /** Reinitialize the OIS controller after it has been enabled. */
-    public boolean reopenCameraForOisEnable() {
-        if (currentStrategy == null || currentConfig == null) {
-            Log.w(TAG, "reopenCameraForOisEnable ignored: camera is not initialized");
-            return false;
-        }
-
-        Log.d(TAG, "reopenCameraForOisEnable id=" + currentConfig.getCameraId());
-        if (isBackgroundRecordingEnabled() && isBackgroundRecordingServiceReady()) {
-            backgroundRecordingHelper.closeCamera();
-            new android.os.Handler(Looper.getMainLooper()).postDelayed(() -> {
-                if (currentConfig != null) {
-                    backgroundRecordingHelper.openCamera(currentConfig);
-                }
-            }, 300);
-        } else {
-            currentStrategy.closeCamera();
-            currentStrategy.openCamera(currentConfig);
-        }
-        return true;
     }
 
     /**
@@ -551,7 +542,7 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         boolean photoHdrEnabled = config.isPhotoHdrEnabled()
                 && apiType == CameraApiType.CAMERA2
                 && "0".equals(config.getCameraId())
-                && config.getPhotoResolution() == PhotoResolution.MP_12;
+                && isHdrPhotoResolution(config.getCameraId(), config.getPhotoResolution());
 
         if (apiType == CameraApiType.CAMERAX) {
             // CameraX 1.4.2 uses the system Recorder codec and cannot select HEVC.
@@ -598,15 +589,6 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         }
         int width = resolution.getWidth();
         int height = resolution.getHeight();
-        if (width == 2560 && height == 1440) {
-            return Quality.QHD;
-        }
-        if (width == 1920 && height == 1080) {
-            return Quality.FULL_HD;
-        }
-        if (width == 1280 && height == 720) {
-            return Quality.HD;
-        }
         long area = (long) width * height;
         long bestDelta = Long.MAX_VALUE;
         Quality best = Quality.DEFAULT;
@@ -628,6 +610,9 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
     public void stageConfiguration(CameraConfig newConfig) {
         Log.d(TAG, "stageConfiguration: ");
         this.currentConfig = applyVideoCapabilityConstraints(newConfig);
+        this.currentConfig = normalizePhotoResolutionForActiveCamera(this.currentConfig);
+        this.currentConfig = normalizeVideoResolutionForActiveMode(this.currentConfig);
+        this.currentConfig = normalizeFrameRateForActiveMode(this.currentConfig);
         settingsManager.saveCameraConfig(this.currentConfig);
         configurationDirty = true;
         Log.d(TAG, "stageConfiguration staged api=" + currentConfig.getApiType()
@@ -662,6 +647,8 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         Log.d(TAG, "updateConfiguration: ");
         CameraApiType previousApi = currentConfig != null ? currentConfig.getApiType() : null;
         this.currentConfig = applyVideoCapabilityConstraints(newConfig);
+        this.currentConfig = normalizePhotoResolutionForActiveCamera(this.currentConfig);
+        this.currentConfig = normalizeVideoResolutionForActiveMode(this.currentConfig);
         this.currentConfig = normalizeFrameRateForActiveMode(this.currentConfig);
         settingsManager.saveCameraConfig(this.currentConfig);
         configurationDirty = false;
@@ -693,56 +680,179 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
      * Get supported resolutions
      */
     public List<Resolution> getSupportedResolutions() {
-        if (currentStrategy != null) {
-            return currentStrategy.getSupportedResolutions();
+        if (currentConfig != null && currentConfig.getApiType() == CameraApiType.CAMERA1
+                && currentStrategy != null) {
+            List<Resolution> camera1Resolutions = currentStrategy.getSupportedResolutions();
+            if (camera1Resolutions != null && !camera1Resolutions.isEmpty()) {
+                return camera1Resolutions;
+            }
         }
-        return java.util.Collections.emptyList();
+        List<Resolution> queried = queryCamera2Resolutions();
+        if (!queried.isEmpty()) {
+            return queried;
+        }
+        if (currentStrategy != null) {
+            List<Resolution> strategyResolutions = currentStrategy.getSupportedResolutions();
+            if (strategyResolutions != null && !strategyResolutions.isEmpty()) {
+                return strategyResolutions;
+            }
+        }
+        if (currentConfig != null && currentConfig.getResolution() != null) {
+            return Collections.singletonList(currentConfig.getResolution());
+        }
+        return Collections.emptyList();
+    }
+
+    /**
+     * Return still-photo sizes reported by the active camera's JPEG capability.
+     * Unlike video resolution, still sizes are not restricted to the video's
+     * selectable presets.
+     */
+    public List<Resolution> getSupportedPhotoResolutions() {
+        if (currentConfig == null) {
+            return Collections.emptyList();
+        }
+        if (currentConfig.getApiType() == CameraApiType.CAMERA1) {
+            if (currentStrategy != null) {
+                List<Resolution> camera1Resolutions = currentStrategy.getSupportedPhotoResolutions();
+                if (camera1Resolutions != null && !camera1Resolutions.isEmpty()) {
+                    return camera1Resolutions;
+                }
+            }
+            return currentConfig.getPhotoResolution() != null
+                    ? Collections.singletonList(currentConfig.getPhotoResolution())
+                    : Collections.emptyList();
+        }
+
+        List<Resolution> queried = queryCamera2PhotoResolutions();
+        if (!queried.isEmpty()) {
+            return queried;
+        }
+        if (currentStrategy != null) {
+            List<Resolution> strategyResolutions = currentStrategy.getSupportedPhotoResolutions();
+            if (strategyResolutions != null && !strategyResolutions.isEmpty()) {
+                return strategyResolutions;
+            }
+        }
+        if (currentConfig.getPhotoResolution() != null) {
+            return Collections.singletonList(currentConfig.getPhotoResolution());
+        }
+        return Collections.emptyList();
     }
     
     /**
      * Get supported frame rates
      */
     public List<Integer> getSupportedFrameRates() {
-        Resolution resolution = currentConfig != null ? currentConfig.getResolution() : null;
+        return getSupportedFrameRates(currentConfig != null ? currentConfig.getResolution() : null);
+    }
+
+    /**
+     * Query frame rates for a specific video size. The settings screen uses
+     * this overload while the user is changing resolution, before the new
+     * configuration has been staged.
+     */
+    public List<Integer> getSupportedFrameRates(Resolution resolution) {
+        if (currentConfig != null && currentConfig.getApiType() == CameraApiType.CAMERA1
+                && currentStrategy != null) {
+            List<Integer> camera1Rates = normalizeFrameRates(currentStrategy.getSupportedFrameRates());
+            if (!camera1Rates.isEmpty()) {
+                return camera1Rates;
+            }
+        }
         List<Integer> cameraRates = queryCameraFrameRates(resolution);
         if (!cameraRates.isEmpty()) {
             return cameraRates;
         }
         if (currentStrategy != null) {
-            return currentStrategy.getSupportedFrameRates();
+            List<Integer> strategyRates = normalizeFrameRates(currentStrategy.getSupportedFrameRates());
+            if (!strategyRates.isEmpty()) {
+                return strategyRates;
+            }
+        }
+        int profileRate = queryCamcorderProfileFrameRate();
+        if (profileRate > 0) {
+            return Collections.singletonList(profileRate);
         }
         return Collections.emptyList();
     }
 
     /**
-     * Select the preferred frame rate for the requested video resolution.
-     * The driver-reported ranges are authoritative; the constants are only
-     * fallbacks for devices that do not expose Camera2 FPS metadata.
+     * Select the currently saved frame rate when it is supported. For a new
+     * configuration with no saved rate, use the highest value reported by the
+     * camera for that resolution.
      */
     public int getPreferredFrameRate(Resolution resolution) {
-        boolean highSpeedResolution = Resolution.HD_720P.equals(resolution);
-        int targetRate = highSpeedResolution ? HIGH_SPEED_FRAME_RATE : DEFAULT_VIDEO_FRAME_RATE;
-        List<Integer> supportedRates = queryCameraFrameRates(resolution);
-        if (supportedRates.isEmpty() && currentStrategy != null) {
-            supportedRates = currentStrategy.getSupportedFrameRates();
+        return getPreferredFrameRate(resolution,
+                currentConfig != null ? currentConfig.getFrameRate() : 0);
+    }
+
+    private int getPreferredFrameRate(Resolution resolution, int requestedRate) {
+        List<Integer> supportedRates = getSupportedFrameRates(resolution);
+        if (supportedRates.isEmpty()) {
+            return requestedRate > 0 ? requestedRate : 0;
         }
-        int bestRate = targetRate;
-        int bestDistance = Integer.MAX_VALUE;
+        if (requestedRate <= 0) {
+            int profileRate = queryCamcorderProfileFrameRate();
+            if (supportedRates.contains(profileRate)) {
+                return profileRate;
+            }
+            return supportedRates.get(supportedRates.size() - 1);
+        }
+
+        int bestRate = supportedRates.get(0);
+        int bestDistance = Math.abs(bestRate - requestedRate);
 
         for (Integer supportedRate : supportedRates) {
             if (supportedRate == null || supportedRate <= 0) {
                 continue;
             }
-            if (!highSpeedResolution && supportedRate >= HIGH_SPEED_FRAME_RATE) {
-                continue;
-            }
-            int distance = Math.abs(supportedRate - targetRate);
-            if (distance < bestDistance) {
+            int distance = Math.abs(supportedRate - requestedRate);
+            if (distance < bestDistance
+                    || (distance == bestDistance && supportedRate > bestRate)) {
                 bestDistance = distance;
                 bestRate = supportedRate;
             }
         }
         return bestRate;
+    }
+
+    /** Return whether the selected size/rate pair is a Camera2 high-speed mode. */
+    public boolean isHighSpeedVideoSupported(Resolution resolution, int frameRate) {
+        if (resolution == null || frameRate <= 0 || currentConfig == null
+                || currentConfig.getCameraId() == null) {
+            return false;
+        }
+        try {
+            android.hardware.camera2.CameraManager systemCameraManager =
+                    (android.hardware.camera2.CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            if (systemCameraManager == null) {
+                return false;
+            }
+            CameraCharacteristics characteristics = systemCameraManager.getCameraCharacteristics(
+                    currentConfig.getCameraId());
+            StreamConfigurationMap streamMap = characteristics.get(
+                    CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+            if (streamMap == null) {
+                return false;
+            }
+            Size targetSize = new Size(resolution.getWidth(), resolution.getHeight());
+            if (!containsSize(streamMap.getHighSpeedVideoSizes(), targetSize)) {
+                return false;
+            }
+            Range<Integer>[] ranges = streamMap.getHighSpeedVideoFpsRangesFor(targetSize);
+            if (ranges == null) {
+                return false;
+            }
+            for (Range<Integer> range : ranges) {
+                if (range != null && range.getUpper() == frameRate) {
+                    return true;
+                }
+            }
+        } catch (CameraAccessException | IllegalArgumentException | SecurityException e) {
+            Log.w(TAG, "Failed to query high-speed video capability", e);
+        }
+        return false;
     }
 
     private List<Integer> queryCameraFrameRates(Resolution resolution) {
@@ -761,31 +871,43 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
                     CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
 
             Set<Integer> rates = new TreeSet<>();
-            addFrameRatesFromRanges(rates, ranges);
+            Set<Integer> regularRates = new TreeSet<>();
+            addFrameRatesFromRanges(regularRates, ranges);
 
-            // 120fps is exposed through the high-speed stream map on some
-            // Camera2 HALs instead of CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES.
-            if (Resolution.HD_720P.equals(resolution)) {
-                StreamConfigurationMap streamMap = characteristics.get(
-                        CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-                if (streamMap != null) {
-                    Size targetSize = new Size(resolution.getWidth(), resolution.getHeight());
-                    Size[] highSpeedSizes = streamMap.getHighSpeedVideoSizes();
-                    if (highSpeedSizes != null) {
-                        for (Size highSpeedSize : highSpeedSizes) {
-                            if (targetSize.equals(highSpeedSize)) {
-                                addFrameRatesFromRanges(rates,
-                                        streamMap.getHighSpeedVideoFpsRangesFor(targetSize));
-                                break;
-                            }
-                        }
+            StreamConfigurationMap streamMap = characteristics.get(
+                    CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+            Size targetSize = resolution == null ? null
+                    : new Size(resolution.getWidth(), resolution.getHeight());
+            int maxByFrameDuration = Integer.MAX_VALUE;
+            if (streamMap != null && targetSize != null
+                    && containsSize(streamMap.getOutputSizes(MediaRecorder.class), targetSize)) {
+                long minFrameDurationNs = streamMap.getOutputMinFrameDuration(
+                        MediaRecorder.class, targetSize);
+                if (minFrameDurationNs > 0) {
+                    long maxByDuration = 1_000_000_000L / minFrameDurationNs;
+                    maxByFrameDuration = (int) Math.min(Integer.MAX_VALUE, maxByDuration);
+                }
+            }
+            if (maxByFrameDuration != Integer.MAX_VALUE) {
+                for (Integer rate : new ArrayList<>(regularRates)) {
+                    if (rate == null || rate > maxByFrameDuration) {
+                        regularRates.remove(rate);
                     }
                 }
+            }
+            rates.addAll(regularRates);
+
+            // High-speed rates are exposed through the high-speed stream map
+            // on some Camera2 HALs instead of the regular AE ranges.
+            if (streamMap != null && targetSize != null
+                    && containsSize(streamMap.getHighSpeedVideoSizes(), targetSize)) {
+                addFrameRatesFromRanges(rates,
+                        streamMap.getHighSpeedVideoFpsRangesFor(targetSize));
             }
             List<Integer> result = new ArrayList<>(rates);
             Log.d(TAG, "Camera " + currentConfig.getCameraId()
                     + " reported FPS ranges=" + java.util.Arrays.toString(ranges)
-                    + ", candidateRates=" + result);
+                    + ", supportedRates=" + result);
             return result;
         } catch (CameraAccessException | SecurityException | IllegalArgumentException e) {
             Log.w(TAG, "Failed to query Camera2 frame rates", e);
@@ -809,12 +931,294 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
             if (upper > 0) {
                 rates.add(upper);
             }
-            for (int candidate : FRAME_RATE_CANDIDATES) {
-                if (candidate >= lower && candidate <= upper) {
-                    rates.add(candidate);
+        }
+    }
+
+    private List<Integer> normalizeFrameRates(List<Integer> rates) {
+        Set<Integer> normalized = new TreeSet<>();
+        if (rates != null) {
+            for (Integer rate : rates) {
+                if (rate != null && rate > 0) {
+                    normalized.add(rate);
                 }
             }
         }
+        return new ArrayList<>(normalized);
+    }
+
+    private int queryCamcorderProfileFrameRate() {
+        if (currentConfig == null || currentConfig.getCameraId() == null) {
+            return 0;
+        }
+        try {
+            int cameraIndex = Integer.parseInt(currentConfig.getCameraId());
+            if (!CamcorderProfile.hasProfile(cameraIndex, CamcorderProfile.QUALITY_HIGH)) {
+                return 0;
+            }
+            CamcorderProfile profile = CamcorderProfile.get(
+                    cameraIndex, CamcorderProfile.QUALITY_HIGH);
+            return profile != null && profile.videoFrameRate > 0 ? profile.videoFrameRate : 0;
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Failed to query CamcorderProfile frame rate", e);
+            return 0;
+        }
+    }
+
+    private List<Resolution> queryCamera2Resolutions() {
+        if (currentConfig == null || currentConfig.getCameraId() == null) {
+            return Collections.emptyList();
+        }
+        try {
+            android.hardware.camera2.CameraManager systemCameraManager =
+                    (android.hardware.camera2.CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            if (systemCameraManager == null) {
+                return Collections.emptyList();
+            }
+            CameraCharacteristics characteristics = systemCameraManager.getCameraCharacteristics(
+                    currentConfig.getCameraId());
+            StreamConfigurationMap streamMap = characteristics.get(
+                    CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+            if (streamMap == null) {
+                return Collections.emptyList();
+            }
+
+            Size[] recorderSizes = streamMap.getOutputSizes(MediaRecorder.class);
+            Size[] jpegSizes = streamMap.getOutputSizes(ImageFormat.JPEG);
+            if (recorderSizes == null || recorderSizes.length == 0) {
+                recorderSizes = jpegSizes;
+            }
+            Set<String> jpegSizeKeys = toSizeKeys(jpegSizes);
+            Set<String> added = new HashSet<>();
+            List<Resolution> resolutions = new ArrayList<>();
+            if (recorderSizes != null) {
+                for (Size size : recorderSizes) {
+                    if (size == null) {
+                        continue;
+                    }
+                    String key = size.getWidth() + "x" + size.getHeight();
+                    if (!jpegSizeKeys.isEmpty() && !jpegSizeKeys.contains(key)) {
+                        continue;
+                    }
+                    if (added.add(key)) {
+                        resolutions.add(Resolution.of(size.getWidth(), size.getHeight()));
+                    }
+                }
+            }
+            Collections.sort(resolutions, new Comparator<Resolution>() {
+                @Override
+                public int compare(Resolution left, Resolution right) {
+                    long rightArea = (long) right.getWidth() * right.getHeight();
+                    long leftArea = (long) left.getWidth() * left.getHeight();
+                    int areaCompare = Long.compare(rightArea, leftArea);
+                    if (areaCompare != 0) {
+                        return areaCompare;
+                    }
+                    return Integer.compare(right.getWidth(), left.getWidth());
+                }
+            });
+            return resolutions;
+        } catch (CameraAccessException | IllegalArgumentException | SecurityException e) {
+            Log.w(TAG, "Failed to query Camera2 supported resolutions", e);
+            return Collections.emptyList();
+        }
+    }
+
+    private List<Resolution> queryCamera2PhotoResolutions() {
+        return currentConfig == null
+                ? Collections.emptyList()
+                : queryCamera2PhotoResolutions(currentConfig.getCameraId());
+    }
+
+    private List<Resolution> queryCamera2PhotoResolutions(String cameraId) {
+        if (cameraId == null) {
+            return Collections.emptyList();
+        }
+        try {
+            android.hardware.camera2.CameraManager systemCameraManager =
+                    (android.hardware.camera2.CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            if (systemCameraManager == null) {
+                return Collections.emptyList();
+            }
+            CameraCharacteristics characteristics = systemCameraManager.getCameraCharacteristics(
+                    cameraId);
+            StreamConfigurationMap streamMap = characteristics.get(
+                    CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+            if (streamMap == null) {
+                return Collections.emptyList();
+            }
+
+            List<Resolution> resolutions = new ArrayList<>();
+            addPhotoResolutions(resolutions, streamMap.getOutputSizes(ImageFormat.JPEG));
+            addPhotoResolutions(resolutions, streamMap.getHighResolutionOutputSizes(ImageFormat.JPEG));
+            sortResolutionsByArea(resolutions);
+            return resolutions;
+        } catch (CameraAccessException | IllegalArgumentException | SecurityException e) {
+            Log.w(TAG, "Failed to query Camera2 supported photo resolutions", e);
+            return Collections.emptyList();
+        }
+    }
+
+    private void addPhotoResolutions(List<Resolution> output, Size[] sizes) {
+        if (sizes == null) {
+            return;
+        }
+        for (Size size : sizes) {
+            if (size == null) {
+                continue;
+            }
+            Resolution resolution = Resolution.of(size.getWidth(), size.getHeight());
+            if (!output.contains(resolution)) {
+                output.add(resolution);
+            }
+        }
+    }
+
+    private void sortResolutionsByArea(List<Resolution> resolutions) {
+        Collections.sort(resolutions, new Comparator<Resolution>() {
+            @Override
+            public int compare(Resolution left, Resolution right) {
+                long rightArea = (long) right.getWidth() * right.getHeight();
+                long leftArea = (long) left.getWidth() * left.getHeight();
+                int areaCompare = Long.compare(rightArea, leftArea);
+                if (areaCompare != 0) {
+                    return areaCompare;
+                }
+                return Integer.compare(right.getWidth(), left.getWidth());
+            }
+        });
+    }
+
+    private Set<String> toSizeKeys(Size[] sizes) {
+        Set<String> keys = new HashSet<>();
+        if (sizes == null) {
+            return keys;
+        }
+        for (Size size : sizes) {
+            if (size != null) {
+                keys.add(size.getWidth() + "x" + size.getHeight());
+            }
+        }
+        return keys;
+    }
+
+    private boolean containsSize(Size[] sizes, Size target) {
+        if (sizes == null || target == null) {
+            return false;
+        }
+        for (Size size : sizes) {
+            if (target.equals(size)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private CameraConfig normalizePhotoResolutionForActiveCamera(CameraConfig config) {
+        if (config == null) {
+            return null;
+        }
+
+        List<Resolution> supported = getSupportedPhotoResolutions();
+        if (supported.isEmpty()) {
+            return config;
+        }
+
+        Resolution current = config.getPhotoResolution();
+        if (current != null && supported.contains(current)) {
+            return config;
+        }
+
+        Resolution selected = supported.get(0);
+        if (current != null) {
+            long targetArea = (long) current.getWidth() * current.getHeight();
+            long bestDistance = Long.MAX_VALUE;
+            for (Resolution candidate : supported) {
+                long area = (long) candidate.getWidth() * candidate.getHeight();
+                long distance = Math.abs(area - targetArea);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    selected = candidate;
+                }
+            }
+        }
+
+        Log.d(TAG, "Normalize photo resolution " + current + " -> " + selected);
+        return new CameraConfig.Builder(config)
+                .setPhotoResolution(selected)
+                .build();
+    }
+
+    public Resolution getHdrPhotoResolution() {
+        if (currentConfig == null || currentConfig.getApiType() != CameraApiType.CAMERA2
+                || !"0".equals(currentConfig.getCameraId())) {
+            return null;
+        }
+        return queryHdrPhotoResolution(currentConfig.getCameraId());
+    }
+
+    private boolean isHdrPhotoResolution(String cameraId, Resolution resolution) {
+        Resolution hdrResolution = queryHdrPhotoResolution(cameraId);
+        return resolution != null && hdrResolution != null && hdrResolution.equals(resolution);
+    }
+
+    private Resolution queryHdrPhotoResolution(String cameraId) {
+        if (cameraId == null) {
+            return null;
+        }
+        try {
+            android.hardware.camera2.CameraManager systemCameraManager =
+                    (android.hardware.camera2.CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            if (systemCameraManager == null) {
+                return null;
+            }
+            CameraCharacteristics characteristics = systemCameraManager.getCameraCharacteristics(cameraId);
+            Size sensorSize = characteristics.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE);
+            if (sensorSize == null) {
+                return null;
+            }
+            Resolution sensorResolution = Resolution.of(sensorSize.getWidth(), sensorSize.getHeight());
+            return queryCamera2PhotoResolutions(cameraId).contains(sensorResolution)
+                    ? sensorResolution : null;
+        } catch (CameraAccessException | IllegalArgumentException | SecurityException e) {
+            Log.w(TAG, "Failed to query HDR photo resolution", e);
+            return null;
+        }
+    }
+
+    private CameraConfig normalizeVideoResolutionForActiveMode(CameraConfig config) {
+        if (config == null || config.getApiType() == CameraApiType.CAMERAX
+                || !CaptureMode.normalize(config.getCaptureMode()).isVideo()) {
+            return config;
+        }
+
+        List<Resolution> supported = getSupportedResolutions();
+        if (supported.isEmpty()) {
+            return config;
+        }
+
+        Resolution current = config.getResolution();
+        if (current != null && supported.contains(current)) {
+            return config;
+        }
+
+        long targetArea = current == null
+                ? 0L : (long) current.getWidth() * current.getHeight();
+        Resolution selected = supported.get(0);
+        long bestDistance = Long.MAX_VALUE;
+        for (Resolution candidate : supported) {
+            long area = (long) candidate.getWidth() * candidate.getHeight();
+            long distance = Math.abs(area - targetArea);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                selected = candidate;
+            }
+        }
+
+        Log.d(TAG, "Normalize video resolution " + current + " -> " + selected);
+        return new CameraConfig.Builder(config)
+                .setResolution(selected)
+                .setQuality(qualityFromResolution(selected))
+                .build();
     }
 
     private CameraConfig normalizeFrameRateForActiveMode(CameraConfig config) {
@@ -823,7 +1227,7 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
         }
         Resolution targetResolution = CaptureMode.normalize(config.getCaptureMode()).isVideo()
                 ? config.getResolution() : null;
-        int preferredRate = getPreferredFrameRate(targetResolution);
+        int preferredRate = getPreferredFrameRate(targetResolution, config.getFrameRate());
         if (config.getFrameRate() == preferredRate) {
             return config;
         }
@@ -996,6 +1400,16 @@ public class CameraManager implements CameraStrategy.CameraStateListener {
     @Override
     public void onStateChanged(CameraState state) {
         Log.d(TAG, "onStateChanged: " + state);
+        if (state == CameraState.OPENED && currentConfig != null) {
+            CameraConfig normalized = normalizePhotoResolutionForActiveCamera(currentConfig);
+            if (normalized != currentConfig) {
+                currentConfig = normalized;
+                settingsManager.saveCameraConfig(currentConfig);
+                if (currentStrategy != null) {
+                    currentStrategy.bindConfiguration(currentConfig);
+                }
+            }
+        }
         CameraState previousState = stateManager.getCurrentState();
         // Camera2 uses a repeated OPENED event to signal that its capture
         // pipeline was rebuilt. Preserve that event for the UI so it can

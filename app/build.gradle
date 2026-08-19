@@ -18,14 +18,14 @@ android {
         archivesBaseName = "YourCamera"
     }
 
-    signingConfigs {
-        debug {
-            storeFile file('platform.jks')
-            storePassword 'luhongda1234'
-            keyAlias 'luhongda'
-            keyPassword 'luhongda1234'
-        }
-    }
+//    signingConfigs {
+//        debug {
+//            storeFile file('platform.jks')
+//            storePassword 'luhongda1234'
+//            keyAlias 'luhongda'
+//            keyPassword 'luhongda1234'
+//        }
+//    }
 
     buildTypes {
         release {

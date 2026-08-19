@@ -84,20 +84,26 @@ public final class Resolution {
     }
 
     public static Resolution fromString(String resolutionString) {
+        Resolution parsed = fromStringOrNull(resolutionString);
+        return parsed != null ? parsed : FULL_HD_1080P;
+    }
+
+    /** Parse a persisted size without inventing a fixed fallback. */
+    public static Resolution fromStringOrNull(String resolutionString) {
         if (resolutionString == null) {
-            return FULL_HD_1080P;
+            return null;
         }
 
         String[] parts = resolutionString.trim().toLowerCase().split("x");
-        if (parts.length == 2) {
-            try {
-                int width = Integer.parseInt(parts[0].trim());
-                int height = Integer.parseInt(parts[1].trim());
-                return of(width, height);
-            } catch (NumberFormatException ignored) {
-                // Fall through to default.
-            }
+        if (parts.length != 2) {
+            return null;
         }
-        return FULL_HD_1080P;
+        try {
+            int width = Integer.parseInt(parts[0].trim());
+            int height = Integer.parseInt(parts[1].trim());
+            return width > 0 && height > 0 ? of(width, height) : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 }

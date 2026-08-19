@@ -18,7 +18,6 @@ import com.android.mycamera.camera.CamSizeActivity;
 import com.android.mycamera.camera.config.CameraConfig;
 import com.android.mycamera.camera.manager.CameraManager;
 import com.android.mycamera.model.CameraApiType;
-import com.android.mycamera.model.PhotoResolution;
 import com.android.mycamera.model.Quality;
 import com.android.mycamera.model.Resolution;
 import com.android.mycamera.model.VideoBitrate;
@@ -33,7 +32,6 @@ import java.util.List;
 
 public class SettingsActivity extends AppCompatActivity {
 
-    private static final int DEFAULT_VIDEO_FRAME_RATE = 30;
     private static final String[] LANGUAGE_VALUES = {
             SettingsManager.LANGUAGE_SYSTEM,
             SettingsManager.LANGUAGE_CHINESE,
@@ -65,6 +63,7 @@ public class SettingsActivity extends AppCompatActivity {
     
     private CameraConfig currentConfig;
     private boolean isUpdatingResolutionSpinner = false;
+    private boolean isUpdatingFrameRateSpinner = false;
     private List<ResolutionOption> resolutionOptions = Collections.emptyList();
     
     @Override
@@ -175,14 +174,15 @@ public class SettingsActivity extends AppCompatActivity {
         videoCodecSpinner.setVisibility(codecVisibility);
 
         boolean showHighSpeedPlayback = apiType == CameraApiType.CAMERA2
-                && Resolution.HD_720P.equals(currentConfig.getResolution())
-                && currentConfig.getFrameRate() >= 120;
+                && cameraManager != null
+                && cameraManager.isHighSpeedVideoSupported(
+                        currentConfig.getResolution(), currentConfig.getFrameRate());
         highSpeedPlaybackSwitch.setVisibility(
                 showHighSpeedPlayback ? View.VISIBLE : View.GONE);
     }
     
     private void setupResolutionSpinner() {
-        resolutionOptions = getFixedResolutionOptions();
+        resolutionOptions = getSupportedResolutionOptions();
         
         ArrayAdapter<ResolutionOption> adapter = new ArrayAdapter<>(
                 this, R.layout.spinner_item_light, resolutionOptions);
@@ -190,20 +190,24 @@ public class SettingsActivity extends AppCompatActivity {
         
         isUpdatingResolutionSpinner = true;
         resolutionSpinner.setAdapter(adapter);
+
+        if (resolutionOptions.isEmpty()) {
+            isUpdatingResolutionSpinner = false;
+            return;
+        }
         
         int position = findResolutionOptionIndex(currentConfig);
         if (position < 0) {
             ResolutionOption fallback = findResolutionOption(currentConfig.getResolution());
-            if (fallback == null) {
-                fallback = findResolutionOption(Resolution.FULL_HD_1080P);
-            }
             if (fallback == null) {
                 fallback = resolutionOptions.get(0);
             }
             currentConfig = new CameraConfig.Builder(currentConfig)
                     .setResolution(fallback.resolution)
                     .setQuality(matchQualityForResolution(fallback.resolution))
-                    .setFrameRate(fallback.fixedFrameRate)
+                    .setFrameRate(chooseFrameRateForResolution(
+                            getSupportedFrameRates(fallback.resolution), fallback.resolution,
+                            currentConfig.getFrameRate()))
                     .build();
             applyAndSaveChanges();
             position = resolutionOptions.indexOf(fallback);
@@ -213,25 +217,35 @@ public class SettingsActivity extends AppCompatActivity {
     }
     
     private void setupFrameRateSpinner() {
-        int fixedFrameRate = getFixedFrameRate(currentConfig.getResolution());
-        List<FrameRateOption> frameRateOptions = Collections.singletonList(
-                new FrameRateOption(fixedFrameRate));
+        List<Integer> supportedFrameRates = getSupportedFrameRates(currentConfig.getResolution());
+        int selectedFrameRate = chooseFrameRateForResolution(
+                supportedFrameRates, currentConfig.getResolution(), currentConfig.getFrameRate());
+        List<FrameRateOption> frameRateOptions = new ArrayList<>();
+        for (Integer frameRate : supportedFrameRates) {
+            frameRateOptions.add(new FrameRateOption(frameRate));
+        }
         
         ArrayAdapter<FrameRateOption> adapter = new ArrayAdapter<>(
                 this, R.layout.spinner_item_light, frameRateOptions);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         
+        isUpdatingFrameRateSpinner = true;
         frameRateSpinner.setAdapter(adapter);
-        frameRateSpinner.setEnabled(false);
-        frameRateSpinner.setAlpha(0.6f);
+        boolean hasMultipleFrameRates = frameRateOptions.size() > 1;
+        frameRateSpinner.setEnabled(hasMultipleFrameRates);
+        frameRateSpinner.setAlpha(hasMultipleFrameRates ? 1f : 0.6f);
 
-        if (fixedFrameRate != currentConfig.getFrameRate()) {
+        if (selectedFrameRate > 0 && selectedFrameRate != currentConfig.getFrameRate()) {
             currentConfig = new CameraConfig.Builder(currentConfig)
-                    .setFrameRate(fixedFrameRate)
+                    .setFrameRate(selectedFrameRate)
                     .build();
             applyAndSaveChanges();
         }
-        frameRateSpinner.setSelection(0, false);
+        int position = findFrameRateOptionIndex(frameRateOptions, selectedFrameRate);
+        if (position >= 0) {
+            frameRateSpinner.setSelection(position, false);
+        }
+        isUpdatingFrameRateSpinner = false;
     }
     
     private void setupQualitySpinner() {
@@ -308,17 +322,21 @@ public class SettingsActivity extends AppCompatActivity {
 
     
     private void setupPhotoResolutionSpinner() {
-        String cameraId = currentConfig.getCameraId();
-        List<PhotoResolution> options = new ArrayList<>(
-                PhotoResolution.selectableValuesForCamera(cameraId));
-        ArrayAdapter<PhotoResolution> adapter = new ArrayAdapter<>(
+        List<Resolution> options = new ArrayList<>(
+                cameraManager != null
+                        ? cameraManager.getSupportedPhotoResolutions()
+                        : Collections.emptyList());
+        if (options.isEmpty() && currentConfig.getPhotoResolution() != null) {
+            options.add(currentConfig.getPhotoResolution());
+        }
+        ArrayAdapter<Resolution> adapter = new ArrayAdapter<>(
                 this, R.layout.spinner_item_light, options);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         photoResolutionSpinner.setAdapter(adapter);
 
-        PhotoResolution selected = PhotoResolution.normalize(
-                currentConfig.getPhotoResolution(), cameraId);
-        if (selected != currentConfig.getPhotoResolution()) {
+        Resolution selected = choosePhotoResolution(options, currentConfig.getPhotoResolution());
+        if (selected != currentConfig.getPhotoResolution()
+                && (selected == null || !selected.equals(currentConfig.getPhotoResolution()))) {
             currentConfig = new CameraConfig.Builder(currentConfig)
                     .setPhotoResolution(selected)
                     .build();
@@ -360,15 +378,18 @@ public class SettingsActivity extends AppCompatActivity {
                     return;
                 }
                 ResolutionOption selectedOption = (ResolutionOption) parent.getItemAtPosition(position);
-                int selectedFps = selectedOption.fixedFrameRate;
+                int selectedFps = chooseFrameRateForResolution(
+                        getSupportedFrameRates(selectedOption.resolution), selectedOption.resolution,
+                        currentConfig.getFrameRate());
                 if (!selectedOption.resolution.equals(currentConfig.getResolution())
-                        || selectedFps != currentConfig.getFrameRate()) {
+                        || (selectedFps > 0 && selectedFps != currentConfig.getFrameRate())) {
                     // Camera2/1 are resolution-driven; keep quality label in sync.
                     Quality matchedQuality = matchQualityForResolution(selectedOption.resolution);
                     currentConfig = new CameraConfig.Builder(currentConfig)
                             .setResolution(selectedOption.resolution)
                             .setQuality(matchedQuality)
-                            .setFrameRate(selectedFps)
+                            .setFrameRate(selectedFps > 0
+                                    ? selectedFps : currentConfig.getFrameRate())
                             .setVideoBitrate(VideoBitrate.recommendedFor(
                                     selectedOption.resolution, currentConfig.getVideoCodec()))
                             .build();
@@ -394,7 +415,9 @@ public class SettingsActivity extends AppCompatActivity {
                     currentConfig = new CameraConfig.Builder(currentConfig)
                             .setQuality(selectedQuality)
                             .setResolution(selectedResolution)
-                            .setFrameRate(getFixedFrameRate(selectedResolution))
+                            .setFrameRate(chooseFrameRateForResolution(
+                                    getSupportedFrameRates(selectedResolution), selectedResolution,
+                                    currentConfig.getFrameRate()))
                             .setVideoBitrate(VideoBitrate.recommendedFor(
                                     selectedResolution, currentConfig.getVideoCodec()))
                             .build();
@@ -404,6 +427,26 @@ public class SettingsActivity extends AppCompatActivity {
                 }
             }
             
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+
+        frameRateSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (isUpdatingFrameRateSpinner || parent.getSelectedItem() == null) {
+                    return;
+                }
+                FrameRateOption selectedOption = (FrameRateOption) parent.getSelectedItem();
+                if (selectedOption.fps != currentConfig.getFrameRate()) {
+                    currentConfig = new CameraConfig.Builder(currentConfig)
+                            .setFrameRate(selectedOption.fps)
+                            .build();
+                    applyAndSaveChanges();
+                    updateSettingsVisibility();
+                }
+            }
+
             @Override
             public void onNothingSelected(AdapterView<?> parent) {}
         });
@@ -446,13 +489,13 @@ public class SettingsActivity extends AppCompatActivity {
         photoResolutionSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                PhotoResolution selectedPhoto = (PhotoResolution) parent.getItemAtPosition(position);
-                if (selectedPhoto != currentConfig.getPhotoResolution()) {
+                Resolution selectedPhoto = (Resolution) parent.getItemAtPosition(position);
+                if (selectedPhoto != null && !selectedPhoto.equals(currentConfig.getPhotoResolution())) {
                     currentConfig = new CameraConfig.Builder(currentConfig)
                             .setPhotoResolution(selectedPhoto)
                             .setCaptureMode(com.android.mycamera.model.CaptureMode.PHOTO)
                             .build();
-                    // Stage only. Opening camera + alloc 36M/64M ImageReader in Settings is slow.
+                    // Stage only. Opening the camera and allocating a large ImageReader in Settings is slow.
                     // MainActivity applies once on resume.
                     applyAndSaveChanges();
                 }
@@ -538,15 +581,6 @@ public class SettingsActivity extends AppCompatActivity {
         if (resolution == null) {
             return Quality.DEFAULT;
         }
-        if (resolution.getWidth() == 2560 && resolution.getHeight() == 1440) {
-            return Quality.QHD;
-        }
-        if (resolution.getWidth() == 1920 && resolution.getHeight() == 1080) {
-            return Quality.FULL_HD;
-        }
-        if (resolution.getWidth() == 1280 && resolution.getHeight() == 720) {
-            return Quality.HD;
-        }
         long area = (long) resolution.getWidth() * resolution.getHeight();
         long bestDelta = Long.MAX_VALUE;
         Quality best = Quality.DEFAULT;
@@ -583,27 +617,129 @@ public class SettingsActivity extends AppCompatActivity {
         saveLocationText.setText(CameraUtils.getDisplaySavePath(currentConfig.getSaveLocation()));
     }
 
-    private List<ResolutionOption> getFixedResolutionOptions() {
-        // Y1 recording presets. FPS is selected with the resolution and cannot be changed separately.
+    private List<ResolutionOption> getSupportedResolutionOptions() {
+        List<Resolution> supported = cameraManager != null
+                ? cameraManager.getSupportedResolutions() : Collections.emptyList();
         List<ResolutionOption> options = new ArrayList<>();
-        options.add(new ResolutionOption(Resolution.QHD_2K, getFixedFrameRate(Resolution.QHD_2K)));
-        options.add(new ResolutionOption(Resolution.FULL_HD_1080P, getFixedFrameRate(Resolution.FULL_HD_1080P)));
-        options.add(new ResolutionOption(Resolution.HD_720P, getFixedFrameRate(Resolution.HD_720P)));
+        if (supported != null) {
+            for (Resolution resolution : supported) {
+                if (resolution == null || containsResolution(options, resolution)) {
+                    continue;
+                }
+                options.add(new ResolutionOption(resolution));
+            }
+        }
+        if (options.isEmpty() && currentConfig != null && currentConfig.getResolution() != null) {
+            options.add(new ResolutionOption(currentConfig.getResolution()));
+        }
         return options;
     }
 
-    private int getFixedFrameRate(Resolution resolution) {
-        if (cameraManager != null) {
-            return cameraManager.getPreferredFrameRate(resolution);
+    private Resolution choosePhotoResolution(List<Resolution> options, Resolution requested) {
+        if (options == null || options.isEmpty()) {
+            return requested;
         }
-        return Resolution.HD_720P.equals(resolution) ? 120 : DEFAULT_VIDEO_FRAME_RATE;
+        if (requested == null) {
+            return options.get(0);
+        }
+        for (Resolution option : options) {
+            if (requested.equals(option)) {
+                return option;
+            }
+        }
+
+        long targetArea = (long) requested.getWidth() * requested.getHeight();
+        Resolution closest = options.get(0);
+        long bestDistance = Long.MAX_VALUE;
+        for (Resolution option : options) {
+            long area = (long) option.getWidth() * option.getHeight();
+            long distance = Math.abs(area - targetArea);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                closest = option;
+            }
+        }
+        return closest;
+    }
+
+    private List<Integer> getSupportedFrameRates(Resolution resolution) {
+        List<Integer> queried = cameraManager != null
+                ? cameraManager.getSupportedFrameRates(resolution) : Collections.emptyList();
+        List<Integer> frameRates = new ArrayList<>();
+        if (queried != null) {
+            for (Integer frameRate : queried) {
+                if (frameRate != null && frameRate > 0 && !frameRates.contains(frameRate)) {
+                    frameRates.add(frameRate);
+                }
+            }
+        }
+        Collections.sort(frameRates);
+        if (frameRates.isEmpty() && currentConfig != null && currentConfig.getFrameRate() > 0) {
+            frameRates.add(currentConfig.getFrameRate());
+        }
+        if (frameRates.isEmpty() && cameraManager != null) {
+            int preferred = cameraManager.getPreferredFrameRate(resolution);
+            if (preferred > 0) {
+                frameRates.add(preferred);
+            }
+        }
+        return frameRates;
+    }
+
+    private int chooseFrameRate(List<Integer> frameRates, int requestedFrameRate) {
+        if (frameRates == null || frameRates.isEmpty()) {
+            return requestedFrameRate;
+        }
+        if (requestedFrameRate <= 0) {
+            return frameRates.get(frameRates.size() - 1);
+        }
+        int selected = frameRates.get(0);
+        int bestDistance = Math.abs(selected - requestedFrameRate);
+        for (Integer frameRate : frameRates) {
+            if (frameRate == null || frameRate <= 0) {
+                continue;
+            }
+            int distance = Math.abs(frameRate - requestedFrameRate);
+            if (distance < bestDistance
+                    || (distance == bestDistance && frameRate > selected)) {
+                selected = frameRate;
+                bestDistance = distance;
+            }
+        }
+        return selected;
+    }
+
+    private int chooseFrameRateForResolution(
+            List<Integer> frameRates, Resolution resolution, int requestedFrameRate) {
+        int requested = requestedFrameRate;
+        if (requested <= 0 && cameraManager != null) {
+            requested = cameraManager.getPreferredFrameRate(resolution);
+        }
+        return chooseFrameRate(frameRates, requested);
+    }
+
+    private boolean containsResolution(List<ResolutionOption> options, Resolution resolution) {
+        for (ResolutionOption option : options) {
+            if (option.resolution.equals(resolution)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private int findFrameRateOptionIndex(List<FrameRateOption> options, int frameRate) {
+        for (int i = 0; i < options.size(); i++) {
+            if (options.get(i).fps == frameRate) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private int findResolutionOptionIndex(CameraConfig config) {
         for (int i = 0; i < resolutionOptions.size(); i++) {
             ResolutionOption option = resolutionOptions.get(i);
-            if (option.resolution.equals(config.getResolution())
-                    && option.fixedFrameRate == config.getFrameRate()) {
+            if (option.resolution.equals(config.getResolution())) {
                 return i;
             }
         }
@@ -621,16 +757,14 @@ public class SettingsActivity extends AppCompatActivity {
 
     private static final class ResolutionOption {
         private final Resolution resolution;
-        private final int fixedFrameRate;
 
-        private ResolutionOption(Resolution resolution, int fixedFrameRate) {
+        private ResolutionOption(Resolution resolution) {
             this.resolution = resolution;
-            this.fixedFrameRate = fixedFrameRate;
         }
 
         @Override
         public String toString() {
-            return resolution + " [" + fixedFrameRate + " FPS]";
+            return resolution.toString();
         }
     }
 

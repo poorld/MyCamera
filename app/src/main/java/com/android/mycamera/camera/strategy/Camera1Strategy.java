@@ -17,7 +17,6 @@ import android.util.Log;
 import com.android.mycamera.R;
 import com.android.mycamera.camera.config.CameraConfig;
 import com.android.mycamera.model.CameraState;
-import com.android.mycamera.model.PhotoResolution;
 import com.android.mycamera.model.Resolution;
 import com.android.mycamera.model.VideoCodec;
 import com.android.mycamera.utils.CameraUtils;
@@ -27,6 +26,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -469,9 +470,9 @@ public class Camera1Strategy extends BaseCameraStrategy {
         if (camera == null || currentConfig == null) return;
         try {
             Camera.Parameters parameters = camera.getParameters();
-            PhotoResolution photoResolution = PhotoResolution.normalize(currentConfig.getPhotoResolution());
-            Resolution resolution = Resolution.of(photoResolution.getWidth(), photoResolution.getHeight());
-            Camera.Size targetPictureSize = chooseBestPictureSize(parameters.getSupportedPictureSizes(), resolution);
+            Resolution requestedResolution = currentConfig.getPhotoResolution();
+            Camera.Size targetPictureSize = chooseBestPictureSize(
+                    parameters.getSupportedPictureSizes(), requestedResolution);
             if (targetPictureSize != null) {
                 parameters.setPictureSize(targetPictureSize.width, targetPictureSize.height);
                 logDebug("Camera1 picture size set to: " + targetPictureSize.width + "x" + targetPictureSize.height);
@@ -483,17 +484,32 @@ public class Camera1Strategy extends BaseCameraStrategy {
     }
 
     private Camera.Size chooseBestPictureSize(List<Camera.Size> supportedSizes, Resolution desiredResolution) {
-        if (supportedSizes == null || supportedSizes.isEmpty() || desiredResolution == null) return null;
+        if (supportedSizes == null || supportedSizes.isEmpty()) return null;
 
         Camera.Size exact = null;
         Camera.Size closest = null;
+        Camera.Size largest = null;
         long bestAreaDiff = Long.MAX_VALUE;
-        long targetArea = (long) desiredResolution.getWidth() * desiredResolution.getHeight();
+        long targetArea = desiredResolution == null
+                ? 0L
+                : (long) desiredResolution.getWidth() * desiredResolution.getHeight();
 
         for (Camera.Size size : supportedSizes) {
-            if (size.width == desiredResolution.getWidth() && size.height == desiredResolution.getHeight()) {
+            if (size == null) {
+                continue;
+            }
+            if (largest == null
+                    || (long) size.width * size.height > (long) largest.width * largest.height) {
+                largest = size;
+            }
+            if (desiredResolution != null
+                    && size.width == desiredResolution.getWidth()
+                    && size.height == desiredResolution.getHeight()) {
                 exact = size;
                 break;
+            }
+            if (desiredResolution == null) {
+                continue;
             }
             long area = (long) size.width * size.height;
             long areaDiff = Math.abs(area - targetArea);
@@ -502,7 +518,7 @@ public class Camera1Strategy extends BaseCameraStrategy {
                 closest = size;
             }
         }
-        return exact != null ? exact : closest;
+        return exact != null ? exact : (desiredResolution == null ? largest : closest);
     }
     
     @Override
@@ -533,6 +549,127 @@ public class Camera1Strategy extends BaseCameraStrategy {
     @Override
     public boolean isCameraAvailable() {
         return camera != null;
+    }
+
+    @Override
+    public List<Resolution> getSupportedResolutions() {
+        if (camera == null) {
+            return Collections.emptyList();
+        }
+        try {
+            Camera.Parameters parameters = camera.getParameters();
+            List<Camera.Size> sizes = parameters.getSupportedVideoSizes();
+            if (sizes == null || sizes.isEmpty()) {
+                sizes = parameters.getSupportedPreviewSizes();
+            }
+            List<Resolution> resolutions = new ArrayList<>();
+            if (sizes != null) {
+                for (Camera.Size size : sizes) {
+                    if (size != null) {
+                        Resolution resolution = Resolution.of(size.width, size.height);
+                        if (!resolutions.contains(resolution)) {
+                            resolutions.add(resolution);
+                        }
+                    }
+                }
+            }
+            Collections.sort(resolutions, new Comparator<Resolution>() {
+                @Override
+                public int compare(Resolution left, Resolution right) {
+                    long rightArea = (long) right.getWidth() * right.getHeight();
+                    long leftArea = (long) left.getWidth() * left.getHeight();
+                    int areaCompare = Long.compare(rightArea, leftArea);
+                    if (areaCompare != 0) {
+                        return areaCompare;
+                    }
+                    return Integer.compare(right.getWidth(), left.getWidth());
+                }
+            });
+            return resolutions;
+        } catch (RuntimeException e) {
+            logError("Failed to query Camera1 supported resolutions", e);
+            return Collections.emptyList();
+        }
+    }
+
+    @Override
+    public List<Resolution> getSupportedPhotoResolutions() {
+        if (camera == null) {
+            return Collections.emptyList();
+        }
+        try {
+            List<Camera.Size> sizes = camera.getParameters().getSupportedPictureSizes();
+            List<Resolution> resolutions = new ArrayList<>();
+            if (sizes != null) {
+                for (Camera.Size size : sizes) {
+                    if (size == null) {
+                        continue;
+                    }
+                    Resolution resolution = Resolution.of(size.width, size.height);
+                    if (!resolutions.contains(resolution)) {
+                        resolutions.add(resolution);
+                    }
+                }
+            }
+            sortByAreaDescending(resolutions);
+            return resolutions;
+        } catch (RuntimeException e) {
+            logError("Failed to query Camera1 supported photo resolutions", e);
+            return Collections.emptyList();
+        }
+    }
+
+    private void sortByAreaDescending(List<Resolution> resolutions) {
+        Collections.sort(resolutions, new Comparator<Resolution>() {
+            @Override
+            public int compare(Resolution left, Resolution right) {
+                long rightArea = (long) right.getWidth() * right.getHeight();
+                long leftArea = (long) left.getWidth() * left.getHeight();
+                int areaCompare = Long.compare(rightArea, leftArea);
+                if (areaCompare != 0) {
+                    return areaCompare;
+                }
+                return Integer.compare(right.getWidth(), left.getWidth());
+            }
+        });
+    }
+
+    @Override
+    public List<Integer> getSupportedFrameRates() {
+        if (camera == null) {
+            return Collections.emptyList();
+        }
+        try {
+            Camera.Parameters parameters = camera.getParameters();
+            List<Integer> frameRates = new ArrayList<>();
+            List<Integer> discreteRates = parameters.getSupportedPreviewFrameRates();
+            if (discreteRates != null) {
+                for (Integer rate : discreteRates) {
+                    addFrameRate(frameRates, rate != null ? rate : 0);
+                }
+            }
+            List<int[]> ranges = parameters.getSupportedPreviewFpsRange();
+            if (ranges != null) {
+                for (int[] range : ranges) {
+                    if (range == null || range.length < 2) {
+                        continue;
+                    }
+                    addFrameRate(frameRates, Math.round(range[0] / 1000f));
+                    addFrameRate(frameRates, Math.round(range[1] / 1000f));
+                }
+            }
+            Collections.sort(frameRates);
+            return frameRates;
+        } catch (RuntimeException e) {
+            logError("Failed to query Camera1 supported frame rates", e);
+            return Collections.emptyList();
+        }
+    }
+
+    private void addFrameRate(List<Integer> frameRates, int frameRate) {
+        if (frameRate > 0 && !frameRates.contains(frameRate)) {
+            frameRates.add(frameRate);
+        }
     }
     
     @Override

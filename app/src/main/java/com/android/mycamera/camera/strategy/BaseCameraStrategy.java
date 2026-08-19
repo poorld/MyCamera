@@ -13,6 +13,7 @@ import com.android.mycamera.model.CameraState;
 import com.android.mycamera.model.Resolution;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -205,25 +206,12 @@ public abstract class BaseCameraStrategy implements CameraStrategy {
     
     @Override
     public List<Resolution> getSupportedResolutions() {
-        List<Resolution> resolutions = new ArrayList<>();
-        resolutions.add(Resolution.VGA_640x480);
-        resolutions.add(Resolution.HD_720P);
-        resolutions.add(Resolution.FULL_HD_1080P);
-        resolutions.add(Resolution.QHD_2K);
-        resolutions.add(Resolution.UHD_4K);
-
-        return resolutions;
+        return Collections.emptyList();
     }
     
     @Override
     public List<Integer> getSupportedFrameRates() {
-        List<Integer> frameRates = new ArrayList<>();
-        frameRates.add(15);
-        frameRates.add(24);
-        frameRates.add(30);
-        frameRates.add(60);
-        frameRates.add(120);
-        return frameRates;
+        return Collections.emptyList();
     }
     
     @Override
