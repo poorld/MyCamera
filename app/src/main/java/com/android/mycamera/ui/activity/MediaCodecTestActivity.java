@@ -24,9 +24,11 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
+import android.util.Range;
 import android.util.Size;
 import android.view.Surface;
 import android.view.TextureView;
+import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -48,34 +50,35 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public class MediaCodecTestActivity extends BaseAct {
     private static final String TAG = "MediaCodecTest";
     private static final int REQUEST_CAMERA = 1001;
 
     private static final String CAMERA_ID = "0";
-    private static final String MIME_TYPE = MediaFormat.MIMETYPE_VIDEO_AVC;
-    private static final String PREFERRED_CODEC_NAME = "c2.unisoc.avc.encoder";
-    private static final boolean REQUIRE_PREFERRED_CODEC = true;
     private static final int DEFAULT_VIDEO_FPS = 30;
-    private static final int DEFAULT_VIDEO_BIT_RATE = 12_000_000;
     private static final int I_FRAME_INTERVAL = 1;
-    private static final ResolutionOption[] RESOLUTION_OPTIONS = {
-            // new ResolutionOption("2560x1440p30", 2560, 1440, 1920, 1080, 30, 14_000_000),
-            // new ResolutionOption("1920x1080p30", 1920, 1080),
-            new ResolutionOption("2304x1296p30", 2304, 1296),
+
+    private static final CodecOption[] CODEC_OPTIONS = {
+            new CodecOption("H.264 (AVC)", MediaFormat.MIMETYPE_VIDEO_AVC, "H264"),
+            new CodecOption("H.265 (HEVC)", MediaFormat.MIMETYPE_VIDEO_HEVC, "H265")
     };
 
     private TextureView previewView;
     private Button recordButton;
+    private Spinner codecFormatSpinner;
     private Spinner resolutionSpinner;
+    private Spinner fpsSpinner;
     private TextView statusText;
 
     private HandlerThread cameraThread;
     private Handler cameraHandler;
     private CameraDevice cameraDevice;
+    private CameraCharacteristics cameraCharacteristics;
     private CameraCaptureSession captureSession;
     private Surface previewSurface;
 
@@ -89,7 +92,10 @@ public class MediaCodecTestActivity extends BaseAct {
     private File outputFile;
     private boolean isRecording;
     private String activeCodecName = "";
-    private volatile ResolutionOption selectedResolution = RESOLUTION_OPTIONS[0];
+
+    private volatile CodecOption selectedCodec = CODEC_OPTIONS[0];
+    private volatile ResolutionOption selectedResolution;
+    private volatile FpsOption selectedFps;
 
     private final TextureView.SurfaceTextureListener surfaceTextureListener =
             new TextureView.SurfaceTextureListener() {
@@ -142,10 +148,12 @@ public class MediaCodecTestActivity extends BaseAct {
 
         previewView = findViewById(R.id.codecPreview);
         recordButton = findViewById(R.id.codecRecordButton);
+        codecFormatSpinner = findViewById(R.id.codecFormatSpinner);
         resolutionSpinner = findViewById(R.id.codecResolutionSpinner);
+        fpsSpinner = findViewById(R.id.codecFpsSpinner);
         statusText = findViewById(R.id.codecStatus);
 
-        setupResolutionSpinner();
+        initCameraCapabilitiesAndSpinners();
 
         recordButton.setOnClickListener(v -> {
             if (isRecording) {
@@ -154,7 +162,374 @@ public class MediaCodecTestActivity extends BaseAct {
                 startRecording();
             }
         });
+    }
 
+    private void initCameraCapabilitiesAndSpinners() {
+        setupCodecSpinner();
+
+        try {
+            CameraManager manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+            if (manager == null) {
+                setupFallbackSpinners();
+                return;
+            }
+            String cameraId = CAMERA_ID;
+            boolean hasHardcodedId = false;
+            for (String id : manager.getCameraIdList()) {
+                if (CAMERA_ID.equals(id)) {
+                    hasHardcodedId = true;
+                    break;
+                }
+            }
+            if (!hasHardcodedId && manager.getCameraIdList().length > 0) {
+                cameraId = manager.getCameraIdList()[0];
+            }
+            cameraCharacteristics = manager.getCameraCharacteristics(cameraId);
+            setupResolutionSpinnerFromSensor(cameraCharacteristics);
+            setupFpsSpinnerFromSensor(cameraCharacteristics);
+        } catch (Exception e) {
+            Log.e(TAG, "initCameraCapabilitiesAndSpinners failed", e);
+            setupFallbackSpinners();
+        }
+    }
+
+    private void setupCodecSpinner() {
+        ArrayAdapter<CodecOption> adapter = new ArrayAdapter<>(
+                this, R.layout.spinner_item_light, CODEC_OPTIONS);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        codecFormatSpinner.setAdapter(adapter);
+        codecFormatSpinner.setSelection(0, false);
+        selectedCodec = CODEC_OPTIONS[0];
+
+        codecFormatSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedCodec = (CodecOption) parent.getItemAtPosition(position);
+                setStatus("MediaCodec " + selectedCodec.shortName + " " + getVideoSizeLabel() + " Ready");
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+    }
+
+    private void setupResolutionSpinnerFromSensor(CameraCharacteristics characteristics) {
+        StreamConfigurationMap map = characteristics != null
+                ? characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+                : null;
+        if (map == null) {
+            setupFallbackResolutionSpinner();
+            return;
+        }
+
+        Size[] sizes = map.getOutputSizes(MediaRecorder.class);
+        if (sizes == null || sizes.length == 0) {
+            sizes = map.getOutputSizes(SurfaceTexture.class);
+        }
+        if (sizes == null || sizes.length == 0) {
+            setupFallbackResolutionSpinner();
+            return;
+        }
+
+        List<Size> uniqueSizes = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (Size size : sizes) {
+            String key = size.getWidth() + "x" + size.getHeight();
+            if (!seen.contains(key)) {
+                seen.add(key);
+                uniqueSizes.add(size);
+            }
+        }
+
+        uniqueSizes.sort((a, b) -> {
+            int areaA = a.getWidth() * a.getHeight();
+            int areaB = b.getWidth() * b.getHeight();
+            if (areaA != areaB) {
+                return Integer.compare(areaB, areaA);
+            }
+            return Integer.compare(b.getWidth(), a.getWidth());
+        });
+
+        List<ResolutionOption> options = new ArrayList<>();
+        for (Size size : uniqueSizes) {
+            Size previewSize = choosePreviewSize(map, size.getWidth(), size.getHeight());
+            String aspectLabel = getAspectRatioLabel(size.getWidth(), size.getHeight());
+            String label = size.getWidth() + "x" + size.getHeight()
+                    + (aspectLabel.isEmpty() ? "" : " (" + aspectLabel + ")");
+            options.add(new ResolutionOption(label, size.getWidth(), size.getHeight(),
+                    previewSize.getWidth(), previewSize.getHeight()));
+        }
+
+        ArrayAdapter<ResolutionOption> adapter = new ArrayAdapter<>(
+                this, R.layout.spinner_item_light, options);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        resolutionSpinner.setAdapter(adapter);
+
+        int defaultIndex = 0;
+        for (int i = 0; i < options.size(); i++) {
+            ResolutionOption opt = options.get(i);
+            if (opt.width == 1920 && opt.height == 1080) {
+                defaultIndex = i;
+                break;
+            } else if (opt.width == 2304 && opt.height == 1296) {
+                defaultIndex = i;
+            }
+        }
+        resolutionSpinner.setSelection(defaultIndex, false);
+        selectedResolution = options.get(defaultIndex);
+
+        resolutionSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                ResolutionOption newOption = (ResolutionOption) parent.getItemAtPosition(position);
+                if (selectedResolution != newOption) {
+                    selectedResolution = newOption;
+                    setStatus("MediaCodec " + getVideoSizeLabel() + " Ready");
+                    if (cameraDevice != null && !isRecording) {
+                        startCameraSession();
+                    }
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+    }
+
+    private void setupFpsSpinnerFromSensor(CameraCharacteristics characteristics) {
+        Range<Integer>[] fpsRanges = characteristics != null
+                ? characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
+                : null;
+
+        Set<Integer> fpsSet = new HashSet<>();
+        if (fpsRanges != null) {
+            for (Range<Integer> range : fpsRanges) {
+                fpsSet.add(range.getUpper());
+                if (range.getLower().equals(range.getUpper())) {
+                    fpsSet.add(range.getLower());
+                }
+            }
+        }
+        if (fpsSet.isEmpty()) {
+            fpsSet.add(30);
+        }
+
+        List<Integer> fpsList = new ArrayList<>(fpsSet);
+        fpsList.sort((a, b) -> Integer.compare(b, a));
+
+        List<FpsOption> options = new ArrayList<>();
+        for (int fps : fpsList) {
+            options.add(new FpsOption(fps));
+        }
+
+        ArrayAdapter<FpsOption> adapter = new ArrayAdapter<>(
+                this, R.layout.spinner_item_light, options);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        fpsSpinner.setAdapter(adapter);
+
+        int defaultIndex = 0;
+        for (int i = 0; i < options.size(); i++) {
+            if (options.get(i).fps == 30) {
+                defaultIndex = i;
+                break;
+            }
+        }
+        fpsSpinner.setSelection(defaultIndex, false);
+        selectedFps = options.get(defaultIndex);
+
+        fpsSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                FpsOption newOption = (FpsOption) parent.getItemAtPosition(position);
+                if (selectedFps != newOption) {
+                    selectedFps = newOption;
+                    setStatus("MediaCodec " + getVideoSizeLabel() + " Ready");
+                    if (cameraDevice != null && !isRecording) {
+                        startCameraSession();
+                    }
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+    }
+
+    private void setupFallbackSpinners() {
+        setupFallbackResolutionSpinner();
+        setupFallbackFpsSpinner();
+    }
+
+    private void setupFallbackResolutionSpinner() {
+        List<ResolutionOption> options = new ArrayList<>();
+        options.add(new ResolutionOption("1920x1080 (16:9)", 1920, 1080, 1920, 1080));
+        options.add(new ResolutionOption("2304x1296 (16:9)", 2304, 1296, 1920, 1080));
+        options.add(new ResolutionOption("1280x720 (16:9)", 1280, 720, 1280, 720));
+
+        ArrayAdapter<ResolutionOption> adapter = new ArrayAdapter<>(
+                this, R.layout.spinner_item_light, options);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        resolutionSpinner.setAdapter(adapter);
+        resolutionSpinner.setSelection(0, false);
+        selectedResolution = options.get(0);
+
+        resolutionSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedResolution = (ResolutionOption) parent.getItemAtPosition(position);
+                setStatus("MediaCodec " + getVideoSizeLabel() + " Ready");
+                if (cameraDevice != null && !isRecording) {
+                    startCameraSession();
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+    }
+
+    private void setupFallbackFpsSpinner() {
+        List<FpsOption> options = new ArrayList<>();
+        options.add(new FpsOption(30));
+        options.add(new FpsOption(24));
+        options.add(new FpsOption(20));
+        options.add(new FpsOption(15));
+
+        ArrayAdapter<FpsOption> adapter = new ArrayAdapter<>(
+                this, R.layout.spinner_item_light, options);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        fpsSpinner.setAdapter(adapter);
+        fpsSpinner.setSelection(0, false);
+        selectedFps = options.get(0);
+
+        fpsSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedFps = (FpsOption) parent.getItemAtPosition(position);
+                setStatus("MediaCodec " + getVideoSizeLabel() + " Ready");
+                if (cameraDevice != null && !isRecording) {
+                    startCameraSession();
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+    }
+
+    private Size choosePreviewSize(StreamConfigurationMap map, int videoWidth, int videoHeight) {
+        if (map == null) {
+            return new Size(videoWidth, videoHeight);
+        }
+        Size[] previewSizes = map.getOutputSizes(SurfaceTexture.class);
+        if (previewSizes == null || previewSizes.length == 0) {
+            return new Size(videoWidth, videoHeight);
+        }
+
+        if (videoWidth <= 1920 && videoHeight <= 1080) {
+            for (Size size : previewSizes) {
+                if (size.getWidth() == videoWidth && size.getHeight() == videoHeight) {
+                    return size;
+                }
+            }
+        }
+
+        Size bestSameAspect = null;
+        for (Size size : previewSizes) {
+            if (size.getWidth() <= 1920 && size.getHeight() <= 1080) {
+                if (isSameAspect(size, videoWidth, videoHeight)) {
+                    if (bestSameAspect == null
+                            || (size.getWidth() * size.getHeight() > bestSameAspect.getWidth() * bestSameAspect.getHeight())) {
+                        bestSameAspect = size;
+                    }
+                }
+            }
+        }
+        if (bestSameAspect != null) {
+            return bestSameAspect;
+        }
+
+        for (Size size : previewSizes) {
+            if (size.getWidth() == videoWidth && size.getHeight() == videoHeight) {
+                return size;
+            }
+        }
+
+        return previewSizes[0];
+    }
+
+    private boolean isSameAspect(Size size, int targetWidth, int targetHeight) {
+        return (long) size.getWidth() * targetHeight == (long) size.getHeight() * targetWidth;
+    }
+
+    private String getAspectRatioLabel(int width, int height) {
+        if (width * 9 == height * 16) {
+            return "16:9";
+        } else if (width * 3 == height * 4) {
+            return "4:3";
+        } else if (width == height) {
+            return "1:1";
+        } else if (width * 10 == height * 16) {
+            return "16:10";
+        }
+        return "";
+    }
+
+    private Range<Integer> getTargetFpsRange(int targetFps) {
+        if (cameraCharacteristics == null) {
+            return new Range<>(targetFps, targetFps);
+        }
+        Range<Integer>[] ranges = cameraCharacteristics.get(
+                CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
+        if (ranges == null || ranges.length == 0) {
+            return new Range<>(targetFps, targetFps);
+        }
+
+        for (Range<Integer> range : ranges) {
+            if (range.getLower() == targetFps && range.getUpper() == targetFps) {
+                return range;
+            }
+        }
+
+        Range<Integer> bestWithUpper = null;
+        for (Range<Integer> range : ranges) {
+            if (range.getUpper() == targetFps) {
+                if (bestWithUpper == null || range.getLower() > bestWithUpper.getLower()) {
+                    bestWithUpper = range;
+                }
+            }
+        }
+        if (bestWithUpper != null) {
+            return bestWithUpper;
+        }
+
+        Range<Integer> bestCovering = null;
+        for (Range<Integer> range : ranges) {
+            if (range.getLower() <= targetFps && range.getUpper() >= targetFps) {
+                if (bestCovering == null || range.getUpper() < bestCovering.getUpper()) {
+                    bestCovering = range;
+                }
+            }
+        }
+        if (bestCovering != null) {
+            return bestCovering;
+        }
+
+        Range<Integer> closest = ranges[0];
+        int minDiff = Math.abs(closest.getUpper() - targetFps);
+        for (Range<Integer> range : ranges) {
+            int diff = Math.abs(range.getUpper() - targetFps);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closest = range;
+            }
+        }
+        return closest;
     }
 
     @Override
@@ -216,6 +591,7 @@ public class MediaCodecTestActivity extends BaseAct {
             if (!hasHardcodedId && manager.getCameraIdList().length > 0) {
                 cameraId = manager.getCameraIdList()[0];
             }
+            cameraCharacteristics = manager.getCameraCharacteristics(cameraId);
             dumpCameraCapabilities(manager, cameraId);
             manager.openCamera(cameraId, cameraStateCallback, cameraHandler);
             setStatus("Opening camera " + cameraId);
@@ -233,6 +609,9 @@ public class MediaCodecTestActivity extends BaseAct {
             Log.w(TAG, "camera " + cameraId + " has no stream configuration map");
             return;
         }
+        Range<Integer>[] fpsRanges =
+                characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
+        Log.d(TAG, "camera " + cameraId + " fps ranges=" + Arrays.toString(fpsRanges));
         logTargetSizes("SurfaceTexture", map.getOutputSizes(SurfaceTexture.class));
         logTargetSizes("MediaRecorder", map.getOutputSizes(MediaRecorder.class));
         logTargetSizes("JPEG", map.getOutputSizes(ImageFormat.JPEG));
@@ -241,6 +620,7 @@ public class MediaCodecTestActivity extends BaseAct {
     private void logTargetSizes(String output, Size[] sizes) {
         Log.d(TAG, "camera " + output
                 + " has 1920x1080=" + containsSize(sizes, 1920, 1080)
+                + " 2304x1296=" + containsSize(sizes, 2304, 1296)
                 + " 2560x1440=" + containsSize(sizes, 2560, 1440));
     }
 
@@ -269,14 +649,14 @@ public class MediaCodecTestActivity extends BaseAct {
             drainThread.start();
             isRecording = true;
             recordButton.setText("Stop Codec");
-            resolutionSpinner.setEnabled(false);
+            setControlsEnabled(false);
             startCameraSession();
             setStatus("Recording " + activeCodecName + " " + getVideoSizeLabel());
         } catch (Exception e) {
             Log.e(TAG, "startRecording failed", e);
             setStatus("Start failed: " + e.getMessage());
             isRecording = false;
-            resolutionSpinner.setEnabled(true);
+            setControlsEnabled(true);
             releaseEncoder();
         }
     }
@@ -304,9 +684,21 @@ public class MediaCodecTestActivity extends BaseAct {
         releaseEncoder();
         recordButton.setText("Start Codec");
         recordButton.setEnabled(true);
-        resolutionSpinner.setEnabled(true);
+        setControlsEnabled(true);
         setStatus("Saved: " + (outputFile == null ? "" : outputFile.getAbsolutePath()));
         startCameraSession();
+    }
+
+    private void setControlsEnabled(boolean enabled) {
+        if (codecFormatSpinner != null) {
+            codecFormatSpinner.setEnabled(enabled);
+        }
+        if (resolutionSpinner != null) {
+            resolutionSpinner.setEnabled(enabled);
+        }
+        if (fpsSpinner != null) {
+            fpsSpinner.setEnabled(enabled);
+        }
     }
 
     private void startCameraSession() {
@@ -336,8 +728,9 @@ public class MediaCodecTestActivity extends BaseAct {
             if (isRecording && encoderSurface != null) {
                 requestBuilder.addTarget(encoderSurface);
             }
-            requestBuilder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
-                    new android.util.Range<>(getVideoFps(), getVideoFps()));
+            Range<Integer> fpsRange = getTargetFpsRange(getVideoFps());
+            requestBuilder.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO);
+            requestBuilder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fpsRange);
 
             cameraDevice.createCaptureSession(surfaces, new CameraCaptureSession.StateCallback() {
                 @Override
@@ -345,7 +738,7 @@ public class MediaCodecTestActivity extends BaseAct {
                     captureSession = session;
                     try {
                         session.setRepeatingRequest(requestBuilder.build(), null, cameraHandler);
-                    } catch (CameraAccessException e) {
+                    } catch (CameraAccessException | IllegalStateException e) {
                         Log.e(TAG, "setRepeatingRequest failed", e);
                         setStatus("Preview request failed: " + e.getMessage());
                     }
@@ -356,7 +749,7 @@ public class MediaCodecTestActivity extends BaseAct {
                     setStatus("Session config failed");
                 }
             }, cameraHandler);
-        } catch (CameraAccessException | IllegalArgumentException e) {
+        } catch (CameraAccessException | IllegalArgumentException | IllegalStateException e) {
             Log.e(TAG, "startCameraSession failed", e);
             setStatus("Session failed: " + e.getMessage());
         }
@@ -364,14 +757,15 @@ public class MediaCodecTestActivity extends BaseAct {
 
     private void setupEncoder() throws IOException {
         Exception lastError = null;
-        List<String> candidates = getEncoderCandidates(MIME_TYPE);
-        List<FormatOption> options = buildFormatOptions();
+        String mimeType = getSelectedMimeType();
+        List<String> candidates = getEncoderCandidates(mimeType);
+        List<FormatOption> options = buildFormatOptions(mimeType, getVideoBitRate(), getVideoFps());
         for (String codecName : candidates) {
-            dumpEncoderCapability(codecName, MIME_TYPE);
+            dumpEncoderCapability(codecName, mimeType);
             for (FormatOption option : options) {
                 MediaCodec trialEncoder = null;
                 try {
-                    MediaFormat format = createEncodeFormat(option);
+                    MediaFormat format = createEncodeFormat(mimeType, option);
                     Log.d(TAG, "try configure codec=" + codecName + " option=" + option.label
                             + " format=" + format);
                     trialEncoder = MediaCodec.createByCodecName(codecName);
@@ -401,7 +795,7 @@ public class MediaCodecTestActivity extends BaseAct {
             if (lastError instanceof IOException) {
                 throw (IOException) lastError;
             }
-            IOException wrapped = new IOException("No encoder accepts " + getVideoSizeLabel());
+            IOException wrapped = new IOException("No encoder accepts " + mimeType + " " + getVideoSizeLabel());
             if (lastError != null) {
                 wrapped.initCause(lastError);
             }
@@ -417,8 +811,8 @@ public class MediaCodecTestActivity extends BaseAct {
         muxerStarted = false;
     }
 
-    private MediaFormat createEncodeFormat(FormatOption option) {
-        MediaFormat format = MediaFormat.createVideoFormat(MIME_TYPE, getVideoWidth(), getVideoHeight());
+    private MediaFormat createEncodeFormat(String mimeType, FormatOption option) {
+        MediaFormat format = MediaFormat.createVideoFormat(mimeType, getVideoWidth(), getVideoHeight());
         format.setInteger(MediaFormat.KEY_COLOR_FORMAT,
                 MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
         format.setInteger(MediaFormat.KEY_BIT_RATE, option.bitRate);
@@ -441,61 +835,61 @@ public class MediaCodecTestActivity extends BaseAct {
         return format;
     }
 
-    private List<FormatOption> buildFormatOptions() {
+    private List<FormatOption> buildFormatOptions(String mimeType, int bitRate, int fps) {
         List<FormatOption> options = new ArrayList<>();
-        options.add(new FormatOption("cbr-high-l51-bt709", getVideoBitRate(), getVideoFps(),
-                MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, true,
-                MediaCodecInfo.CodecProfileLevel.AVCProfileHigh,
-                MediaCodecInfo.CodecProfileLevel.AVCLevel51));
-        options.add(new FormatOption("no-bitrate-mode-high-l51-bt709", getVideoBitRate(), getVideoFps(),
-                -1, true,
-                MediaCodecInfo.CodecProfileLevel.AVCProfileHigh,
-                MediaCodecInfo.CodecProfileLevel.AVCLevel51));
-        options.add(new FormatOption("cbr-8m-high-l51-bt709", 8_000_000, getVideoFps(),
-                MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, true,
-                MediaCodecInfo.CodecProfileLevel.AVCProfileHigh,
-                MediaCodecInfo.CodecProfileLevel.AVCLevel51));
-        options.add(new FormatOption("cbr-25fps-high-l51-bt709", getVideoBitRate(), 25,
-                MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, true,
-                MediaCodecInfo.CodecProfileLevel.AVCProfileHigh,
-                MediaCodecInfo.CodecProfileLevel.AVCLevel51));
-        options.add(new FormatOption("cbr-23fps-high-l51-bt709", getVideoBitRate(), 23,
-                MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, true,
-                MediaCodecInfo.CodecProfileLevel.AVCProfileHigh,
-                MediaCodecInfo.CodecProfileLevel.AVCLevel51));
-        options.add(new FormatOption("cbr", getVideoBitRate(), getVideoFps(),
-                MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, false));
-        options.add(new FormatOption("no-bitrate-mode", getVideoBitRate(), getVideoFps(),
-                -1, false));
-        options.add(new FormatOption("vbr", getVideoBitRate(), getVideoFps(),
-                MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR, false));
-        options.add(new FormatOption("cbr-bt709", getVideoBitRate(), getVideoFps(),
-                MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, true));
-        options.add(new FormatOption("cbr-avc-high-l51", getVideoBitRate(), getVideoFps(),
-                MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, false,
-                MediaCodecInfo.CodecProfileLevel.AVCProfileHigh,
-                MediaCodecInfo.CodecProfileLevel.AVCLevel51));
-        options.add(new FormatOption("cbr-8m", 8_000_000, getVideoFps(),
-                MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, false));
-        options.add(new FormatOption("cbr-23fps", getVideoBitRate(), 23,
-                MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, false));
-        options.add(new FormatOption("cbr-25fps", getVideoBitRate(), 25,
-                MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, false));
+        boolean isHevc = MediaFormat.MIMETYPE_VIDEO_HEVC.equalsIgnoreCase(mimeType);
+
+        if (isHevc) {
+            options.add(new FormatOption("cbr-hevc-main-l51-bt709", bitRate, fps,
+                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, true,
+                    MediaCodecInfo.CodecProfileLevel.HEVCProfileMain,
+                    MediaCodecInfo.CodecProfileLevel.HEVCMainTierLevel51));
+            options.add(new FormatOption("cbr-hevc-main-bt709", bitRate, fps,
+                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, true,
+                    MediaCodecInfo.CodecProfileLevel.HEVCProfileMain, -1));
+            options.add(new FormatOption("cbr-bt709", bitRate, fps,
+                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, true));
+            options.add(new FormatOption("cbr", bitRate, fps,
+                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, false));
+            options.add(new FormatOption("no-bitrate-mode", bitRate, fps,
+                    -1, false));
+            options.add(new FormatOption("vbr", bitRate, fps,
+                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR, false));
+            options.add(new FormatOption("cbr-8m", 8_000_000, fps,
+                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, false));
+        } else {
+            options.add(new FormatOption("cbr-high-l51-bt709", bitRate, fps,
+                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, true,
+                    MediaCodecInfo.CodecProfileLevel.AVCProfileHigh,
+                    MediaCodecInfo.CodecProfileLevel.AVCLevel51));
+            options.add(new FormatOption("no-bitrate-mode-high-l51-bt709", bitRate, fps,
+                    -1, true,
+                    MediaCodecInfo.CodecProfileLevel.AVCProfileHigh,
+                    MediaCodecInfo.CodecProfileLevel.AVCLevel51));
+            options.add(new FormatOption("cbr-8m-high-l51-bt709", 8_000_000, fps,
+                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, true,
+                    MediaCodecInfo.CodecProfileLevel.AVCProfileHigh,
+                    MediaCodecInfo.CodecProfileLevel.AVCLevel51));
+            options.add(new FormatOption("cbr-bt709", bitRate, fps,
+                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, true));
+            options.add(new FormatOption("cbr-avc-high-l51", bitRate, fps,
+                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, false,
+                    MediaCodecInfo.CodecProfileLevel.AVCProfileHigh,
+                    MediaCodecInfo.CodecProfileLevel.AVCLevel51));
+            options.add(new FormatOption("cbr", bitRate, fps,
+                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, false));
+            options.add(new FormatOption("no-bitrate-mode", bitRate, fps,
+                    -1, false));
+            options.add(new FormatOption("vbr", bitRate, fps,
+                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR, false));
+            options.add(new FormatOption("cbr-8m", 8_000_000, fps,
+                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR, false));
+        }
         return options;
     }
 
     private List<String> getEncoderCandidates(String mimeType) {
-        if (REQUIRE_PREFERRED_CODEC) {
-            List<String> candidates = new ArrayList<>();
-            if (hasEncoder(PREFERRED_CODEC_NAME, mimeType)) {
-                candidates.add(PREFERRED_CODEC_NAME);
-            } else {
-                Log.e(TAG, "preferred encoder not found: " + PREFERRED_CODEC_NAME
-                        + " mimeType=" + mimeType);
-            }
-            return candidates;
-        }
-
+        List<String> vendorCandidates = new ArrayList<>();
         List<String> omxCandidates = new ArrayList<>();
         List<String> otherCandidates = new ArrayList<>();
         MediaCodecInfo[] codecInfos = new MediaCodecList(MediaCodecList.ALL_CODECS).getCodecInfos();
@@ -508,7 +902,12 @@ public class MediaCodecTestActivity extends BaseAct {
                     continue;
                 }
                 String name = codecInfo.getName();
-                if (name.startsWith("OMX.")) {
+                String lower = name.toLowerCase(Locale.ROOT);
+                if (lower.contains("unisoc") || lower.contains("sprd")) {
+                    vendorCandidates.add(name);
+                } else if (name.startsWith("c2.") && !lower.contains("android") && !lower.contains("google")) {
+                    vendorCandidates.add(name);
+                } else if (name.startsWith("OMX.") && !lower.contains("google")) {
                     omxCandidates.add(name);
                 } else {
                     otherCandidates.add(name);
@@ -517,35 +916,11 @@ public class MediaCodecTestActivity extends BaseAct {
             }
         }
         List<String> candidates = new ArrayList<>();
+        candidates.addAll(vendorCandidates);
         candidates.addAll(omxCandidates);
         candidates.addAll(otherCandidates);
-        moveEncoderToFront(candidates, PREFERRED_CODEC_NAME, mimeType);
         Log.d(TAG, "encoder candidates for " + mimeType + ": " + candidates);
         return candidates;
-    }
-
-    private void moveEncoderToFront(List<String> candidates, String codecName, String mimeType) {
-        while (candidates.remove(codecName)) {
-            // Remove duplicates before applying preferred order.
-        }
-        if (hasEncoder(codecName, mimeType)) {
-            candidates.add(0, codecName);
-        }
-    }
-
-    private boolean hasEncoder(String codecName, String mimeType) {
-        MediaCodecInfo[] codecInfos = new MediaCodecList(MediaCodecList.ALL_CODECS).getCodecInfos();
-        for (MediaCodecInfo codecInfo : codecInfos) {
-            if (!codecInfo.isEncoder() || !codecName.equals(codecInfo.getName())) {
-                continue;
-            }
-            for (String type : codecInfo.getSupportedTypes()) {
-                if (mimeType.equalsIgnoreCase(type)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     private void dumpEncoderCapability(String codecName, String mimeType) {
@@ -557,7 +932,7 @@ public class MediaCodecTestActivity extends BaseAct {
                 }
                 MediaCodecInfo.CodecCapabilities caps = codecInfo.getCapabilitiesForType(mimeType);
                 MediaCodecInfo.VideoCapabilities videoCaps = caps.getVideoCapabilities();
-                Log.d(TAG, codecName + " selected size=" + getVideoSizeLabel()
+                Log.d(TAG, codecName + " (" + mimeType + ") size=" + getVideoSizeLabel()
                         + " widths=" + videoCaps.getSupportedWidths()
                         + " heights=" + videoCaps.getSupportedHeights()
                         + " bitrate=" + videoCaps.getBitrateRange()
@@ -573,81 +948,58 @@ public class MediaCodecTestActivity extends BaseAct {
         }
     }
 
-    private void dumpEncoderCapabilities() {
-        try {
-            MediaCodecInfo[] codecInfos = new MediaCodecList(MediaCodecList.ALL_CODECS).getCodecInfos();
-            for (MediaCodecInfo codecInfo : codecInfos) {
-                if (!codecInfo.isEncoder()) {
-                    continue;
-                }
-                Log.d(TAG, "encoder " + codecInfo.getName()
-                        + " types=" + Arrays.toString(codecInfo.getSupportedTypes()));
-                for (String type : codecInfo.getSupportedTypes()) {
-                    if (!MediaFormat.MIMETYPE_VIDEO_AVC.equalsIgnoreCase(type)
-                            && !MediaFormat.MIMETYPE_VIDEO_HEVC.equalsIgnoreCase(type)) {
-                        continue;
-                    }
-                    dumpVideoCapability(codecInfo, type);
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "dumpEncoderCapabilities failed", e);
+    public static final class CodecOption {
+        public final String label;
+        public final String mimeType;
+        public final String shortName;
+
+        public CodecOption(String label, String mimeType, String shortName) {
+            this.label = label;
+            this.mimeType = mimeType;
+            this.shortName = shortName;
+        }
+
+        @NonNull
+        @Override
+        public String toString() {
+            return label;
         }
     }
 
-    private void dumpVideoCapability(MediaCodecInfo codecInfo, String type) {
-        try {
-            MediaCodecInfo.CodecCapabilities caps = codecInfo.getCapabilitiesForType(type);
-            MediaCodecInfo.VideoCapabilities videoCaps = caps.getVideoCapabilities();
-            MediaCodecInfo.EncoderCapabilities encoderCaps = caps.getEncoderCapabilities();
-            Log.d(TAG, codecInfo.getName() + " " + type
-                    + " widths=" + videoCaps.getSupportedWidths()
-                    + " heights=" + videoCaps.getSupportedHeights()
-                    + " widthAlign=" + videoCaps.getWidthAlignment()
-                    + " heightAlign=" + videoCaps.getHeightAlignment()
-                    + " bitrate=" + videoCaps.getBitrateRange()
-                    + " fps=" + videoCaps.getSupportedFrameRates()
-                    + " isSizeSupported(" + getVideoSizeLabel() + ")="
-                    + videoCaps.isSizeSupported(getVideoWidth(), getVideoHeight())
-                    + " isTargetFpsSupported="
-                    + videoCaps.areSizeAndRateSupported(getVideoWidth(), getVideoHeight(), getVideoFps())
-                    + " modes[cbr/vbr/cq]="
-                    + encoderCaps.isBitrateModeSupported(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
-                    + "/"
-                    + encoderCaps.isBitrateModeSupported(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)
-                    + "/"
-                    + encoderCaps.isBitrateModeSupported(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ));
-            for (MediaCodecInfo.CodecProfileLevel level : caps.profileLevels) {
-                Log.d(TAG, codecInfo.getName() + " " + type
-                        + " profile=" + level.profile + " level=" + level.level);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "dumpVideoCapability failed " + codecInfo.getName() + " " + type, e);
-        }
-    }
+    public static final class ResolutionOption {
+        public final String label;
+        public final int width;
+        public final int height;
+        public final int previewWidth;
+        public final int previewHeight;
 
-    private static final class ResolutionOption {
-        final String label;
-        final int width;
-        final int height;
-        final int previewWidth;
-        final int previewHeight;
-        final int fps;
-        final int bitRate;
-
-        ResolutionOption(String label, int width, int height) {
-            this(label, width, height, width, height, DEFAULT_VIDEO_FPS, DEFAULT_VIDEO_BIT_RATE);
-        }
-
-        ResolutionOption(String label, int width, int height, int previewWidth, int previewHeight,
-                int fps, int bitRate) {
+        public ResolutionOption(String label, int width, int height, int previewWidth, int previewHeight) {
             this.label = label;
             this.width = width;
             this.height = height;
             this.previewWidth = previewWidth;
             this.previewHeight = previewHeight;
+        }
+
+        @NonNull
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
+
+    public static final class FpsOption {
+        public final int fps;
+        public final String label;
+
+        public FpsOption(int fps) {
             this.fps = fps;
-            this.bitRate = bitRate;
+            this.label = fps + " fps";
+        }
+
+        public FpsOption(int fps, String label) {
+            this.fps = fps;
+            this.label = label;
         }
 
         @NonNull
@@ -742,58 +1094,57 @@ public class MediaCodecTestActivity extends BaseAct {
             throw new IOException("Cannot create dir: " + dir.getAbsolutePath());
         }
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-        return new File(dir, "MC_" + timestamp + "_" + getVideoSizeLabel() + ".mp4");
-    }
-
-    private void setupResolutionSpinner() {
-        ArrayAdapter<ResolutionOption> adapter = new ArrayAdapter<>(
-                this, R.layout.spinner_item_light, RESOLUTION_OPTIONS);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        resolutionSpinner.setAdapter(adapter);
-        resolutionSpinner.setSelection(0, false);
-        resolutionSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, android.view.View view, int position, long id) {
-                selectedResolution = RESOLUTION_OPTIONS[position];
-                setStatus("MediaCodec " + getVideoSizeLabel() + " Ready");
-                if (cameraDevice != null && !isRecording) {
-                    startCameraSession();
-                }
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-            }
-        });
+        String codecTag = selectedCodec != null ? selectedCodec.shortName : "AVC";
+        return new File(dir, "MC_" + timestamp + "_" + codecTag + "_" + getVideoSizeLabel() + ".mp4");
     }
 
     private int getVideoWidth() {
-        return selectedResolution.width;
+        return selectedResolution != null ? selectedResolution.width : 1920;
     }
 
     private int getVideoHeight() {
-        return selectedResolution.height;
+        return selectedResolution != null ? selectedResolution.height : 1080;
     }
 
     private int getPreviewWidth() {
-        return selectedResolution.previewWidth;
+        return selectedResolution != null ? selectedResolution.previewWidth : 1920;
     }
 
     private int getPreviewHeight() {
-        return selectedResolution.previewHeight;
+        return selectedResolution != null ? selectedResolution.previewHeight : 1080;
     }
 
     private int getVideoFps() {
-        return selectedResolution.fps;
+        return selectedFps != null ? selectedFps.fps : DEFAULT_VIDEO_FPS;
     }
 
     private int getVideoBitRate() {
-        return selectedResolution.bitRate;
+        return calculateBitRate(getVideoWidth(), getVideoHeight(), getVideoFps());
+    }
+
+    private int calculateBitRate(int width, int height, int fps) {
+        long pixels = (long) width * height;
+        if (pixels >= 3840L * 2160) {
+            return 25_000_000;
+        } else if (pixels >= 2560L * 1440) {
+            return 16_000_000;
+        } else if (pixels >= 2304L * 1296) {
+            return 14_000_000;
+        } else if (pixels >= 1920L * 1080) {
+            return 12_000_000;
+        } else if (pixels >= 1280L * 720) {
+            return 6_000_000;
+        } else {
+            return 3_000_000;
+        }
+    }
+
+    private String getSelectedMimeType() {
+        return selectedCodec != null ? selectedCodec.mimeType : MediaFormat.MIMETYPE_VIDEO_AVC;
     }
 
     private String getVideoSizeLabel() {
-        return selectedResolution.width + "x" + selectedResolution.height
-                + "@" + selectedResolution.fps;
+        return getVideoWidth() + "x" + getVideoHeight() + "@" + getVideoFps() + "fps";
     }
 
     private void closeCamera() {
