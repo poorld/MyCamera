@@ -101,6 +101,16 @@
         </activity>
 
         <activity
+            android:name=".ui.activity.MediaCodecStreamAct"
+            android:exported="true"
+            android:screenOrientation="portrait" />
+
+        <activity
+            android:name=".ui.activity.YuvStreamAct"
+            android:exported="true"
+            android:screenOrientation="portrait" />
+
+        <activity
             android:name=".camera.Cam1ApiActivity"
             android:exported="true">
 

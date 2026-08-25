@@ -201,6 +201,8 @@ public class MediaCodecTestActivity extends BaseAct {
         codecFormatSpinner.setSelection(0, false);
         selectedCodec = CODEC_OPTIONS[0];
 
+
+
         codecFormatSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {

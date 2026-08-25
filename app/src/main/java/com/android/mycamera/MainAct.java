@@ -30,6 +30,9 @@ import com.android.mycamera.multicamera.AutoMultiCameraActivity;
 import com.android.mycamera.multicamera.MultiCameraActivity;
 import com.android.mycamera.multicamera.MultiCameraCaptureActivity;
 import com.android.mycamera.record.VideoRecordActivity;
+import com.android.mycamera.ui.activity.MediaCodecStreamAct;
+import com.android.mycamera.ui.activity.MediaCodecTestActivity;
+import com.android.mycamera.ui.activity.YuvStreamAct;
 
 public class MainAct extends BaseAct {
 
@@ -170,6 +173,27 @@ public class MainAct extends BaseAct {
                     @Override
                     public void onClick(View v) {
                         startActivity(new Intent(MainAct.this, MultipleCam2ApiActivity.class));
+                    }
+                });
+        findViewById(R.id.media_codec_test_button)
+                .setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        startActivity(new Intent(MainAct.this, MediaCodecTestActivity.class));
+                    }
+                });
+        findViewById(R.id.media_codec_stream_button)
+                .setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        startActivity(new Intent(MainAct.this, MediaCodecStreamAct.class));
+                    }
+                });
+        findViewById(R.id.yuv_stream_button)
+                .setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        startActivity(new Intent(MainAct.this, YuvStreamAct.class));
                     }
                 });
     }

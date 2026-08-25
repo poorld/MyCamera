@@ -155,6 +155,27 @@
                 android:layout_height="wrap_content"
                 android:text="Multi-Camera3"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+            <Button
+                android:id="@+id/media_codec_test_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="MediaCodec 录制 (MP4)"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+            <Button
+                android:id="@+id/media_codec_stream_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="MediaCodec 裸流录制 (H.264/H.265)"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+            <Button
+                android:id="@+id/yuv_stream_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="YUV 原始裸流录制 (I420/NV21/NV12)"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </androidx.constraintlayout.widget.ConstraintLayout>
