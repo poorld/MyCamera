@@ -69,6 +69,7 @@ public class PreviewMCActivity extends BaseAct {
     private static final boolean ENABLE_YUV_PREVIEW_CALLBACK = true;
     private static final int YUV_READER_MAX_IMAGES = 3;
     private static final ResolutionOption[] RESOLUTION_OPTIONS = {
+            // new ResolutionOption("854x480p30", 854, 480, 854, 480, 30, 4_000_000),
             // new ResolutionOption("2560x1440p30", 2560, 1440, 1920, 1080, 30, 14_000_000),
             // new ResolutionOption("1920x1080p30", 1920, 1080),
             new ResolutionOption("2304x1296p30", 2304, 1296, 1920, 1080, 30, DEFAULT_VIDEO_BIT_RATE),
