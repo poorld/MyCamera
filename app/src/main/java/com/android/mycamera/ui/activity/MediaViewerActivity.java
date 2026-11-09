@@ -1,6 +1,5 @@
 package com.android.mycamera.ui.activity;
 
-import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
@@ -12,7 +11,6 @@ import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.GestureDetector;
-import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.TextureView;
@@ -27,7 +25,6 @@ import androidx.annotation.Nullable;
 
 import com.android.mycamera.BaseAct;
 import com.android.mycamera.R;
-import com.android.mycamera.utils.GravityOrientationHelper;
 import com.android.mycamera.utils.MediaOrientationUtils;
 
 import java.io.File;
@@ -57,11 +54,7 @@ public class MediaViewerActivity extends BaseAct {
     private Bitmap currentBitmap;
     private final ExecutorService decodeExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final Runnable viewerOrientationRunnable = this::applyViewerOrientation;
     private int loadGeneration;
-    private GravityOrientationHelper gravityOrientationHelper;
-    private boolean gravityLandscape;
-    private float gravityOrientationDegrees;
     private MediaPlayer mediaPlayer;
     private Surface mediaSurface;
     private String pendingVideoPath;
@@ -75,11 +68,6 @@ public class MediaViewerActivity extends BaseAct {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_media_viewer);
-        gravityOrientationHelper = new GravityOrientationHelper(this, (landscape, degrees) -> {
-            gravityLandscape = landscape;
-            gravityOrientationDegrees = degrees;
-            mainHandler.postDelayed(viewerOrientationRunnable, 400);
-        });
         mediaImage = findViewById(R.id.mediaImage);
         mediaVideo = findViewById(R.id.mediaVideo);
         mediaPosition = findViewById(R.id.mediaPosition);
@@ -156,82 +144,15 @@ public class MediaViewerActivity extends BaseAct {
         showCurrentMedia();
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (gravityOrientationHelper != null) {
-            gravityOrientationHelper.start();
-        }
-    }
-
-    @Override
-    protected void onPause() {
-        if (gravityOrientationHelper != null) {
-            gravityOrientationHelper.stop();
-        }
-        super.onPause();
-    }
-
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        mainHandler.post(viewerOrientationRunnable);
-    }
 
     @Override
     protected void onDestroy() {
-        mainHandler.removeCallbacks(viewerOrientationRunnable);
         mainHandler.removeCallbacks(playbackUpdateRunnable);
         releaseVideoPlayer();
         super.onDestroy();
         loadGeneration++;
         recycleCurrentBitmap();
         decodeExecutor.shutdownNow();
-    }
-
-    /**
-     * Some device builds report a landscape request but keep the physical
-     * display at ROTATION_0. Rotate the complete viewer only in that case;
-     * normal displays use the system orientation and stay untransformed.
-     */
-    private void applyViewerOrientation() {
-        if (viewerRoot == null || isFinishing() || isDestroyed()) {
-            return;
-        }
-        int displayRotation = getWindowManager().getDefaultDisplay().getRotation();
-        boolean displayLandscape = displayRotation == android.view.Surface.ROTATION_90
-                || displayRotation == android.view.Surface.ROTATION_270;
-        if (!gravityLandscape || displayLandscape) {
-            resetViewerLayout();
-            return;
-        }
-
-        if (!(viewerRoot.getParent() instanceof View)) {
-            return;
-        }
-        View parent = (View) viewerRoot.getParent();
-        int parentWidth = parent.getWidth();
-        int parentHeight = parent.getHeight();
-        if (parentWidth <= 0 || parentHeight <= 0) {
-            mainHandler.postDelayed(viewerOrientationRunnable, 200);
-            return;
-        }
-
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                parentHeight, parentWidth, Gravity.CENTER);
-        viewerRoot.setLayoutParams(params);
-        viewerRoot.setPivotX(parentHeight / 2f);
-        viewerRoot.setPivotY(parentWidth / 2f);
-        viewerRoot.setRotation(gravityOrientationDegrees < 180f ? -90f : 90f);
-    }
-
-    private void resetViewerLayout() {
-        viewerRoot.setRotation(0f);
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                Gravity.CENTER);
-        viewerRoot.setLayoutParams(params);
     }
 
     private void showCurrentMedia() {
